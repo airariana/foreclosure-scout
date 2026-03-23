@@ -42,8 +42,12 @@ jobs:
     
     - name: Check if data changed
       id: check_changes
-      run: |
-        git diff --exit-code data/foreclosures_va.json || echo "changed=true" >> $GITHUB_OUTPUT
+          run: |
+        if [ -f data/foreclosures_va.json ]; then
+          git diff --exit-code data/foreclosures_va.json || echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
     
     - name: Commit and push if changed
       if: steps.check_changes.outputs.changed == 'true'
