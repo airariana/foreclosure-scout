@@ -3,7 +3,7 @@
 
 const CACHE_NAME = 'fc-scout-v1';
 const APP_SHELL = [
-  '/foreclosure-scout.html',
+  './foreclosure-scout.html',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap'
 ];
 
@@ -58,7 +58,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
           return res;
         })
-        .catch(() => caches.match('/foreclosure-scout.html'))
+        .catch(() => caches.match('./foreclosure-scout.html'))
     );
     return;
   }

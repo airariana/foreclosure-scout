@@ -2,7 +2,7 @@
   "name": "Foreclosure Scout",
   "short_name": "FC Scout",
   "description": "DC/MD/VA Foreclosure Intelligence Platform",
-  "start_url": "/foreclosure-scout.html",
+  "start_url": "./foreclosure-scout.html",
   "display": "standalone",
   "background_color": "#0a0b0f",
   "theme_color": "#c84b2f",
@@ -35,14 +35,14 @@
       "name": "Search Listings",
       "short_name": "Search",
       "description": "Search DC/MD/VA foreclosure listings",
-      "url": "/foreclosure-scout.html",
+      "url": "./foreclosure-scout.html",
       "icons": [{ "src": "icons/fc-icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Court Filings",
       "short_name": "Court",
       "description": "Browse CourtListener bankruptcy filings",
-      "url": "/foreclosure-scout.html#court",
+      "url": "./foreclosure-scout.html#court",
       "icons": [{ "src": "icons/fc-icon-192.png", "sizes": "192x192" }]
     }
   ]
