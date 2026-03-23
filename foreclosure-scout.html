@@ -86,29 +86,54 @@ body{
 }
 
 /* Remove frame on tablets and mobile devices */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-device-width: 768px) {
   body {
-    background: var(--bg);
-    padding: 0;
-    display: block;
+    background: var(--bg) !important;
+    padding: 0 !important;
+    display: block !important;
     align-items: stretch;
     justify-content: stretch;
   }
   
   .mobile-frame {
-    max-width: 100%;
-    width: 100%;
-    border-radius: 0;
-    box-shadow: none;
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0;
   }
   
   .mobile-frame::before {
-    display: none;
+    display: none !important;
   }
   
   .app {
-    max-height: none;
+    max-height: none !important;
     min-height: 100vh;
+  }
+  
+  .app::before {
+    position: absolute !important;
+  }
+}
+
+/* Force mobile layout on actual mobile devices */
+@media (hover: none) and (pointer: coarse) {
+  body {
+    background: var(--bg) !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  
+  .mobile-frame {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .mobile-frame::before {
+    display: none !important;
   }
 }
 
