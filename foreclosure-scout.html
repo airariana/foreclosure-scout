@@ -74,26 +74,30 @@ body{
 
 .app::before{
   content:'';
-  position:fixed;
-  inset:0;
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
   background-image:linear-gradient(rgba(180,160,120,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(180,160,120,0.07) 1px,transparent 1px);
   background-size:32px 32px;
   pointer-events:none;
   z-index:0;
-  max-width: 430px;
-  margin: 0 auto;
 }
 
-/* Remove frame on actual mobile devices */
-@media (max-width: 480px) {
+/* Remove frame on tablets and mobile devices */
+@media (max-width: 768px) {
   body {
     background: var(--bg);
     padding: 0;
     display: block;
+    align-items: stretch;
+    justify-content: stretch;
   }
   
   .mobile-frame {
     max-width: 100%;
+    width: 100%;
     border-radius: 0;
     box-shadow: none;
   }
@@ -104,6 +108,7 @@ body{
   
   .app {
     max-height: none;
+    min-height: 100vh;
   }
 }
 
@@ -2386,6 +2391,10 @@ async function loadMarketComparison(property) {
   try {
     console.log(`[Market Comp] Fetching for ${property.address}`);
     
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
     const response = await fetch(`${REDFIN_API_URL}/api/comparables`, {
       method: 'POST',
       headers: {
@@ -2398,8 +2407,11 @@ async function loadMarketComparison(property) {
         sqft: property.sqft || 1400,
         beds: property.beds || 3,
         baths: property.baths || 2
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`Backend error: ${response.status}`);
@@ -2424,16 +2436,64 @@ async function loadMarketComparison(property) {
     
   } catch (error) {
     console.error('[Market Comp] Error:', error);
-    compEl.innerHTML = `
-      <div class="market-comp">
-        <div style="text-align:center;padding:20px">
-          <div style="color:var(--red);font-size:12px;margin-bottom:8px">⚠️ Unable to load market data</div>
-          <div style="color:var(--muted);font-size:10px">${error.message}</div>
-          <div style="color:var(--muted);font-size:10px;margin-top:8px">Check that backend is deployed and REDFIN_API_URL is correct</div>
-        </div>
-      </div>
-    `;
+    console.log('[Market Comp] Falling back to demo mode');
+    
+    // Fallback to demo mode with estimated comparables
+    const demoComparables = generateDemoComparables(property);
+    const demoStats = {
+      averagePrice: Math.round(demoComparables.reduce((s,c)=>s+c.price,0)/demoComparables.length),
+      averagePricePerSqft: Math.round(demoComparables.reduce((s,c)=>s+c.pricePerSqft,0)/demoComparables.length),
+      averageDaysOnMarket: Math.round(demoComparables.reduce((s,c)=>s+c.daysOnMarket,0)/demoComparables.length)
+    };
+    
+    renderRedfinComparison(property, {
+      comparables: demoComparables,
+      stats: demoStats,
+      count: demoComparables.length
+    }, compId);
+    
+    // Show warning that it's demo mode
+    setTimeout(() => {
+      const warning = document.createElement('div');
+      warning.style.cssText = 'background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.3);color:#f39c12;padding:8px 12px;border-radius:3px;font-size:10px;font-family:IBM Plex Mono,monospace;margin-top:10px';
+      warning.innerHTML = '⚠️ <strong>Demo Mode:</strong> Backend unavailable. Showing estimated comparables. Deploy backend for live Redfin MLS data.';
+      compEl.querySelector('.market-comp')?.appendChild(warning);
+    }, 100);
   }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Demo Comparables Generator (Fallback)
+// ───────────────────────────────────────────────────────────────────
+function generateDemoComparables(property) {
+  const numComps = 4 + Math.floor(Math.random() * 3);
+  const comparables = [];
+  const streets = ['Oak', 'Maple', 'Pine', 'Cedar', 'Elm', 'Birch', 'Willow', 'Cherry', 'Ash', 'Walnut'];
+  const suffixes = ['St', 'Ave', 'Dr', 'Ln', 'Ct', 'Way', 'Pl', 'Rd'];
+  
+  for(let i = 0; i < numComps; i++) {
+    const priceVariance = 0.90 + (Math.random() * 0.3);
+    const price = Math.round(property.price * priceVariance / 1000) * 1000;
+    const sqft = property.sqft ? Math.round(property.sqft * (0.92 + Math.random() * 0.16)) : 1400;
+    const streetNum = Math.floor(Math.random() * 9000) + 1000;
+    const address = `${streetNum} ${streets[Math.floor(Math.random()*streets.length)]} ${suffixes[Math.floor(Math.random()*suffixes.length)]}`;
+    
+    comparables.push({
+      address,
+      price,
+      beds: property.beds || 3,
+      baths: property.baths || 2,
+      sqft,
+      daysOnMarket: Math.floor(Math.random() * 75) + 10,
+      pricePerSqft: Math.round(price / sqft),
+      latitude: property.lat + (Math.random() - 0.5) * 0.01,
+      longitude: property.lng + (Math.random() - 0.5) * 0.01,
+      yearBuilt: property.yearBuilt ? property.yearBuilt + Math.floor(Math.random() * 10) - 5 : 1985,
+      url: `https://www.redfin.com/`
+    });
+  }
+  
+  return comparables.sort((a,b) => a.price - b.price);
 }
 
 // ───────────────────────────────────────────────────────────────────
