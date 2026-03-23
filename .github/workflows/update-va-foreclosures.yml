@@ -1,0 +1,50 @@
+name: Update VA Foreclosures
+
+on:
+  schedule:
+    # Every Monday at 6 AM EST (11 AM UTC)
+    - cron: '0 11 * * 1'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        cd scraper
+        pip install --break-system-packages -r requirements.txt
+    
+    - name: Run VA foreclosure scraper
+      env:
+        GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      run: |
+        cd scraper
+        python3 va_foreclosure_scraper.py
+    
+    - name: Move output to data folder
+      run: |
+        mv scraper/foreclosures_va.json data/foreclosures_va.json
+    
+    - name: Commit and push if changed
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add data/foreclosures_va.json
+        
+        # Only commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🤖 Auto-update: Virginia foreclosures - $(date +'%Y-%m-%d')"
+          git push
+        fi
