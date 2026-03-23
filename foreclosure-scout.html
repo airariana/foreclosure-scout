@@ -24,9 +24,88 @@
   --shadow:0 2px 12px rgba(26,26,24,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(180,160,120,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(180,160,120,0.07) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
-.app{position:relative;z-index:1;}
+
+/* Mobile Frame Wrapper - Desktop View */
+body{
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color:var(--ink);
+  font-family:'IBM Plex Sans',sans-serif;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+/* Mobile Device Frame */
+.mobile-frame {
+  max-width: 430px;
+  width: 100%;
+  background: var(--bg);
+  border-radius: 36px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 12px #1a1a1a, 0 0 0 14px #333;
+  position: relative;
+}
+
+/* Notch at top of phone */
+.mobile-frame::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 28px;
+  background: #1a1a1a;
+  border-radius: 0 0 20px 20px;
+  z-index: 999;
+}
+
+/* App container inside frame */
+.app{
+  position:relative;
+  z-index:1;
+  background:var(--bg);
+  max-height: 844px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:linear-gradient(rgba(180,160,120,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(180,160,120,0.07) 1px,transparent 1px);
+  background-size:32px 32px;
+  pointer-events:none;
+  z-index:0;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+/* Remove frame on actual mobile devices */
+@media (max-width: 480px) {
+  body {
+    background: var(--bg);
+    padding: 0;
+    display: block;
+  }
+  
+  .mobile-frame {
+    max-width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  
+  .mobile-frame::before {
+    display: none;
+  }
+  
+  .app {
+    max-height: none;
+  }
+}
 
 /* Header */
 header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-items:stretch;justify-content:space-between;border-bottom:3px solid var(--accent);position:sticky;top:0;z-index:200;}
@@ -977,6 +1056,7 @@ header,
 </style>
 </head>
 <body>
+<div class="mobile-frame">
 <div class="app">
 
 <!-- Pull to Refresh Indicator -->
@@ -3899,5 +3979,7 @@ document.getElementById('alertModal').addEventListener('click',function(e){if(e.
 document.getElementById('boolInput').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
 </script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po&callback=initMap"></script>
+</div><!-- /app -->
+</div><!-- /mobile-frame -->
 </body>
 </html>
