@@ -42,7 +42,7 @@ jobs:
     
     - name: Check if data changed
       id: check_changes
-          run: |
+      run: |
         if [ -f data/foreclosures_va.json ]; then
           git diff --exit-code data/foreclosures_va.json || echo "changed=true" >> $GITHUB_OUTPUT
         else
