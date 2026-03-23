@@ -1569,6 +1569,110 @@ function setDot(id,state,label){
   d.className='api-dot '+state; l.className='api-label '+state; l.textContent=label;
 }
 
+// ── Virginia Foreclosure Data Loading ────────────────────────────────────
+let vaForeclosures = [];
+
+// Load Virginia Foreclosure Data from JSON
+async function loadVirginiaForeclosures() {
+  try {
+    console.log('🏠 Loading Virginia foreclosure data...');
+    
+    const response = await fetch('data/foreclosures_va.json');
+    
+    if (!response.ok) {
+      console.warn(`Virginia data not available (${response.status})`);
+      return [];
+    }
+    
+    const data = await response.json();
+    
+    console.log(`✅ Loaded ${data.metadata.total_properties} VA foreclosures`);
+    console.log(`📅 Last updated: ${data.metadata.scraped_at}`);
+    if (data.foreclosures[0]) {
+      console.log('📍 Sample property:', data.foreclosures[0]);
+    }
+    
+    // Store in global variable
+    vaForeclosures = data.foreclosures;
+    
+    // Update stats
+    updateVAStats(data.metadata);
+    
+    return data.foreclosures;
+    
+  } catch (error) {
+    console.error('❌ Error loading Virginia foreclosures:', error);
+    return [];
+  }
+}
+
+// Update stats banner with VA data
+function updateVAStats(metadata) {
+  console.log(`VA Properties: ${metadata.total_properties}`);
+  console.log(`Counties: ${metadata.counties_covered}`);
+  console.log(`Last scraped: ${new Date(metadata.scraped_at).toLocaleDateString()}`);
+}
+
+// Convert VA foreclosure to your existing property format
+function convertVAToProperty(vaProperty) {
+  return {
+    address: vaProperty.address,
+    city: vaProperty.city,
+    state: vaProperty.state,
+    zip: vaProperty.zip_code,
+    county: vaProperty.county,
+    price: null, // VA data doesn't have price
+    beds: null,
+    baths: null,
+    sqft: null,
+    lat: vaProperty.latitude,
+    lng: vaProperty.longitude,
+    source: vaProperty.source,
+    type: 'Auction', // Samuel I. White is auction stage
+    saleDate: vaProperty.sale_date,
+    saleTime: vaProperty.sale_time,
+    saleLocation: vaProperty.sale_location,
+    firmFileNumber: vaProperty.firm_file_number,
+    sourceUrl: vaProperty.source_url,
+    enriched: false,
+    hudStatus: null,
+    distressed: false
+  };
+}
+
+// Display VA foreclosures on map
+async function displayVAForeclosures() {
+  // Load data if not already loaded
+  if (vaForeclosures.length === 0) {
+    await loadVirginiaForeclosures();
+  }
+  
+  if (vaForeclosures.length === 0) {
+    console.log('No VA foreclosures to display');
+    return;
+  }
+  
+  console.log(`📍 Displaying ${vaForeclosures.length} VA foreclosures on map...`);
+  
+  vaForeclosures.forEach(property => {
+    // Skip if no coordinates
+    if (!property.latitude || !property.longitude) return;
+    
+    // Convert to your property format
+    const prop = convertVAToProperty(property);
+    
+    // Add to map using your existing addMarker function
+    addMarker(prop);
+  });
+  
+  // Fit map to show all markers
+  if (map && markers.length > 0) {
+    fitAll();
+  }
+  
+  console.log('✅ VA foreclosures displayed');
+}
+
 // ── Map ─────────────────────────────────────────────────────────────────────
 function initMap(){
   map=new google.maps.Map(document.getElementById('map'),{
@@ -1585,6 +1689,11 @@ function initMap(){
     disableDefaultUI:false,zoomControl:true,mapTypeControl:false,streetViewControl:false,fullscreenControl:false
   });
   infoWindow=new google.maps.InfoWindow();
+  
+  // Load and display Virginia foreclosures
+  setTimeout(() => {
+    displayVAForeclosures();
+  }, 1000);
 }
 function setMapType(t,btn){map.setMapTypeId(t);document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function fitAll(){if(!markers.length)return;const b=new google.maps.LatLngBounds();markers.forEach(m=>b.extend(m.getPosition()));map.fitBounds(b);}
