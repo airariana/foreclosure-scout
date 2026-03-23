@@ -40,23 +40,17 @@ jobs:
         # Move output to data directory
         mv foreclosures_va.json ../data/foreclosures_va.json
     
-    - name: Check if data changed
-      id: check_changes
-      run: |
-        if [ -f data/foreclosures_va.json ]; then
-          git diff --exit-code data/foreclosures_va.json || echo "changed=true" >> $GITHUB_OUTPUT
-        else
-          echo "changed=true" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Commit and push if changed
-      if: steps.check_changes.outputs.changed == 'true'
+    - name: Commit and push data
       run: |
         git config user.name "Foreclosure Scout Bot"
         git config user.email "bot@foreclosure-scout.com"
         git add data/foreclosures_va.json
-        git commit -m "Update Virginia foreclosures - $(date +'%Y-%m-%d %H:%M')"
-        git push
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update Virginia foreclosures - $(date +'%Y-%m-%d %H:%M')"
+          git push
+        fi
     
     - name: Create summary
       if: always()
