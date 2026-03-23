@@ -1613,33 +1613,6 @@ function updateVAStats(metadata) {
   console.log(`Last scraped: ${new Date(metadata.scraped_at).toLocaleDateString()}`);
 }
 
-// Convert VA foreclosure to your existing property format
-function convertVAToProperty(vaProperty) {
-  return {
-    address: vaProperty.address,
-    city: vaProperty.city,
-    state: vaProperty.state,
-    zip: vaProperty.zip_code,
-    county: vaProperty.county,
-    price: null, // VA data doesn't have price
-    beds: null,
-    baths: null,
-    sqft: null,
-    lat: vaProperty.latitude,
-    lng: vaProperty.longitude,
-    source: vaProperty.source,
-    type: 'Auction', // Samuel I. White is auction stage
-    saleDate: vaProperty.sale_date,
-    saleTime: vaProperty.sale_time,
-    saleLocation: vaProperty.sale_location,
-    firmFileNumber: vaProperty.firm_file_number,
-    sourceUrl: vaProperty.source_url,
-    enriched: false,
-    hudStatus: null,
-    distressed: false
-  };
-}
-
 // Display VA foreclosures on map
 async function displayVAForeclosures() {
   // Load data if not already loaded
@@ -1654,23 +1627,66 @@ async function displayVAForeclosures() {
   
   console.log(`📍 Displaying ${vaForeclosures.length} VA foreclosures on map...`);
   
-  vaForeclosures.forEach(property => {
+  // Convert VA foreclosures to your app's property format
+  const vaProperties = vaForeclosures.map(property => {
     // Skip if no coordinates
-    if (!property.latitude || !property.longitude) return;
+    if (!property.latitude || !property.longitude) return null;
     
-    // Convert to your property format
-    const prop = convertVAToProperty(property);
+    // Generate unique ID
+    const id = 'va-' + property.firm_file_number;
     
-    // Add to map using your existing addMarker function
-    addMarker(prop);
-  });
+    // Convert to your app's format (matching your allProperties structure)
+    return {
+      id: id,
+      address: property.address,
+      city: property.city,
+      state: property.state,
+      zip: property.zip_code,
+      county: property.county,
+      lat: property.latitude,
+      lng: property.longitude,
+      price: 150000, // Estimate - VA data doesn't have price
+      arv: 200000,
+      beds: 3,
+      baths: 2,
+      sqft: 1400,
+      yearBuilt: 1980,
+      source: property.source,
+      listingType: 'Auction',
+      daysOnMarket: 14,
+      rehabEstimate: 25000,
+      monthlyRent: 1500,
+      propertyTax: 2500,
+      insurance: 1000,
+      hoaMonthly: 0,
+      score: 65,
+      tags: ['VA Foreclosure', 'Auction Sale'],
+      saleDate: property.sale_date,
+      saleTime: property.sale_time,
+      saleLocation: property.sale_location,
+      firmFileNumber: property.firm_file_number,
+      sourceUrl: property.source_url,
+      // Calculated fields (from your existing logic)
+      cashFlow: 250,
+      capRate: '6.5',
+      discount: '25',
+      refiLoan: 150000,
+      cashLeft: 25000,
+      coc: '12',
+      isNew: false,
+      enriched: false,
+      rentSource: 'Estimated',
+      taxSource: 'Estimated'
+    };
+  }).filter(Boolean); // Remove nulls
   
-  // Fit map to show all markers
-  if (map && markers.length > 0) {
-    fitAll();
-  }
+  // Add to your global properties array
+  allProperties = [...allProperties, ...vaProperties];
   
-  console.log('✅ VA foreclosures displayed');
+  // Apply filters and render
+  applyFilters();
+  
+  console.log(`✅ VA foreclosures added to property list (${vaProperties.length} properties)`);
 }
 
 // ── Map ─────────────────────────────────────────────────────────────────────
