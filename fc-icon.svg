@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="24" fill="#1a1a18"/>
+  <rect width="192" height="4" y="188" rx="0" fill="#c84b2f"/>
+  <!-- House shape -->
+  <polygon points="96,30 152,80 152,160 40,160 40,80" fill="#2a2a26"/>
+  <polygon points="96,24 160,80 152,80 96,32 40,80 32,80" fill="#c84b2f"/>
+  <!-- Door -->
+  <rect x="80" y="110" width="32" height="50" rx="4" fill="#c84b2f"/>
+  <!-- Window left -->
+  <rect x="50" y="95" width="24" height="22" rx="3" fill="#2a6496"/>
+  <!-- Window right -->
+  <rect x="118" y="95" width="24" height="22" rx="3" fill="#2a6496"/>
+  <!-- Text FC -->
+  <text x="96" y="178" font-family="sans-serif" font-size="14" font-weight="bold" fill="#c84b2f" text-anchor="middle" letter-spacing="4">SCOUT</text>
+</svg>
