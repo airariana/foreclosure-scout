@@ -1961,16 +1961,26 @@ async function fetchCourtDataForState(state) {
       try {
         const url = `https://www.courtlistener.com/api/rest/v3/dockets/?court=${court}&nature_of_suit=${caseType.code}&order_by=-date_filed&page_size=50&format=json`;
         
+        console.log(`[Court] Fetching: ${url}`);
+        
         const r = await fetch(url, {
-          headers: { 'Authorization': 'Token ' + KEYS.court }
+          headers: { 
+            'Authorization': 'Token ' + KEYS.court,
+            'Content-Type': 'application/json'
+          }
         });
         
+        console.log(`[Court] ${state} ${caseType.label}: Status ${r.status}`);
+        
         if (!r.ok) {
-          console.warn(`[Court] ${state} ${caseType.label}: Status ${r.status}`);
+          const errorText = await r.text();
+          console.warn(`[Court] ${state} ${caseType.label}: ${r.status} - ${errorText.substring(0, 200)}`);
           continue;
         }
         
         const d = await r.json();
+        console.log(`[Court] ${state} ${caseType.label}: Response:`, d);
+        
         const results = d.results || [];
         
         // Process and format each docket
@@ -1987,7 +1997,7 @@ async function fetchCourtDataForState(state) {
         await new Promise(resolve => setTimeout(resolve, 500));
         
       } catch (err) {
-        console.warn(`[Court] Error fetching ${state} ${caseType.label}:`, err);
+        console.error(`[Court] Error fetching ${state} ${caseType.label}:`, err);
       }
     }
     
@@ -1997,6 +2007,7 @@ async function fetchCourtDataForState(state) {
     
   } catch (e) {
     setDot('court', 'error', 'COURTLISTENER — ERROR');
+    console.error('[Court] Fatal error:', e);
     return [];
   }
 }
