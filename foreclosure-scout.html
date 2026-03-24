@@ -1105,6 +1105,25 @@ header,
   .links-grid { grid-template-columns: 1fr; }
 }
 
+
+/* ═══ Auction Calendar ════════════════════════════════════════════════════ */
+.auction-calendar-panel{position:fixed;top:80px;right:20px;width:450px;max-height:80vh;background:var(--surface);border:2px solid var(--accent);border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:10000;overflow:hidden;display:none;flex-direction:column;}
+.calendar-header{background:var(--accent);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+.calendar-header h3{margin:0;font-size:18px;}
+.calendar-controls{padding:12px 20px;display:flex;gap:8px;border-bottom:1px solid var(--border);}
+.auction-timeline{flex:1;overflow-y:auto;padding:20px;}
+.auction-date-group{margin-bottom:24px;}
+.auction-date-header{font-weight:600;font-size:14px;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;}
+.auction-card{background:var(--surface2);border-left:4px solid var(--accent);padding:12px 16px;margin-bottom:12px;border-radius:4px;cursor:pointer;transition:all 0.2s;}
+.auction-card:hover{background:var(--surface3);transform:translateX(4px);}
+.auction-card-time{font-weight:600;color:var(--accent);font-size:13px;margin-bottom:4px;}
+.auction-card-address{font-size:14px;margin-bottom:4px;color:var(--text);}
+.auction-card-location{font-size:12px;color:var(--muted);}
+.floating-calendar-btn{position:fixed;bottom:90px;right:20px;width:60px;height:60px;border-radius:50%;background:var(--accent);color:white;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;transition:all 0.2s;}
+.floating-calendar-btn:hover{transform:scale(1.1);box-shadow:0 6px 16px rgba(0,0,0,0.4);}
+.days-until{background:var(--accent);color:white;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;}
+.days-until.urgent{background:#e74c3c;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.7;}}
 </style>
 </head>
 <body>
@@ -1894,46 +1913,113 @@ async function displayVAForeclosures() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🏦 COURTLISTENER REO INTEGRATION
-// Adds foreclosure/REO court cases to map (matches VA foreclosure display style)
+// ⚖️ COURTLISTENER REO/FORECLOSURE INTEGRATION - V4 API
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Global storage for court properties
 let courtProperties = [];
 
-// ── Load Court Properties ────────────────────────────────────────────────────
+// ── Extract Address from Case Name ──────────────────────────────────────────
 
-async function loadCourtProperties() {
-  if (!KEYS.court) {
-    console.log('⚖️ CourtListener API key not set - skipping court data');
-    return [];
+function extractAddressFromCaseName(caseName) {
+  const result = {
+    address: null,
+    city: null,
+    zip: null,
+    state: null
+  };
+  
+  // Enhanced patterns for foreclosure case names
+  const patterns = [
+    // Pattern 1: "RE: FULL_ADDRESS"
+    /RE:\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl|Circle|Cir|Terrace|Ter)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
+    
+    // Pattern 2: "Property: FULL_ADDRESS" or "Property Located At:"
+    /(?:Property|Property Located At):\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
+    
+    // Pattern 3: "(FULL_ADDRESS)" in parentheses
+    /\(([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?\)/i,
+    
+    // Pattern 4: "- FULL_ADDRESS" or "; FULL_ADDRESS"
+    /[-;]\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?/i,
+    
+    // Pattern 5: Just "STREET_NUMBER STREET_NAME, CITY, STATE ZIP" anywhere
+    /([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = caseName.match(pattern);
+    if (match) {
+      result.address = match[1].trim();
+      if (match[2]) result.city = match[2].trim();
+      if (match[3]) result.state = match[3].trim();
+      if (match[4]) result.zip = match[4].trim();
+      console.log(`   📍 Address: ${result.address}, ${result.city}, ${result.state} ${result.zip}`);
+      return result;
+    }
   }
   
-  try {
-    console.log('⚖️ Loading court foreclosure/REO data...');
-    
-    const states = ['VA', 'MD', 'DC'];
-    const allProperties = [];
-    
-    for (const state of states) {
-      const properties = await fetchCourtDataForState(state);
-      allProperties.push(...properties);
-    }
-    
-    console.log(`✅ Loaded ${allProperties.length} court properties`);
-    
-    // Store in global variable
-    courtProperties = allProperties;
-    
-    return allProperties;
-    
-  } catch (error) {
-    console.error('❌ Error loading court properties:', error);
-    return [];
+  // If no address found, try to at least extract city/state for approximate location
+  const cityStatePattern = /,\s*([A-Za-z\s]+),?\s*([A-Z]{2})\b/;
+  const cityStateMatch = caseName.match(cityStatePattern);
+  if (cityStateMatch) {
+    result.city = cityStateMatch[1].trim();
+    result.state = cityStateMatch[2].trim();
+    console.log(`   🏙️ City/State: ${result.city}, ${result.state}`);
   }
+  
+  return result;
 }
 
-// ── Fetch Court Data for State ───────────────────────────────────────────────
+// ── Parse Court Docket into Property ───────────────────────────────────────
+
+function parseCourtDocket(docket, state, caseType) {
+  const addressData = extractAddressFromCaseName(docket.case_name);
+  
+  const property = {
+    // Basic Info
+    source: 'courtlistener',
+    caseNumber: docket.docket_number,
+    caseName: docket.case_name,
+    dateFiled: docket.date_filed,
+    courtLink: docket.absolute_url,
+    
+    // Address (extracted from case name)
+    address: addressData.address || `Case ${docket.docket_number}`,
+    city: addressData.city || '',
+    state: state,
+    zip: addressData.zip || '',
+    county: '',
+    
+    // Case Type
+    caseType: caseType.code,
+    caseTypeLabel: caseType.label,
+    caseTypeColor: caseType.color,
+    
+    // Location
+    lat: null,
+    lng: null,
+    needsGeocoding: true,
+    hasRealAddress: !!addressData.address, // true if street address extracted
+    isApproximateLocation: false,
+    
+    // Metadata
+    tags: [],
+    propertyId: `court-${state}-${docket.id}`
+  };
+  
+  // Add tags based on what we found
+  if (!property.hasRealAddress && !addressData.city) {
+    property.tags.push('Address Pending');
+    property.needsGeocoding = false; // Can't geocode without any location
+  } else if (!property.hasRealAddress && addressData.city) {
+    // We have city but no street address - will geocode to city center
+    property.tags.push('City-Level Location');
+  }
+  
+  return property;
+}
+
+// ── Fetch Court Data for State ─────────────────────────────────────────────
 
 async function fetchCourtDataForState(state) {
   if (!KEYS.court) return [];
@@ -1950,9 +2036,7 @@ async function fetchCourtDataForState(state) {
     
     console.log(`[Court] Fetching recent dockets for ${state}...`);
     
-    // ✅ UPGRADED TO V4 API
-    // Get recent dockets, filter client-side (simpler and more reliable)
-    // Using field selection to reduce payload size (v4 feature)
+    // ✅ USING V4 API with field selection
     const url = `https://www.courtlistener.com/api/rest/v4/dockets/?court=${court}&order_by=-date_filed&fields=id,docket_number,case_name,date_filed,court,absolute_url&page_size=100`;
     
     const r = await fetch(url, {
@@ -2008,146 +2092,36 @@ async function fetchCourtDataForState(state) {
   }
 }
 
-// ── Parse Court Docket to Property ───────────────────────────────────────────
+// ── Load All Court Properties ──────────────────────────────────────────────
 
-function parseCourtDocket(docket, state, caseType) {
-  // Extract address from case name (if available)
-  const addressInfo = extractAddressFromCaseName(docket.case_name);
-  
-  // Generate unique ID
-  const id = `court-${docket.id}`;
-  
-  // Estimate price based on case type
-  const estimatedPrice = caseType.code === '941' ? 250000 : // Bankruptcy
-                        caseType.code === '220' ? 200000 : // Foreclosure
-                        caseType.code === 'foreclosure' ? 200000 : // Keyword search
-                        150000; // REO
-  
-  // Create property even without address - we'll show it as "Address Pending"
-  // Users can click through to court docs to find address
-  const address = addressInfo.address || `Case ${docket.docket_number}`;
-  const city = addressInfo.city || getCityFromState(state);
-  
-  // Format to match your app's property structure
-  return {
-    id: id,
-    address: address,
-    city: city,
-    state: state,
-    zip: addressInfo.zip || '',
-    county: '',
-    lat: null, // Will try to geocode later if we have address
-    lng: null,
-    price: estimatedPrice,
-    arv: Math.round(estimatedPrice * 1.3),
-    beds: 3,
-    baths: 2,
-    sqft: 1400,
-    yearBuilt: 1990,
-    source: 'CourtListener',
-    listingType: caseType.label,
-    caseTypeCode: caseType.code,
-    caseTypeColor: caseType.color,
-    daysOnMarket: Math.floor((new Date() - new Date(docket.date_filed)) / (1000 * 60 * 60 * 24)),
-    rehabEstimate: 25000,
-    monthlyRent: 1500,
-    propertyTax: 2500,
-    insurance: 1000,
-    hoaMonthly: 0,
-    score: 60,
-    tags: [caseType.label, 'Court Case', addressInfo.address ? 'Address Found' : 'Address Pending'],
-    
-    // Court-specific fields
-    caseNumber: docket.docket_number,
-    caseName: docket.case_name,
-    dateFiled: docket.date_filed,
-    courtName: docket.court,
-    sourceUrl: `https://www.courtlistener.com${docket.absolute_url}`,
-    
-    // Calculated fields
-    cashFlow: 200,
-    capRate: '8.5',
-    discount: Math.round((estimatedPrice * 1.3 - estimatedPrice) / (estimatedPrice * 1.3) * 100),
-    refiLoan: Math.round(estimatedPrice * 0.75),
-    cashLeft: 20000,
-    coc: '10',
-    isNew: false,
-    enriched: false,
-    rentSource: 'Estimated',
-    taxSource: 'Estimated',
-    needsGeocoding: addressInfo.address ? true : false, // Only geocode if we have real address
-    hasRealAddress: addressInfo.address ? true : false
-  };
-}
-
-// ── Extract Address from Case Name ───────────────────────────────────────────
-
-function extractAddressFromCaseName(caseName) {
-  const result = {
-    address: null,
-    city: null,
-    zip: null,
-    state: null
-  };
-  
-  // Enhanced patterns for foreclosure case names
-  // Pattern examples from actual cases:
-  // "Wells Fargo Bank v. Smith, RE: 123 Main Street, Fairfax, VA 22030"
-  // "Bank of America v. Johnson (456 Oak Ave, Arlington, VA)"
-  // "U.S. Bank v. Williams - Property: 789 Pine Rd, Vienna, Virginia 22180"
-  // "Wilmington Trust v. Davis; 321 Elm St, Leesburg, VA"
-  
-  const patterns = [
-    // Pattern 1: "RE: FULL_ADDRESS"
-    /RE:\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl|Circle|Cir|Terrace|Ter)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
-    
-    // Pattern 2: "Property: FULL_ADDRESS" or "Property Located At:"
-    /(?:Property|Property Located At):\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
-    
-    // Pattern 3: "(FULL_ADDRESS)" in parentheses
-    /\(([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?\)/i,
-    
-    // Pattern 4: "- FULL_ADDRESS" or "; FULL_ADDRESS"
-    /[-;]\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?/i,
-    
-    // Pattern 5: Just "STREET_NUMBER STREET_NAME, CITY, STATE ZIP" anywhere
-    /([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i
-  ];
-  
-  for (const pattern of patterns) {
-    const match = caseName.match(pattern);
-    if (match) {
-      result.address = match[1].trim();
-      if (match[2]) result.city = match[2].trim();
-      if (match[3]) result.state = match[3].trim();
-      if (match[4]) result.zip = match[4].trim();
-      console.log(`   📍 Address extracted: ${result.address}, ${result.city}, ${result.state} ${result.zip}`);
-      return result; // Found address, return immediately
-    }
+async function loadCourtProperties() {
+  if (!KEYS.court) {
+    showToast('Add your CourtListener token in ⚙ Data Keys first', 'red');
+    return;
   }
   
-  // If no address found, try to at least extract city/state for approximate location
-  const cityStatePattern = /,\s*([A-Za-z\s]+),?\s*([A-Z]{2})\b/;
-  const cityStateMatch = caseName.match(cityStatePattern);
-  if (cityStateMatch) {
-    result.city = cityStateMatch[1].trim();
-    result.state = cityStateMatch[2].trim();
-    console.log(`   🏙️ City/State extracted: ${result.city}, ${result.state}`);
+  console.log('⚖️ Loading CourtListener foreclosure cases...');
+  
+  const states = ['DC', 'MD', 'VA'];
+  const allProperties = [];
+  
+  for (const state of states) {
+    const stateProperties = await fetchCourtDataForState(state);
+    allProperties.push(...stateProperties);
   }
   
-  return result;
+  courtProperties = allProperties;
+  
+  console.log(`⚖️ Total court properties loaded: ${courtProperties.length}`);
+  
+  // Geocode properties
+  if (courtProperties.length > 0) {
+    await geocodeCourtProperties();
+    await displayCourtProperties();
+  }
 }
 
-function getCityFromState(state) {
-  const defaults = {
-    VA: 'Fairfax',
-    MD: 'Silver Spring',
-    DC: 'Washington'
-  };
-  return defaults[state] || 'Unknown';
-}
-
-// ── Geocode Court Properties ─────────────────────────────────────────────────
+// ── Geocode Court Properties ───────────────────────────────────────────────
 
 async function geocodeCourtProperties() {
   console.log('📍 Geocoding court properties...');
@@ -2242,49 +2216,35 @@ async function geocodeCourtProperties() {
   }
 }
 
-// ── Display Court Properties on Map ──────────────────────────────────────────
+// ── Display Court Properties ───────────────────────────────────────────────
 
 async function displayCourtProperties() {
-  // Load data if not already loaded
-  if (courtProperties.length === 0) {
-    await loadCourtProperties();
-  }
+  console.log('🗺️ Adding court properties to map...');
   
-  if (courtProperties.length === 0) {
-    console.log('No court properties to display');
-    return;
-  }
-  
-  // Geocode properties that have real addresses
-  await geocodeCourtProperties();
-  
-  // Separate properties with and without coordinates
+  // Separate geolocated vs non-geolocated
   const geolocatedProperties = courtProperties.filter(p => p.lat && p.lng);
   const nonGeolocatedProperties = courtProperties.filter(p => !p.lat || !p.lng);
   
-  console.log(`📍 Adding ${geolocatedProperties.length} geolocated court properties to map...`);
-  if (nonGeolocatedProperties.length > 0) {
-    console.log(`📋 ${nonGeolocatedProperties.length} court cases without addresses (available in property list)`);
-  }
+  console.log(`   📍 ${geolocatedProperties.length} properties with locations (will show on map)`);
+  console.log(`   📋 ${nonGeolocatedProperties.length} properties without locations (list only)`);
   
-  // Add ALL properties to allProperties array (both geolocated and non-geolocated)
-  // Properties without coordinates won't show on map but will appear in list view
-  courtProperties.forEach(property => {
-    const exists = allProperties.some(p => p.id === property.id);
-    if (!exists) {
-      allProperties.push(property);
-    }
+  // Add to global properties array
+  geolocatedProperties.forEach(p => {
+    allProperties.push(p);
+  });
+  
+  // Add non-geolocated to list (but not map)
+  nonGeolocatedProperties.forEach(p => {
+    allProperties.push(p);
   });
   
   // Apply filters and render markers (only geolocated ones will show on map)
   applyFilters();
   
-  console.log(`✅ Court properties added (Total: ${allProperties.length} | On Map: ${geolocatedProperties.length} | List Only: ${nonGeolocatedProperties.length})`);
+  console.log(`✅ Court properties added (Total: ${allProperties.length})`);
 }
 
 console.log('⚖️ CourtListener REO integration loaded');
-
-
 // ── Map ─────────────────────────────────────────────────────────────────────
 function initMap(){
   map=new google.maps.Map(document.getElementById('map'),{
@@ -2306,14 +2266,6 @@ function initMap(){
   setTimeout(() => {
     displayVAForeclosures();
   }, 1000);
-  
-  // Load and display CourtListener foreclosure/REO cases
-  if (KEYS.court) {
-    setTimeout(async () => {
-      console.log('🏦 CourtListener API key detected - loading foreclosure/REO cases...');
-      await displayCourtProperties();
-    }, 3000); // Wait 3 seconds to allow VA properties to load first
-  }
 }
 function setMapType(t,btn){map.setMapTypeId(t);document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function fitAll(){if(!markers.length)return;const b=new google.maps.LatLngBounds();markers.forEach(m=>b.extend(m.getPosition()));map.fitBounds(b);}
@@ -4531,5 +4483,109 @@ document.getElementById('boolInput').addEventListener('keydown',e=>{if(e.key==='
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po&callback=initMap"></script>
 </div><!-- /app -->
 </div><!-- /mobile-frame -->
+
+<!-- ═══ Auction Calendar Panel ═══════════════════════════════════════════ -->
+<div class="auction-calendar-panel" id="auctionCalendar">
+  <div class="calendar-header">
+    <h3>📅 Upcoming Foreclosure Auctions</h3>
+    <button class="btn btn-secondary" onclick="closeAuctionCalendar()" style="padding:4px 12px;font-size:14px;">✕ Close</button>
+  </div>
+  <div class="calendar-controls">
+    <button class="btn btn-primary" onclick="showThisWeek()">This Week</button>
+    <button class="btn btn-primary" onclick="showThisMonth()">This Month</button>
+    <button class="btn btn-primary" onclick="showAll()">All Upcoming</button>
+  </div>
+  <div class="auction-timeline" id="auctionTimeline">
+    <div style="text-align:center;padding:40px;color:var(--muted)">Loading auctions...</div>
+  </div>
+</div>
+
+<button class="floating-calendar-btn" onclick="toggleAuctionCalendar()" title="View Auction Calendar">📅</button>
+
+<script>
+// ═══ Auction Calendar Functions ════════════════════════════════════════════
+
+function toggleAuctionCalendar(){
+  const panel=document.getElementById('auctionCalendar');
+  if(!panel)return;
+  if(panel.style.display==='none'||panel.style.display===''){
+    panel.style.display='flex';
+    loadAuctionTimeline();
+  }else{
+    panel.style.display='none';
+  }
+}
+
+function closeAuctionCalendar(){
+  document.getElementById('auctionCalendar').style.display='none';
+}
+
+function loadAuctionTimeline(filter='all'){
+  const timeline=document.getElementById('auctionTimeline');
+  if(!timeline)return;
+  if(!vaForeclosures||vaForeclosures.length===0){
+    timeline.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">No Virginia foreclosures loaded yet</div>';
+    return;
+  }
+  const upcomingAuctions=vaForeclosures.filter(p=>p.sale_date).map(p=>({...p,saleDateTime:new Date(p.sale_date+' '+(p.sale_time||'10:00 AM'))})).filter(p=>p.saleDateTime>new Date()).sort((a,b)=>a.saleDateTime-b.saleDateTime);
+  let filtered=upcomingAuctions;
+  const now=new Date();
+  if(filter==='week'){
+    const weekFromNow=new Date(now.getTime()+7*24*60*60*1000);
+    filtered=upcomingAuctions.filter(a=>a.saleDateTime<=weekFromNow);
+  }else if(filter==='month'){
+    const monthFromNow=new Date(now.getTime()+30*24*60*60*1000);
+    filtered=upcomingAuctions.filter(a=>a.saleDateTime<=monthFromNow);
+  }
+  const grouped={};
+  filtered.forEach(auction=>{
+    const dateKey=auction.sale_date;
+    if(!grouped[dateKey])grouped[dateKey]=[];
+    grouped[dateKey].push(auction);
+  });
+  let html='';
+  if(filtered.length===0){
+    html='<div style="text-align:center;padding:40px;color:var(--muted)">No upcoming auctions found</div>';
+  }else{
+    Object.keys(grouped).forEach(date=>{
+      const auctions=grouped[date];
+      const daysUntil=Math.ceil((new Date(date)-now)/(1000*60*60*24));
+      const isUrgent=daysUntil<=3;
+      html+=`<div class="auction-date-group"><div class="auction-date-header"><span>${formatAuctionDate(date)}</span><span class="days-until ${isUrgent?'urgent':''}">${daysUntil} day${daysUntil!==1?'s':''}</span></div>`;
+      auctions.forEach(auction=>{
+        html+=`<div class="auction-card" onclick="showAuctionDetails('${auction.firm_file_number}')"><div class="auction-card-time">${auction.sale_time||'10:00 AM'}</div><div class="auction-card-address">${auction.address}</div><div class="auction-card-location">${auction.city}, ${auction.state} ${auction.zip_code||''}</div></div>`;
+      });
+      html+='</div>';
+    });
+  }
+  timeline.innerHTML=html;
+}
+
+function formatAuctionDate(dateStr){
+  const date=new Date(dateStr);
+  const options={weekday:'long',month:'long',day:'numeric',year:'numeric'};
+  return date.toLocaleDateString('en-US',options);
+}
+
+function showThisWeek(){loadAuctionTimeline('week');}
+function showThisMonth(){loadAuctionTimeline('month');}
+function showAll(){loadAuctionTimeline('all');}
+
+function showAuctionDetails(fileNumber){
+  const property=vaForeclosures.find(p=>p.firm_file_number===fileNumber);
+  if(!property)return;
+  if(map&&property.latitude&&property.longitude){
+    map.setCenter({lat:property.latitude,lng:property.longitude});
+    map.setZoom(15);
+    const marker=markers.find(m=>m.get('propertyId')==='va-'+fileNumber);
+    if(marker){
+      google.maps.event.trigger(marker,'click');
+    }
+    closeAuctionCalendar();
+  }
+}
+
+console.log('📅 Auction calendar loaded');
+</script>
 </body>
 </html>
