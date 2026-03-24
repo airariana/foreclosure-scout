@@ -1950,9 +1950,10 @@ async function fetchCourtDataForState(state) {
     
     console.log(`[Court] Fetching recent dockets for ${state}...`);
     
-    // SIMPLE APPROACH: Just get recent dockets, filter client-side
-    // This avoids complex API parameter issues
-    const url = `https://www.courtlistener.com/api/rest/v3/dockets/?court=${court}&order_by=-date_filed&page_size=100`;
+    // ✅ UPGRADED TO V4 API
+    // Get recent dockets, filter client-side (simpler and more reliable)
+    // Using field selection to reduce payload size (v4 feature)
+    const url = `https://www.courtlistener.com/api/rest/v4/dockets/?court=${court}&order_by=-date_filed&fields=id,docket_number,case_name,date_filed,court,absolute_url&page_size=100`;
     
     const r = await fetch(url, {
       headers: { 
@@ -1972,7 +1973,7 @@ async function fetchCourtDataForState(state) {
     console.log(`[Court] ${state}: Received ${dockets.length} dockets`);
     
     // Filter for foreclosure-related cases (client-side)
-    const foreclosureKeywords = ['foreclos', 'mortgage', 'deed of trust', 'wells fargo', 'bank of america', 'chase', 'trustee'];
+    const foreclosureKeywords = ['foreclos', 'mortgage', 'deed of trust', 'wells fargo', 'bank of america', 'chase', 'trustee', 'fnma', 'freddie mac'];
     
     const foreclosureDockets = dockets.filter(docket => {
       const caseName = (docket.case_name || '').toLowerCase();
@@ -2188,7 +2189,6 @@ async function geocodeCourtProperties() {
   if (skipped > 0) {
     console.log(`📍 Skipped ${skipped} properties without addresses (view in list to see case details)`);
   }
-}
 }
 
 // ── Display Court Properties on Map ──────────────────────────────────────────
