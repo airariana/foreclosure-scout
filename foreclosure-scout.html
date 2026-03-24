@@ -1108,6 +1108,21 @@ header,
 
 /* ═══ Auction Calendar ════════════════════════════════════════════════════ */
 .auction-calendar-panel{position:fixed;top:80px;right:20px;width:450px;max-height:80vh;background:var(--surface);border:2px solid var(--accent);border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:10000;overflow:hidden;display:none;flex-direction:column;}
+
+/* Mobile: Full screen, centered, locked in place */
+@media (max-width: 768px), (max-device-width: 768px) {
+  .auction-calendar-panel {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: calc(100vw - 40px) !important;
+    max-width: 400px !important;
+    max-height: 85vh !important;
+    border-radius: 12px !important;
+  }
+}
+
 .calendar-header{background:var(--accent);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
 .calendar-header h3{margin:0;font-size:18px;}
 .calendar-controls{padding:12px 20px;display:flex;gap:8px;border-bottom:1px solid var(--border);}
