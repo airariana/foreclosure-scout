@@ -1948,60 +1948,68 @@ async function fetchCourtDataForState(state) {
     };
     const court = courtMap[state] || 'mdb';
     
-    // Fetch 3 case types: Bankruptcy (941), Foreclosure (220), REO/Property (290)
-    const caseTypes = [
-      { code: '941', label: 'Bankruptcy', color: '#f39c12' },
-      { code: '220', label: 'Foreclosure', color: '#e74c3c' },
-      { code: '290', label: 'REO/Property', color: '#9b59b6' }
+    // SEARCH BY KEYWORDS instead of nature_of_suit (which returns 0 results)
+    const searchTerms = [
+      'foreclosure',
+      'mortgage',
+      'deed of trust',
+      'Wells Fargo',
+      'Bank of America',
+      'Chase'
     ];
     
     const allResults = [];
+    const seenIds = new Set();
     
-    for (const caseType of caseTypes) {
+    for (const term of searchTerms) {
       try {
-        const url = `https://www.courtlistener.com/api/rest/v3/dockets/?court=${court}&nature_of_suit=${caseType.code}&order_by=-date_filed&page_size=50&format=json`;
+        // Use case_name search to find foreclosure-related cases
+        const url = `https://www.courtlistener.com/api/rest/v3/dockets/?court=${court}&case_name__icontains=${encodeURIComponent(term)}&order_by=-date_filed&page_size=20&format=json`;
         
-        console.log(`[Court] Fetching: ${url}`);
+        console.log(`[Court] Searching ${state} for: "${term}"`);
         
         const r = await fetch(url, {
           headers: { 
-            'Authorization': 'Token ' + KEYS.court,
-            'Content-Type': 'application/json'
+            'Authorization': 'Token ' + KEYS.court
           }
         });
         
-        console.log(`[Court] ${state} ${caseType.label}: Status ${r.status}`);
-        
         if (!r.ok) {
-          const errorText = await r.text();
-          console.warn(`[Court] ${state} ${caseType.label}: ${r.status} - ${errorText.substring(0, 200)}`);
+          console.warn(`[Court] ${state} "${term}": Status ${r.status}`);
           continue;
         }
         
         const d = await r.json();
-        console.log(`[Court] ${state} ${caseType.label}: Response:`, d);
-        
         const results = d.results || [];
         
-        // Process and format each docket
+        console.log(`[Court] ${state} "${term}": ${results.length} cases found`);
+        
+        // Process and format each docket (avoid duplicates)
         results.forEach(docket => {
-          const property = parseCourtDocket(docket, state, caseType);
-          if (property) {
-            allResults.push(property);
+          if (!seenIds.has(docket.id)) {
+            seenIds.add(docket.id);
+            const property = parseCourtDocket(docket, state, {
+              code: 'search',
+              label: 'Foreclosure',
+              color: '#e74c3c'
+            });
+            if (property) {
+              allResults.push(property);
+            }
           }
         });
         
-        console.log(`   ✅ ${state} ${caseType.label}: ${results.length} cases`);
-        
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Rate limiting - be nice to the API
+        await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (err) {
-        console.error(`[Court] Error fetching ${state} ${caseType.label}:`, err);
+        console.error(`[Court] Error searching ${state} for "${term}":`, err);
       }
     }
     
     setDot('court', 'live', `COURTLISTENER (${allResults.length})`);
+    
+    console.log(`[Court] ✅ Total ${state} foreclosure cases: ${allResults.length}`);
     
     return allResults;
     
