@@ -2086,26 +2086,32 @@ function extractAddressFromCaseName(caseName) {
   const result = {
     address: null,
     city: null,
-    zip: null
+    zip: null,
+    state: null
   };
   
-  // Common patterns in foreclosure case names:
-  // "Bank of America v. Smith RE: 123 Main Street, Fairfax, VA 22030"
-  // "Wells Fargo v. Johnson (456 Oak Ave, Arlington)"
-  // "FNMA v. Williams - 789 Pine Rd, Vienna, Virginia"
+  // Enhanced patterns for foreclosure case names
+  // Pattern examples from actual cases:
+  // "Wells Fargo Bank v. Smith, RE: 123 Main Street, Fairfax, VA 22030"
+  // "Bank of America v. Johnson (456 Oak Ave, Arlington, VA)"
+  // "U.S. Bank v. Williams - Property: 789 Pine Rd, Vienna, Virginia 22180"
+  // "Wilmington Trust v. Davis; 321 Elm St, Leesburg, VA"
   
   const patterns = [
-    // Pattern 1: "RE: ADDRESS, CITY, STATE ZIP"
-    /RE:\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*[A-Z]{2}\s*(\d{5})?/i,
+    // Pattern 1: "RE: FULL_ADDRESS"
+    /RE:\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl|Circle|Cir|Terrace|Ter)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
     
-    // Pattern 2: "(ADDRESS, CITY)"
-    /\(([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+)\)/i,
+    // Pattern 2: "Property: FULL_ADDRESS" or "Property Located At:"
+    /(?:Property|Property Located At):\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i,
     
-    // Pattern 3: "- ADDRESS, CITY"
-    /-\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+)/i,
+    // Pattern 3: "(FULL_ADDRESS)" in parentheses
+    /\(([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?\)/i,
     
-    // Pattern 4: Just address with street suffix
-    /([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl))/i
+    // Pattern 4: "- FULL_ADDRESS" or "; FULL_ADDRESS"
+    /[-;]\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})?\s*(\d{5})?/i,
+    
+    // Pattern 5: Just "STREET_NUMBER STREET_NAME, CITY, STATE ZIP" anywhere
+    /([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5})?/i
   ];
   
   for (const pattern of patterns) {
@@ -2113,9 +2119,20 @@ function extractAddressFromCaseName(caseName) {
     if (match) {
       result.address = match[1].trim();
       if (match[2]) result.city = match[2].trim();
-      if (match[3]) result.zip = match[3].trim();
-      break;
+      if (match[3]) result.state = match[3].trim();
+      if (match[4]) result.zip = match[4].trim();
+      console.log(`   📍 Address extracted: ${result.address}, ${result.city}, ${result.state} ${result.zip}`);
+      return result; // Found address, return immediately
     }
+  }
+  
+  // If no address found, try to at least extract city/state for approximate location
+  const cityStatePattern = /,\s*([A-Za-z\s]+),?\s*([A-Z]{2})\b/;
+  const cityStateMatch = caseName.match(cityStatePattern);
+  if (cityStateMatch) {
+    result.city = cityStateMatch[1].trim();
+    result.state = cityStateMatch[2].trim();
+    console.log(`   🏙️ City/State extracted: ${result.city}, ${result.state}`);
   }
   
   return result;
@@ -2137,17 +2154,41 @@ async function geocodeCourtProperties() {
   
   const GOOGLE_MAPS_API_KEY = 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po';
   let geocoded = 0;
+  let approximateGeocode = 0;
   let skipped = 0;
   
   for (const property of courtProperties) {
-    // Skip if no real address or already geocoded
-    if (!property.needsGeocoding || !property.hasRealAddress || property.lat) {
-      if (!property.hasRealAddress) skipped++;
+    // Skip if already geocoded
+    if (property.lat) continue;
+    
+    // Skip if no needsGeocoding flag
+    if (!property.needsGeocoding) continue;
+    
+    // Try to geocode even without street address if we have city/state
+    if (!property.hasRealAddress && !property.city) {
+      skipped++;
       continue;
     }
     
     try {
-      const fullAddress = `${property.address}, ${property.city}, ${property.state} ${property.zip}`.trim();
+      let fullAddress;
+      let isApproximate = false;
+      
+      if (property.hasRealAddress) {
+        // Full street address - precise geocoding
+        fullAddress = `${property.address}, ${property.city}, ${property.state} ${property.zip}`.trim();
+      } else if (property.city) {
+        // City/state only - approximate geocoding (will show at city center)
+        fullAddress = `${property.city}, ${property.state}`.trim();
+        isApproximate = true;
+        if (!property.tags.includes('Approximate Location')) {
+          property.tags.push('Approximate Location');
+        }
+      } else {
+        skipped++;
+        continue;
+      }
+      
       const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
       
       const response = await fetch(url);
@@ -2156,8 +2197,9 @@ async function geocodeCourtProperties() {
       if (data.results && data.results[0]) {
         property.lat = data.results[0].geometry.location.lat;
         property.lng = data.results[0].geometry.location.lng;
+        property.isApproximateLocation = isApproximate;
         
-        // Update city/zip from geocoded result
+        // Update city/zip/county from geocoded result
         const addressComponents = data.results[0].address_components;
         addressComponents.forEach(component => {
           if (component.types.includes('locality')) {
@@ -2172,22 +2214,31 @@ async function geocodeCourtProperties() {
         });
         
         property.needsGeocoding = false;
-        geocoded++;
         
-        console.log(`   ✅ Geocoded: ${property.address}`);
+        if (isApproximate) {
+          approximateGeocode++;
+          console.log(`   🎯 Approximate: ${property.city}, ${property.state} (${property.caseNumber})`);
+        } else {
+          geocoded++;
+          console.log(`   ✅ Precise: ${property.address}`);
+        }
       }
       
       // Rate limiting for Google Maps API
       await new Promise(resolve => setTimeout(resolve, 200));
       
     } catch (error) {
-      console.warn(`   ❌ Failed to geocode: ${property.address}`, error);
+      console.warn(`   ❌ Geocode failed: ${property.address || property.city}`, error);
     }
   }
   
-  console.log(`📍 Geocoded ${geocoded} court properties`);
+  console.log(`📍 Geocoding complete:`);
+  console.log(`   ✅ ${geocoded} precise locations (street addresses)`);
+  if (approximateGeocode > 0) {
+    console.log(`   🎯 ${approximateGeocode} approximate locations (city-level only)`);
+  }
   if (skipped > 0) {
-    console.log(`📍 Skipped ${skipped} properties without addresses (view in list to see case details)`);
+    console.log(`   ⏭️ ${skipped} skipped (no location data)`);
   }
 }
 
@@ -2229,7 +2280,6 @@ async function displayCourtProperties() {
   applyFilters();
   
   console.log(`✅ Court properties added (Total: ${allProperties.length} | On Map: ${geolocatedProperties.length} | List Only: ${nonGeolocatedProperties.length})`);
-}
 }
 
 console.log('⚖️ CourtListener REO integration loaded');
