@@ -2010,13 +2010,8 @@ async function fetchCourtDataForState(state) {
 // ── Parse Court Docket to Property ───────────────────────────────────────────
 
 function parseCourtDocket(docket, state, caseType) {
-  // Extract address from case name
+  // Extract address from case name (if available)
   const addressInfo = extractAddressFromCaseName(docket.case_name);
-  
-  // Skip if no address found
-  if (!addressInfo.address) {
-    return null;
-  }
   
   // Generate unique ID
   const id = `court-${docket.id}`;
@@ -2024,17 +2019,23 @@ function parseCourtDocket(docket, state, caseType) {
   // Estimate price based on case type
   const estimatedPrice = caseType.code === '941' ? 250000 : // Bankruptcy
                         caseType.code === '220' ? 200000 : // Foreclosure
+                        caseType.code === 'foreclosure' ? 200000 : // Keyword search
                         150000; // REO
+  
+  // Create property even without address - we'll show it as "Address Pending"
+  // Users can click through to court docs to find address
+  const address = addressInfo.address || `Case ${docket.docket_number}`;
+  const city = addressInfo.city || getCityFromState(state);
   
   // Format to match your app's property structure
   return {
     id: id,
-    address: addressInfo.address,
-    city: addressInfo.city || getCityFromState(state),
+    address: address,
+    city: city,
     state: state,
     zip: addressInfo.zip || '',
     county: '',
-    lat: null, // Will geocode later
+    lat: null, // Will try to geocode later if we have address
     lng: null,
     price: estimatedPrice,
     arv: Math.round(estimatedPrice * 1.3),
@@ -2053,7 +2054,7 @@ function parseCourtDocket(docket, state, caseType) {
     insurance: 1000,
     hoaMonthly: 0,
     score: 60,
-    tags: [caseType.label, 'Court Case'],
+    tags: [caseType.label, 'Court Case', addressInfo.address ? 'Address Found' : 'Address Pending'],
     
     // Court-specific fields
     caseNumber: docket.docket_number,
@@ -2073,7 +2074,8 @@ function parseCourtDocket(docket, state, caseType) {
     enriched: false,
     rentSource: 'Estimated',
     taxSource: 'Estimated',
-    needsGeocoding: true
+    needsGeocoding: addressInfo.address ? true : false, // Only geocode if we have real address
+    hasRealAddress: addressInfo.address ? true : false
   };
 }
 
@@ -2134,9 +2136,14 @@ async function geocodeCourtProperties() {
   
   const GOOGLE_MAPS_API_KEY = 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po';
   let geocoded = 0;
+  let skipped = 0;
   
   for (const property of courtProperties) {
-    if (!property.needsGeocoding || property.lat) continue;
+    // Skip if no real address or already geocoded
+    if (!property.needsGeocoding || !property.hasRealAddress || property.lat) {
+      if (!property.hasRealAddress) skipped++;
+      continue;
+    }
     
     try {
       const fullAddress = `${property.address}, ${property.city}, ${property.state} ${property.zip}`.trim();
@@ -2178,6 +2185,10 @@ async function geocodeCourtProperties() {
   }
   
   console.log(`📍 Geocoded ${geocoded} court properties`);
+  if (skipped > 0) {
+    console.log(`📍 Skipped ${skipped} properties without addresses (view in list to see case details)`);
+  }
+}
 }
 
 // ── Display Court Properties on Map ──────────────────────────────────────────
@@ -2193,26 +2204,32 @@ async function displayCourtProperties() {
     return;
   }
   
-  // Geocode properties that need it
+  // Geocode properties that have real addresses
   await geocodeCourtProperties();
   
-  // Filter to only properties with valid coordinates
-  const validProperties = courtProperties.filter(p => p.lat && p.lng);
+  // Separate properties with and without coordinates
+  const geolocatedProperties = courtProperties.filter(p => p.lat && p.lng);
+  const nonGeolocatedProperties = courtProperties.filter(p => !p.lat || !p.lng);
   
-  console.log(`📍 Adding ${validProperties.length} court properties to map...`);
+  console.log(`📍 Adding ${geolocatedProperties.length} geolocated court properties to map...`);
+  if (nonGeolocatedProperties.length > 0) {
+    console.log(`📋 ${nonGeolocatedProperties.length} court cases without addresses (available in property list)`);
+  }
   
-  // Add to your global allProperties array (avoid duplicates)
-  validProperties.forEach(property => {
+  // Add ALL properties to allProperties array (both geolocated and non-geolocated)
+  // Properties without coordinates won't show on map but will appear in list view
+  courtProperties.forEach(property => {
     const exists = allProperties.some(p => p.id === property.id);
     if (!exists) {
       allProperties.push(property);
     }
   });
   
-  // Apply filters and render markers
+  // Apply filters and render markers (only geolocated ones will show on map)
   applyFilters();
   
-  console.log(`✅ Court properties added to map (Total properties: ${allProperties.length})`);
+  console.log(`✅ Court properties added (Total: ${allProperties.length} | On Map: ${geolocatedProperties.length} | List Only: ${nonGeolocatedProperties.length})`);
+}
 }
 
 console.log('⚖️ CourtListener REO integration loaded');
