@@ -1893,6 +1893,325 @@ async function displayVAForeclosures() {
   console.log(`✅ VA foreclosures added to property list (${vaProperties.length} properties)`);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🏦 COURTLISTENER REO INTEGRATION
+// Adds foreclosure/REO court cases to map (matches VA foreclosure display style)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Global storage for court properties
+let courtProperties = [];
+
+// ── Load Court Properties ────────────────────────────────────────────────────
+
+async function loadCourtProperties() {
+  if (!KEYS.court) {
+    console.log('⚖️ CourtListener API key not set - skipping court data');
+    return [];
+  }
+  
+  try {
+    console.log('⚖️ Loading court foreclosure/REO data...');
+    
+    const states = ['VA', 'MD', 'DC'];
+    const allProperties = [];
+    
+    for (const state of states) {
+      const properties = await fetchCourtDataForState(state);
+      allProperties.push(...properties);
+    }
+    
+    console.log(`✅ Loaded ${allProperties.length} court properties`);
+    
+    // Store in global variable
+    courtProperties = allProperties;
+    
+    return allProperties;
+    
+  } catch (error) {
+    console.error('❌ Error loading court properties:', error);
+    return [];
+  }
+}
+
+// ── Fetch Court Data for State ───────────────────────────────────────────────
+
+async function fetchCourtDataForState(state) {
+  if (!KEYS.court) return [];
+  
+  try {
+    setDot('court', 'loading', 'COURTLISTENER');
+    
+    const courtMap = {
+      DC: 'dcb',
+      MD: 'mdb',
+      VA: 'vaeb'
+    };
+    const court = courtMap[state] || 'mdb';
+    
+    // Fetch 3 case types: Bankruptcy (941), Foreclosure (220), REO/Property (290)
+    const caseTypes = [
+      { code: '941', label: 'Bankruptcy', color: '#f39c12' },
+      { code: '220', label: 'Foreclosure', color: '#e74c3c' },
+      { code: '290', label: 'REO/Property', color: '#9b59b6' }
+    ];
+    
+    const allResults = [];
+    
+    for (const caseType of caseTypes) {
+      try {
+        const url = `https://www.courtlistener.com/api/rest/v3/dockets/?court=${court}&nature_of_suit=${caseType.code}&order_by=-date_filed&page_size=50&format=json`;
+        
+        const r = await fetch(url, {
+          headers: { 'Authorization': 'Token ' + KEYS.court }
+        });
+        
+        if (!r.ok) {
+          console.warn(`[Court] ${state} ${caseType.label}: Status ${r.status}`);
+          continue;
+        }
+        
+        const d = await r.json();
+        const results = d.results || [];
+        
+        // Process and format each docket
+        results.forEach(docket => {
+          const property = parseCourtDocket(docket, state, caseType);
+          if (property) {
+            allResults.push(property);
+          }
+        });
+        
+        console.log(`   ✅ ${state} ${caseType.label}: ${results.length} cases`);
+        
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (err) {
+        console.warn(`[Court] Error fetching ${state} ${caseType.label}:`, err);
+      }
+    }
+    
+    setDot('court', 'live', `COURTLISTENER (${allResults.length})`);
+    
+    return allResults;
+    
+  } catch (e) {
+    setDot('court', 'error', 'COURTLISTENER — ERROR');
+    return [];
+  }
+}
+
+// ── Parse Court Docket to Property ───────────────────────────────────────────
+
+function parseCourtDocket(docket, state, caseType) {
+  // Extract address from case name
+  const addressInfo = extractAddressFromCaseName(docket.case_name);
+  
+  // Skip if no address found
+  if (!addressInfo.address) {
+    return null;
+  }
+  
+  // Generate unique ID
+  const id = `court-${docket.id}`;
+  
+  // Estimate price based on case type
+  const estimatedPrice = caseType.code === '941' ? 250000 : // Bankruptcy
+                        caseType.code === '220' ? 200000 : // Foreclosure
+                        150000; // REO
+  
+  // Format to match your app's property structure
+  return {
+    id: id,
+    address: addressInfo.address,
+    city: addressInfo.city || getCityFromState(state),
+    state: state,
+    zip: addressInfo.zip || '',
+    county: '',
+    lat: null, // Will geocode later
+    lng: null,
+    price: estimatedPrice,
+    arv: Math.round(estimatedPrice * 1.3),
+    beds: 3,
+    baths: 2,
+    sqft: 1400,
+    yearBuilt: 1990,
+    source: 'CourtListener',
+    listingType: caseType.label,
+    caseTypeCode: caseType.code,
+    caseTypeColor: caseType.color,
+    daysOnMarket: Math.floor((new Date() - new Date(docket.date_filed)) / (1000 * 60 * 60 * 24)),
+    rehabEstimate: 25000,
+    monthlyRent: 1500,
+    propertyTax: 2500,
+    insurance: 1000,
+    hoaMonthly: 0,
+    score: 60,
+    tags: [caseType.label, 'Court Case'],
+    
+    // Court-specific fields
+    caseNumber: docket.docket_number,
+    caseName: docket.case_name,
+    dateFiled: docket.date_filed,
+    courtName: docket.court,
+    sourceUrl: `https://www.courtlistener.com${docket.absolute_url}`,
+    
+    // Calculated fields
+    cashFlow: 200,
+    capRate: '8.5',
+    discount: Math.round((estimatedPrice * 1.3 - estimatedPrice) / (estimatedPrice * 1.3) * 100),
+    refiLoan: Math.round(estimatedPrice * 0.75),
+    cashLeft: 20000,
+    coc: '10',
+    isNew: false,
+    enriched: false,
+    rentSource: 'Estimated',
+    taxSource: 'Estimated',
+    needsGeocoding: true
+  };
+}
+
+// ── Extract Address from Case Name ───────────────────────────────────────────
+
+function extractAddressFromCaseName(caseName) {
+  const result = {
+    address: null,
+    city: null,
+    zip: null
+  };
+  
+  // Common patterns in foreclosure case names:
+  // "Bank of America v. Smith RE: 123 Main Street, Fairfax, VA 22030"
+  // "Wells Fargo v. Johnson (456 Oak Ave, Arlington)"
+  // "FNMA v. Williams - 789 Pine Rd, Vienna, Virginia"
+  
+  const patterns = [
+    // Pattern 1: "RE: ADDRESS, CITY, STATE ZIP"
+    /RE:\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+),?\s*[A-Z]{2}\s*(\d{5})?/i,
+    
+    // Pattern 2: "(ADDRESS, CITY)"
+    /\(([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+)\)/i,
+    
+    // Pattern 3: "- ADDRESS, CITY"
+    /-\s*([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl)),?\s*([A-Za-z\s]+)/i,
+    
+    // Pattern 4: Just address with street suffix
+    /([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|Pl))/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = caseName.match(pattern);
+    if (match) {
+      result.address = match[1].trim();
+      if (match[2]) result.city = match[2].trim();
+      if (match[3]) result.zip = match[3].trim();
+      break;
+    }
+  }
+  
+  return result;
+}
+
+function getCityFromState(state) {
+  const defaults = {
+    VA: 'Fairfax',
+    MD: 'Silver Spring',
+    DC: 'Washington'
+  };
+  return defaults[state] || 'Unknown';
+}
+
+// ── Geocode Court Properties ─────────────────────────────────────────────────
+
+async function geocodeCourtProperties() {
+  console.log('📍 Geocoding court properties...');
+  
+  const GOOGLE_MAPS_API_KEY = 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po';
+  let geocoded = 0;
+  
+  for (const property of courtProperties) {
+    if (!property.needsGeocoding || property.lat) continue;
+    
+    try {
+      const fullAddress = `${property.address}, ${property.city}, ${property.state} ${property.zip}`.trim();
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.results && data.results[0]) {
+        property.lat = data.results[0].geometry.location.lat;
+        property.lng = data.results[0].geometry.location.lng;
+        
+        // Update city/zip from geocoded result
+        const addressComponents = data.results[0].address_components;
+        addressComponents.forEach(component => {
+          if (component.types.includes('locality')) {
+            property.city = component.long_name;
+          }
+          if (component.types.includes('postal_code')) {
+            property.zip = component.short_name;
+          }
+          if (component.types.includes('administrative_area_level_2')) {
+            property.county = component.long_name;
+          }
+        });
+        
+        property.needsGeocoding = false;
+        geocoded++;
+        
+        console.log(`   ✅ Geocoded: ${property.address}`);
+      }
+      
+      // Rate limiting for Google Maps API
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+    } catch (error) {
+      console.warn(`   ❌ Failed to geocode: ${property.address}`, error);
+    }
+  }
+  
+  console.log(`📍 Geocoded ${geocoded} court properties`);
+}
+
+// ── Display Court Properties on Map ──────────────────────────────────────────
+
+async function displayCourtProperties() {
+  // Load data if not already loaded
+  if (courtProperties.length === 0) {
+    await loadCourtProperties();
+  }
+  
+  if (courtProperties.length === 0) {
+    console.log('No court properties to display');
+    return;
+  }
+  
+  // Geocode properties that need it
+  await geocodeCourtProperties();
+  
+  // Filter to only properties with valid coordinates
+  const validProperties = courtProperties.filter(p => p.lat && p.lng);
+  
+  console.log(`📍 Adding ${validProperties.length} court properties to map...`);
+  
+  // Add to your global allProperties array (avoid duplicates)
+  validProperties.forEach(property => {
+    const exists = allProperties.some(p => p.id === property.id);
+    if (!exists) {
+      allProperties.push(property);
+    }
+  });
+  
+  // Apply filters and render markers
+  applyFilters();
+  
+  console.log(`✅ Court properties added to map (Total properties: ${allProperties.length})`);
+}
+
+console.log('⚖️ CourtListener REO integration loaded');
+
+
 // ── Map ─────────────────────────────────────────────────────────────────────
 function initMap(){
   map=new google.maps.Map(document.getElementById('map'),{
@@ -1914,6 +2233,14 @@ function initMap(){
   setTimeout(() => {
     displayVAForeclosures();
   }, 1000);
+  
+  // Load and display CourtListener foreclosure/REO cases
+  if (KEYS.court) {
+    setTimeout(async () => {
+      console.log('🏦 CourtListener API key detected - loading foreclosure/REO cases...');
+      await displayCourtProperties();
+    }, 3000); // Wait 3 seconds to allow VA properties to load first
+  }
 }
 function setMapType(t,btn){map.setMapTypeId(t);document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function fitAll(){if(!markers.length)return;const b=new google.maps.LatLngBounds();markers.forEach(m=>b.extend(m.getPosition()));map.fitBounds(b);}
