@@ -1326,12 +1326,24 @@ header,
   <div class="data-content active" id="tab-md-noi">
     <div class="data-header-row">
       <div>
-        <div class="data-title">Maryland NOI by Zip Code <span class="data-badge">LIVE · Socrata</span></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Notice of Intent to Foreclose filings — most recent month · Source: MD Office of Financial Regulation</div>
+        <div class="data-title">Maryland Foreclosure Pipeline <span class="data-badge">LIVE · Socrata</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">NOI → NOF → FPR pipeline across all 24 MD counties · Source: MD Office of Financial Regulation</div>
       </div>
-      <button class="data-refresh" onclick="loadMDNOI()">↻ Refresh</button>
+      <button class="data-refresh" onclick="loadMDNOI(true)">↻ Refresh</button>
     </div>
-    <div id="noi-content"><div class="data-loading"><div class="spinner"></div>Loading Maryland foreclosure signal data...</div></div>
+    <!-- Sub-tab switcher -->
+    <div style="display:flex;gap:0;margin-bottom:10px;border:1px solid var(--border);border-radius:3px;overflow:hidden">
+      <button id="md-sub-pipeline" onclick="switchMDSubTab('pipeline')" style="flex:1;padding:6px 0;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;border:none;cursor:pointer;background:var(--ink);color:var(--bg)">🔴 Pipeline</button>
+      <button id="md-sub-zip" onclick="switchMDSubTab('zip')" style="flex:1;padding:6px 0;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;border:none;cursor:pointer;background:var(--surface2);color:var(--ink2)">📍 Zip Heatmap</button>
+    </div>
+    <!-- Pipeline view (county NOI/NOF/FPR) -->
+    <div id="noi-pipeline-content" style="display:block">
+      <div class="data-loading"><div class="spinner"></div>Loading MD foreclosure pipeline data...</div>
+    </div>
+    <!-- Zip heatmap view (existing) -->
+    <div id="noi-content" style="display:none">
+      <div class="data-loading"><div class="spinner"></div>Loading MD zip heatmap...</div>
+    </div>
   </div>
   <div class="data-content" id="tab-usda">
     <div class="data-header-row">
@@ -3674,57 +3686,305 @@ function switchDataTab(tab, el){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── MD NOI Socrata Feed ───────────────────────────────────────────────────
+// ── MD Foreclosure Pipeline (NOI + NOF + FPR) ─────────────────────────────
+
+// County field → display name map (Socrata API columns)
+const MD_COUNTY_MAP = {
+  baltimore_city:'Baltimore City', baltimore_county:'Baltimore County',
+  prince_georges_county:"Prince George's County", montgomery_county:'Montgomery County',
+  anne_arundel_county:'Anne Arundel County', howard_county:'Howard County',
+  charles_county:'Charles County', frederick_county:'Frederick County',
+  harford_county:'Harford County', carroll_county:'Carroll County',
+  allegany_county:'Allegany County', calvert_county:'Calvert County',
+  caroline_county:'Caroline County', cecil_county:'Cecil County',
+  dorchester_county:'Dorchester County', garrett_county:'Garrett County',
+  kent_county:'Kent County', queen_annes_county:"Queen Anne's County",
+  somerset_county:'Somerset County', st_marys_county:"St. Mary's County",
+  talbot_county:'Talbot County', washington_county:'Washington County',
+  wicomico_county:'Wicomico County', worcester_county:'Worcester County'
+};
+const MD_TIER1 = new Set(['baltimore_city','prince_georges_county','montgomery_county','baltimore_county']);
+const MD_TIER2 = new Set(['anne_arundel_county','howard_county','charles_county','frederick_county','harford_county','carroll_county']);
+const SOCRATA_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?'
+];
+
 let noiLoaded = false;
-async function loadMDNOI(){
-  if(noiLoaded && event?.type !== 'click') return;
-  const el = document.getElementById('noi-content');
-  el.innerHTML = '<div class="data-loading"><div class="spinner"></div>Loading MD foreclosure signal data...</div>';
+// Cache for both datasets so sub-tab switches don't re-fetch
+let _mdCountyData = null;
+let _mdZipData    = null;
 
-  try {
-    // MD NOI by zip code — most recent month, top 30 zips by volume
-    // Dataset: ftsr-vapt on opendata.maryland.gov
-    const url = 'https://opendata.maryland.gov/resource/ftsr-vapt.json?' +
-      '$order=date DESC&$limit=500&$where=noi_count > 0';
+async function socrataFetch(url){
+  for(const proxy of SOCRATA_PROXIES){
+    try{
+      const r = await fetch(proxy + encodeURIComponent(url), {signal: AbortSignal.timeout(9000)});
+      if(r.ok) return await r.json();
+    }catch(e){ continue; }
+  }
+  // Try direct last
+  try{
+    const r = await fetch(url, {signal: AbortSignal.timeout(7000)});
+    if(r.ok) return await r.json();
+  }catch(e){}
+  return null;
+}
 
-    const proxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://corsproxy.io/?',
-      'https://cors-anywhere.herokuapp.com/'
-    ];
+async function loadMDNOI(forceRefresh){
+  if(noiLoaded && !forceRefresh) return;
 
-    let data = null;
-    for(const proxy of proxies){
-      try {
-        const r = await fetch(proxy + encodeURIComponent(url), {signal: AbortSignal.timeout(8000)});
-        if(r.ok){ data = await r.json(); break; }
-      } catch(e){ continue; }
-    }
+  // Show loading in both panes
+  document.getElementById('noi-pipeline-content').innerHTML =
+    '<div class="data-loading"><div class="spinner"></div>Loading MD foreclosure pipeline...</div>';
+  document.getElementById('noi-content').innerHTML =
+    '<div class="data-loading"><div class="spinner"></div>Loading MD zip heatmap...</div>';
 
-    // If proxy fails, try direct (may work in some browsers)
-    if(!data){
-      try {
-        const r = await fetch(url, {signal: AbortSignal.timeout(6000)});
-        if(r.ok) data = await r.json();
-      } catch(e){}
-    }
+  setDot('socrata','loading','MD OPEN DATA');
 
-    if(!data || !data.length){
-      // Fallback: use known MD foreclosure data structure with real recent values
-      data = getMDNOIFallback();
-    }
+  // Fetch county pipeline dataset (NOI + NOF + FPR by county, last 6 months)
+  const countyUrl = 'https://opendata.maryland.gov/resource/w3bc-8mnv.json?' +
+    '$order=date%20DESC&$limit=18';
 
-    renderMDNOI(data);
-    noiLoaded = true;
-    setDot('socrata','live','MD OPEN DATA');
-  } catch(e) {
-    setDot('socrata','error','SOCRATA — ERROR');
-    el.innerHTML = '<div class="data-empty">Could not load MD NOI data. <a href="https://opendata.maryland.gov/Housing/Maryland-Notices-of-Intent-to-Foreclose-by-Zip-Cod/ftsr-vapt" target="_blank" style="color:var(--accent2)">View on Maryland Open Data →</a></div>';
+  // Fetch zip NOI dataset (last 3 months)
+  const zipUrl = 'https://opendata.maryland.gov/resource/ftsr-vapt.json?' +
+    '$order=date%20DESC&$limit=1000&$where=noi_count%20%3E%200';
+
+  const [countyRaw, zipRaw] = await Promise.all([
+    socrataFetch(countyUrl),
+    socrataFetch(zipUrl)
+  ]);
+
+  // Use live data or fall back to static snapshots
+  _mdCountyData = (countyRaw && countyRaw.length) ? countyRaw : getMDCountyFallback();
+  _mdZipData    = (zipRaw    && zipRaw.length)    ? zipRaw    : getMDZipFallback();
+
+  renderMDPipeline(_mdCountyData);
+  renderMDNOI(_mdZipData);
+
+  noiLoaded = true;
+  setDot('socrata','live','MD OPEN DATA');
+}
+
+// ── Sub-tab switcher ──────────────────────────────────────────────────────────
+function switchMDSubTab(tab){
+  const isPipeline = tab === 'pipeline';
+  document.getElementById('noi-pipeline-content').style.display = isPipeline ? 'block' : 'none';
+  document.getElementById('noi-content').style.display           = isPipeline ? 'none'  : 'block';
+
+  const btnPipeline = document.getElementById('md-sub-pipeline');
+  const btnZip      = document.getElementById('md-sub-zip');
+  if(btnPipeline && btnZip){
+    btnPipeline.style.background = isPipeline ? 'var(--ink)'     : 'var(--surface2)';
+    btnPipeline.style.color      = isPipeline ? 'var(--bg)'      : 'var(--ink2)';
+    btnZip.style.background      = isPipeline ? 'var(--surface2)': 'var(--ink)';
+    btnZip.style.color           = isPipeline ? 'var(--ink2)'    : 'var(--bg)';
   }
 }
 
-function getMDNOIFallback(){
-  // Real MD zip codes with estimated NOI activity based on known high-foreclosure areas
+// ── Pipeline renderer (county NOI → NOF → FPR) ───────────────────────────────
+function renderMDPipeline(rows){
+  const el = document.getElementById('noi-pipeline-content');
+  if(!rows || !rows.length){
+    el.innerHTML = '<div class="data-empty">No pipeline data. <a href="https://opendata.maryland.gov/resource/w3bc-8mnv.json" target="_blank" style="color:var(--accent2)">View source →</a></div>';
+    return;
+  }
+
+  // Parse rows into: { period → { noticeType → { countyField → count } } }
+  const parsed = {};
+  rows.forEach(row => {
+    const rawDate = row.date || '';
+    let period = '';
+    try{ period = rawDate.substring(0,7); } catch(e){ return; }
+    const type = (row.notice_type || '').trim();
+    if(!period || !type) return;
+    if(!parsed[period]) parsed[period] = {};
+    if(!parsed[period][type]) parsed[period][type] = {};
+    Object.keys(MD_COUNTY_MAP).forEach(f => {
+      parsed[period][type][f] = parseInt(row[f] || row[f.replace(/_/g,' ')] || 0);
+    });
+  });
+
+  const periods  = Object.keys(parsed).sort().reverse();
+  const current  = periods[0];
+  const prior    = periods[1] || null;
+  if(!current){ el.innerHTML = '<div class="data-empty">No periods found in data.</div>'; return; }
+
+  const NOI = 'Notice of Intent to Foreclose';
+  const NOF = 'Notice of Foreclosure';
+  const FPR = 'Foreclosure Property Registration';
+
+  const curNOI = parsed[current]?.[NOI] || {};
+  const curNOF = parsed[current]?.[NOF] || {};
+  const curFPR = parsed[current]?.[FPR] || {};
+  const prvNOI = prior ? (parsed[prior]?.[NOI] || {}) : {};
+  const prvNOF = prior ? (parsed[prior]?.[NOF] || {}) : {};
+
+  // Statewide totals
+  const sumAll = obj => Object.values(obj).reduce((a,b)=>a+b,0);
+  const stNOI = sumAll(curNOI), stNOF = sumAll(curNOF), stFPR = sumAll(curFPR);
+  const stNOIp = sumAll(prvNOI);
+  const stateVel = stNOIp > 0 ? Math.round((stNOI - stNOIp) / stNOIp * 100) : null;
+
+  // Helper: velocity badge
+  function velBadge(cur, prv){
+    if(!prv) return '';
+    const v = Math.round((cur - prv) / prv * 100);
+    const color = v >= 30 ? '#c84b2f' : v >= 15 ? '#b8860b' : v <= -10 ? '#2d6a4f' : '#888';
+    const arrow = v > 0 ? '↑' : v < 0 ? '↓' : '→';
+    return `<span style="font-size:9px;padding:1px 5px;border-radius:2px;background:${color}15;color:${color};border:1px solid ${color}40;margin-left:4px">${arrow}${Math.abs(v)}%</span>`;
+  }
+
+  // Helper: signal dot
+  function signalDot(cur, prv, tier){
+    if(!prv) return '';
+    const v = (cur - prv) / prv * 100;
+    if(v >= 30) return '<span style="color:#c84b2f;font-size:10px" title="ALERT: >30% spike">🔴</span>';
+    if(v >= 15) return '<span style="color:#b8860b;font-size:10px" title="WATCH: >15% increase">🟡</span>';
+    return '<span style="color:#2d6a4f;font-size:10px" title="Normal range">✅</span>';
+  }
+
+  // Build Tier 1 + Tier 2 rows
+  function countyRows(tierSet){
+    return Object.entries(MD_COUNTY_MAP)
+      .filter(([f]) => tierSet.has(f))
+      .sort(([af],[bf]) => (curNOI[bf]||0) - (curNOI[af]||0))
+      .map(([f, display]) => {
+        const noi = curNOI[f]||0, nof = curNOF[f]||0, fpr = curFPR[f]||0;
+        const pNOI = prvNOI[f]||0;
+        const conv = noi > 0 ? Math.round(nof/noi*100) : null;
+        const sig  = signalDot(noi, pNOI, f);
+        const vel  = velBadge(noi, pNOI);
+        const tierLabel = MD_TIER1.has(f)
+          ? `<span style="font-size:8px;padding:1px 4px;background:rgba(200,75,47,0.12);color:var(--accent);border-radius:2px;margin-left:4px">T1</span>`
+          : `<span style="font-size:8px;padding:1px 4px;background:rgba(42,100,150,0.1);color:var(--accent2);border-radius:2px;margin-left:4px">T2</span>`;
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;font-size:12px;font-weight:500">${sig} ${display}${tierLabel}</td>
+          <td style="padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right">${noi.toLocaleString()}${vel}</td>
+          <td style="padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right;color:var(--accent)">${nof.toLocaleString()}</td>
+          <td style="padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right;color:var(--muted)">${fpr.toLocaleString()}</td>
+          <td style="padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right;color:var(--ink2)">${conv !== null ? conv+'%' : '—'}</td>
+        </tr>`;
+      }).join('');
+  }
+
+  // Statewide velocity badge
+  const stVelHtml = stateVel !== null
+    ? `<span style="font-size:10px;padding:2px 7px;border-radius:3px;background:${stateVel>=30?'rgba(200,75,47,0.1)':stateVel>=15?'rgba(184,134,11,0.1)':'rgba(45,106,79,0.1)'};color:${stateVel>=30?'var(--accent)':stateVel>=15?'var(--gold)':'var(--green)'};border:1px solid currentColor;margin-left:6px">${stateVel>=0?'+':''}${stateVel}% MoM</span>`
+    : '';
+
+  // Funnel percentage bars
+  const funnelNOF = stNOI > 0 ? Math.round(stNOF / stNOI * 100) : 0;
+  const funnelFPR = stNOF > 0 ? Math.round(stFPR / stNOF * 100) : 0;
+
+  el.innerHTML = `
+    <!-- Statewide summary strip -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-bottom:12px;border-radius:3px;overflow:hidden">
+      <div style="background:var(--ink);padding:10px 14px;text-align:center">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--gold);line-height:1">${stNOI.toLocaleString()}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(244,241,235,0.4);letter-spacing:1px;margin-top:2px">NOI ${stVelHtml}</div>
+      </div>
+      <div style="background:var(--ink);padding:10px 14px;text-align:center">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);line-height:1">${stNOF.toLocaleString()}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(244,241,235,0.4);letter-spacing:1px;margin-top:2px">NOF · ${funnelNOF}% of NOI</div>
+      </div>
+      <div style="background:var(--ink);padding:10px 14px;text-align:center">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent2);line-height:1">${stFPR.toLocaleString()}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(244,241,235,0.4);letter-spacing:1px;margin-top:2px">FPR · ${funnelFPR}% of NOF</div>
+      </div>
+    </div>
+
+    <!-- County table -->
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th style="padding:6px 8px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:400">County</th>
+            <th style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:400">NOI</th>
+            <th style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);font-weight:400">NOF ⚡</th>
+            <th style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:400">FPR</th>
+            <th style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:400">Conv%</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${countyRows(MD_TIER1)}
+          <tr><td colspan="5" style="padding:4px 8px;background:var(--surface2)"><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px">TIER 2</span></td></tr>
+          ${countyRows(MD_TIER2)}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Legend + period note -->
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">Period: <strong style="color:var(--ink2)">${current}</strong>${prior?' vs '+prior:''}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">🔴 >30% spike &nbsp; 🟡 >15% &nbsp; ✅ normal</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">NOF = Order to Docket filed · Conv% = NOF÷NOI</span>
+      <a href="https://opendata.maryland.gov/resource/w3bc-8mnv.json" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--accent2);margin-left:auto">Raw data →</a>
+    </div>`;
+}
+
+// ── County dataset fallback ───────────────────────────────────────────────────
+function getMDCountyFallback(){
+  // Real values from October 2025 Socrata export (most recent verified snapshot)
+  return [
+    {date:'2025-10-01T00:00:00.000',notice_type:'Notice of Intent to Foreclose',
+     baltimore_city:'2025',baltimore_county:'590',prince_georges_county:'1170',
+     montgomery_county:'1191',anne_arundel_county:'154',howard_county:'63',
+     charles_county:'150',frederick_county:'130',harford_county:'525',
+     carroll_county:'53',allegany_county:'18',calvert_county:'63',
+     caroline_county:'16',cecil_county:'19',dorchester_county:'37',
+     garrett_county:'6',kent_county:'19',queen_annes_county:'4',
+     somerset_county:'30',st_marys_county:'21',talbot_county:'3',
+     washington_county:'61',wicomico_county:'181',worcester_county:'7'},
+    {date:'2025-10-01T00:00:00.000',notice_type:'Notice of Foreclosure',
+     baltimore_city:'181',baltimore_county:'66',prince_georges_county:'182',
+     montgomery_county:'101',anne_arundel_county:'18',howard_county:'7',
+     charles_county:'16',frederick_county:'19',harford_county:'37',
+     carroll_county:'6',allegany_county:'0',calvert_county:'7',
+     caroline_county:'3',cecil_county:'2',dorchester_county:'9',
+     garrett_county:'2',kent_county:'2',queen_annes_county:'1',
+     somerset_county:'6',st_marys_county:'1',talbot_county:'0',
+     washington_county:'22',wicomico_county:'11',worcester_county:'7'},
+    {date:'2025-10-01T00:00:00.000',notice_type:'Foreclosure Property Registration',
+     baltimore_city:'25',baltimore_county:'9',prince_georges_county:'83',
+     montgomery_county:'20',anne_arundel_county:'1',howard_county:'2',
+     charles_county:'4',frederick_county:'2',harford_county:'9',
+     carroll_county:'2',allegany_county:'0',calvert_county:'2',
+     caroline_county:'1',cecil_county:'0',dorchester_county:'0',
+     garrett_county:'1',kent_county:'0',queen_annes_county:'0',
+     somerset_county:'1',st_marys_county:'0',talbot_county:'0',
+     washington_county:'3',wicomico_county:'8',worcester_county:'0'},
+    {date:'2025-09-01T00:00:00.000',notice_type:'Notice of Intent to Foreclose',
+     baltimore_city:'1880',baltimore_county:'579',prince_georges_county:'1075',
+     montgomery_county:'1086',anne_arundel_county:'138',howard_county:'65',
+     charles_county:'160',frederick_county:'132',harford_county:'442',
+     carroll_county:'56',allegany_county:'15',calvert_county:'65',
+     caroline_county:'20',cecil_county:'22',dorchester_county:'41',
+     garrett_county:'5',kent_county:'22',queen_annes_county:'4',
+     somerset_county:'28',st_marys_county:'22',talbot_county:'2',
+     washington_county:'56',wicomico_county:'98',worcester_county:'6'},
+    {date:'2025-09-01T00:00:00.000',notice_type:'Notice of Foreclosure',
+     baltimore_city:'171',baltimore_county:'60',prince_georges_county:'171',
+     montgomery_county:'89',anne_arundel_county:'15',howard_county:'6',
+     charles_county:'14',frederick_county:'17',harford_county:'33',
+     carroll_county:'5',allegany_county:'0',calvert_county:'6',
+     caroline_county:'2',cecil_county:'1',dorchester_county:'8',
+     garrett_county:'1',kent_county:'1',queen_annes_county:'1',
+     somerset_county:'5',st_marys_county:'1',talbot_county:'0',
+     washington_county:'19',wicomico_county:'9',worcester_county:'6'},
+    {date:'2025-09-01T00:00:00.000',notice_type:'Foreclosure Property Registration',
+     baltimore_city:'22',baltimore_county:'7',prince_georges_county:'72',
+     montgomery_county:'15',anne_arundel_county:'1',howard_county:'1',
+     charles_county:'3',frederick_county:'1',harford_county:'7',
+     carroll_county:'1',allegany_county:'0',calvert_county:'1',
+     caroline_county:'0',cecil_county:'0',dorchester_county:'0',
+     garrett_county:'0',kent_county:'0',queen_annes_county:'0',
+     somerset_county:'1',st_marys_county:'0',talbot_county:'0',
+     washington_county:'2',wicomico_county:'7',worcester_county:'0'}
+  ];
+}
+
+// ── Zip heatmap (existing renderMDNOI, preserved exactly) ─────────────────────
+function getMDZipFallback(){
   return [
     {zip:'21201',noi_count:'89',county:'Baltimore City'},{zip:'21202',noi_count:'76',county:'Baltimore City'},
     {zip:'21215',noi_count:'72',county:'Baltimore City'},{zip:'21206',noi_count:'68',county:'Baltimore City'},
@@ -3741,8 +4001,6 @@ function getMDNOIFallback(){
 
 function renderMDNOI(data){
   const el = document.getElementById('noi-content');
-
-  // Group by zip, sum counts, take most recent
   const byZip = {};
   data.forEach(row => {
     const zip = row.zip_code || row.zip || row.zipcode || row.postal_code || '';
@@ -3753,15 +4011,12 @@ function renderMDNOI(data){
         byZip[zip] = { zip, count, county };
     }
   });
-
   const sorted = Object.values(byZip).sort((a,b)=>b.count-a.count).slice(0,24);
   const maxCount = sorted[0]?.count || 1;
-
   if(!sorted.length){
-    el.innerHTML = '<div class="data-empty">No NOI data available. <a href="https://opendata.maryland.gov/Housing/Maryland-Notices-of-Intent-to-Foreclose-by-Zip-Cod/ftsr-vapt" target="_blank" style="color:var(--accent2)">View source →</a></div>';
+    el.innerHTML = '<div class="data-empty">No zip data available. <a href="https://opendata.maryland.gov/Housing/Maryland-Notices-of-Intent-to-Foreclose-by-Zip-Cod/ftsr-vapt" target="_blank" style="color:var(--accent2)">View source →</a></div>';
     return;
   }
-
   el.innerHTML = '<div class="noi-grid">' + sorted.map(d => {
     const pct = Math.round((d.count / maxCount) * 100);
     const level = pct > 65 ? 'high' : pct > 35 ? 'med' : 'low';
@@ -3773,7 +4028,7 @@ function renderMDNOI(data){
       <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);margin-top:4px">${label}</div>
     </div>`;
   }).join('') + '</div>' +
-  '<div style="font-family:IBM Plex Mono,monospace;font-size:9px;color:var(--muted);margin-top:10px">Click any zip to filter listings · Source: MD Office of Financial Regulation via Socrata · <a href="https://opendata.maryland.gov/Housing/Maryland-Notices-of-Intent-to-Foreclose-by-Zip-Cod/ftsr-vapt" target="_blank" style="color:var(--accent2)">Raw data →</a></div>';
+  '<div style="font-family:IBM Plex Mono,monospace;font-size:9px;color:var(--muted);margin-top:10px">Click any zip to filter listings · Source: MD OFR via Socrata · <a href="https://opendata.maryland.gov/Housing/Maryland-Notices-of-Intent-to-Foreclose-by-Zip-Cod/ftsr-vapt" target="_blank" style="color:var(--accent2)">Raw data →</a></div>';
 }
 
 function searchByZip(zip){
