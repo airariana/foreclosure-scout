@@ -30,6 +30,7 @@ jobs:
     - name: Run VA foreclosure scraper
       env:
         GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
       run: |
         python3 scraper/va_foreclosure_scraper.py
 
@@ -37,8 +38,8 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add data/foreclosures_va.json
-        
+        git add data/foreclosures_va.json data/enrichment_cache.json data/enrichment_retry.json
+
         # Only commit if there are changes
         if git diff --staged --quiet; then
           echo "No changes to commit"
