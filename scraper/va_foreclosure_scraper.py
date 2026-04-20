@@ -439,17 +439,140 @@ def parse_siw_block(text: str, source_url: str) -> dict | None:
     return None
 
 
-# ── Source 2: Orlans Law Group ────────────────────────────────────────────────
+# ── Source 2: Orlans Law Group (Mid Atlantic portal) ─────────────────────────
+# Portal: https://matlsales.orlans.com/
+# Flow: visit root → click "ACCEPT" policy link → navigate to
+#       /Home/ForeclosureSales → ~100 .sales-item divs, each with structured
+#       label/value pairs (File Number, Property Address, Property State, etc.)
+# Filter: keep only State=VA and Status=Active.
+
+ORLANS_ROOT   = "https://matlsales.orlans.com/"
+ORLANS_SALES  = "https://matlsales.orlans.com/Home/ForeclosureSales"
+
 
 def scrape_orlans() -> list[dict]:
+    """Scrape Orlans MATL sales portal via Playwright (JS-rendered listings)."""
+    log.info("Scraping Orlans (matlsales.orlans.com) ...")
+    properties: list[dict] = []
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        log.warning("Orlans: playwright not installed — skipping")
+        return properties
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(user_agent=HEADERS["User-Agent"])
+                page.goto(ORLANS_ROOT, timeout=30_000)
+                # ACCEPT policy link lives on root
+                try:
+                    page.locator('a:has-text("ACCEPT")').first.click(timeout=10_000)
+                    page.wait_for_load_state("networkidle", timeout=30_000)
+                except Exception:
+                    log.warning("Orlans: ACCEPT button not found (may already be accepted)")
+                page.goto(ORLANS_SALES, timeout=30_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                # Parse .sales-item blocks
+                items = page.locator(".sales-item")
+                n = items.count()
+                log.info(f"Orlans: {n} total listings (pre-filter)")
+                for i in range(n):
+                    try:
+                        text = items.nth(i).inner_text()
+                        prop = _parse_orlans_item(text)
+                        if prop:
+                            properties.append(prop)
+                    except Exception as e:
+                        log.debug(f"Orlans item {i} parse failed: {e}")
+            finally:
+                browser.close()
+
+    except Exception as e:
+        log.error(f"Orlans scrape failed: {e}")
+
+    log.info(f"Orlans: {len(properties)} VA properties after filter")
+    return properties
+
+
+def _parse_orlans_item(text: str) -> dict | None:
     """
-    Orlans Law Group: disabled pending research.
-    The old /property-listings/ URL returns 404 — site was restructured and
-    the public listings feed appears to have been removed. To re-enable,
-    either find the new listings URL or swap to a paid API feed.
+    Parse a single Orlans .sales-item block's visible text into a property dict.
+    Returns None if state != VA or status != Active.
+
+    Expected text format (one field-label per line, value on next line):
+        File Number\n24-000825\nStatus\nActive\nProperty Address\n...\nProperty State\nVA\n...
     """
-    log.warning("Orlans: source disabled (no public listings URL — site restructured)")
-    return []
+    fields: dict[str, str] = {}
+    labels = {
+        "File Number", "Status", "Property Address", "Property City",
+        "Property State", "Property Zip", "Property County",
+        "Sale Date", "Sale Time", "Deposit Amount", "Sale Location",
+    }
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    i = 0
+    while i < len(lines) - 1:
+        if lines[i] in labels:
+            fields[lines[i]] = lines[i + 1]
+            i += 2
+        else:
+            i += 1
+
+    # Filter
+    state = fields.get("Property State", "").strip().upper()
+    status = fields.get("Status", "").strip().lower()
+    if state != "VA" or status != "active":
+        return None
+    address = fields.get("Property Address", "").strip()
+    if not address:
+        return None
+
+    # Sale date → ISO
+    sale_date_raw = fields.get("Sale Date", "").strip()
+    sale_date_iso = None
+    try:
+        sale_date_iso = datetime.strptime(sale_date_raw, "%m/%d/%Y").strftime("%Y-%m-%d")
+    except Exception:
+        sale_date_iso = sale_date_raw or None
+
+    # County is "Fairfax, VA" or "City of Alexandria, VA" — strip state
+    county_raw = fields.get("Property County", "").strip()
+    county_raw = re.sub(r",\s*VA\s*$", "", county_raw, flags=re.IGNORECASE).strip()
+    county = normalize_county(county_raw)
+
+    property_type = detect_property_type(address)
+    pricing = build_pricing(county, property_type, None, None, None)
+
+    return {
+        "id":               make_id("orlans", address, sale_date_iso or ""),
+        "source":           "Orlans Law Group",
+        "source_url":       ORLANS_SALES,
+        "firm_file_number": fields.get("File Number", "").strip() or None,
+        "address":          address,
+        "city":             fields.get("Property City", "").strip(),
+        "state":            "VA",
+        "zip_code":         fields.get("Property Zip", "").strip(),
+        "county":           county,
+        "lat":              None,
+        "lng":              None,
+        "sale_date":        sale_date_iso,
+        "sale_date_raw":    sale_date_raw,
+        "sale_time":        fields.get("Sale Time", "").strip() or None,
+        "sale_location":    fields.get("Sale Location", "").strip() or f"{county} Courthouse",
+        "property_type":    property_type,
+        "sqft":             None,
+        "beds":             None,
+        "baths":            None,
+        "year_built":       None,
+        "pricing":          pricing,
+        "tags":             ["VA Foreclosure", "Trustee Sale", county, "Orlans"],
+        "status":           "active",
+        "scraped_at":       datetime.utcnow().isoformat() + "Z",
+        "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
+    }
 
 
 def _unused_scrape_orlans_legacy() -> list[dict]:
@@ -620,31 +743,240 @@ def parse_orlans_json(item: dict) -> dict | None:
         return None
 
 
-# ── Source 3: BWW Law Group ───────────────────────────────────────────────────
+# ── Source 3: BWW Law Group (Aldridge Pite) ──────────────────────────────────
+# Flow: visit /disclaimer-virginia/ → click "I agree" → land on
+#   /sale-day-listings-selection/foreclosure-listings-virginia/
+#   → 1 main table with columns [FILE NUMBER, ADDRESS, CITY, STATE, ZIP,
+#     COUNTY, DATE LISTED (sale date+time), ORIGINAL LOAN AMOUNT]
+# The ORIGINAL LOAN AMOUNT column unlocks HIGH-confidence pricing.
+
+BWW_DISCLAIMER = "https://aldridgepite.com/disclaimer-virginia/"
+BWW_LISTINGS   = "https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-virginia/"
+
 
 def scrape_bww() -> list[dict]:
+    """Scrape Aldridge Pite VA listings via Playwright (disclaimer gate)."""
+    log.info("Scraping BWW / Aldridge Pite ...")
+    properties: list[dict] = []
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        log.warning("BWW: playwright not installed — skipping")
+        return properties
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(user_agent=HEADERS["User-Agent"])
+                page.goto(BWW_DISCLAIMER, timeout=30_000)
+                page.locator('a:has-text("I agree")').first.click(timeout=10_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                tables = page.locator("table")
+                n_tables = tables.count()
+                # The second table is the listings table (first is a "affected
+                # counties → new sale locations" lookup). Find by header text.
+                target_idx = None
+                for i in range(n_tables):
+                    try:
+                        first_row = tables.nth(i).locator("tr").first.inner_text()
+                        if "FILE NUMBER" in first_row.upper() and "ADDRESS" in first_row.upper():
+                            target_idx = i
+                            break
+                    except Exception:
+                        continue
+                if target_idx is None:
+                    log.warning("BWW: could not find listings table")
+                    return properties
+
+                rows = tables.nth(target_idx).locator("tr")
+                row_count = rows.count()
+                log.info(f"BWW: {row_count - 1} total listings")
+                for r in range(1, row_count):  # skip header
+                    try:
+                        cells = rows.nth(r).locator("td").all_inner_texts()
+                        prop = _parse_bww_row(cells)
+                        if prop:
+                            properties.append(prop)
+                    except Exception as e:
+                        log.debug(f"BWW row {r} parse failed: {e}")
+            finally:
+                browser.close()
+
+    except Exception as e:
+        log.error(f"BWW scrape failed: {e}")
+
+    log.info(f"BWW: {len(properties)} properties")
+    return properties
+
+
+def _parse_bww_row(cells: list[str]) -> dict | None:
     """
-    BWW Law Group: disabled pending research.
-    BWW merged with Aldridge Pite (www.bww-law.com now redirects to
-    aldridgepite.com). Their listings page is a JS-rendered state-selection
-    form served with Brotli-only compression — bare HTTP scraping is
-    infeasible. Needs Playwright in CI or a different data source.
+    Parse a BWW listings-table row.
+    Columns: [FILE NUMBER, ADDRESS, CITY, STATE, ZIP, COUNTY, DATE LISTED, ORIGINAL LOAN AMOUNT]
+    Example: ['VA-361587-1', '4622 Flatlick Branch Drive', 'Chantilly', 'VA',
+              '20151', 'Fairfax County', 'July 15, 2026 11:45 AM', '$412,093.30']
     """
-    log.warning("BWW: source disabled (merged with Aldridge Pite — JS-rendered, needs browser automation)")
-    return []
+    if len(cells) < 8:
+        return None
+    file_number, address, city, state, zip_code, county_raw, date_listed, loan_amount_raw = \
+        [c.strip() for c in cells[:8]]
+
+    if state.upper() != "VA" or not address:
+        return None
+
+    # Parse "July 15, 2026 11:45 AM" into sale_date + sale_time
+    sale_date_iso, sale_time = None, None
+    m = re.match(
+        r"([A-Za-z]+\s+\d{1,2},\s+\d{4})\s+(\d{1,2}:\d{2}\s*[AP]M)",
+        date_listed, re.IGNORECASE,
+    )
+    if m:
+        date_part, sale_time = m.group(1), m.group(2).upper().replace(" ", "")
+        try:
+            sale_date_iso = datetime.strptime(date_part, "%B %d, %Y").strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+    # Parse loan amount "$412,093.30"
+    original_loan = None
+    m2 = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", loan_amount_raw)
+    if m2:
+        try:
+            val = float(m2.group(1).replace(",", ""))
+            if val > 10_000:
+                original_loan = val
+        except Exception:
+            pass
+
+    county = normalize_county(county_raw)
+    property_type = detect_property_type(address)
+    pricing = build_pricing(county, property_type, None, None, original_loan)
+
+    return {
+        "id":               make_id("bww", address, sale_date_iso or ""),
+        "source":           "BWW / Aldridge Pite",
+        "source_url":       BWW_LISTINGS,
+        "firm_file_number": file_number or None,
+        "address":          address,
+        "city":             city,
+        "state":            "VA",
+        "zip_code":         zip_code,
+        "county":           county,
+        "lat":              None,
+        "lng":              None,
+        "sale_date":        sale_date_iso,
+        "sale_date_raw":    date_listed,
+        "sale_time":        sale_time,
+        "sale_location":    f"{county} Courthouse",
+        "property_type":    property_type,
+        "sqft":             None,
+        "beds":             None,
+        "baths":            None,
+        "year_built":       None,
+        "pricing":          pricing,
+        "tags":             ["VA Foreclosure", "Trustee Sale", county, "Aldridge Pite"],
+        "status":           "active",
+        "scraped_at":       datetime.utcnow().isoformat() + "Z",
+        "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
+    }
 
 
 # ── Source 4: McCabe, Weisberg & Conway ──────────────────────────────────────
+# The main site (mccabeesq.com) gates with a disclaimer click-through, but the
+# actual VA sales list is served from their apps subdomain at a stable URL
+# with NO disclaimer — plain HTTP, clean HTML table. No Playwright needed.
+# Columns: [Sale Date, Sale Time, County, Address, City, State, Mat No]
+
+MWC_VA_URL = "https://apps.mwc-law.com/SalesLists/VA.html"
+
 
 def scrape_mwc() -> list[dict]:
+    """Scrape McCabe VA sales list via direct HTTP (HTML table)."""
+    log.info("Scraping McCabe, Weisberg & Conway ...")
+    properties: list[dict] = []
+
+    try:
+        r = requests.get(MWC_VA_URL, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        table = soup.find("table")
+        if table is None:
+            log.warning("MWC: no table found")
+            return properties
+
+        rows = table.find_all("tr")
+        # Header row is at index 1 (index 0 is title row "VA Sales List").
+        # Data starts at index 2.
+        log.info(f"MWC: {max(0, len(rows) - 2)} total listings")
+        for row in rows[2:]:
+            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+            prop = _parse_mwc_row(cells)
+            if prop:
+                properties.append(prop)
+
+    except Exception as e:
+        log.error(f"MWC scrape failed: {e}")
+
+    log.info(f"MWC: {len(properties)} properties")
+    return properties
+
+
+def _parse_mwc_row(cells: list[str]) -> dict | None:
     """
-    McCabe Weisberg & Conway: disabled pending research.
-    Site moved to mccabeesq.com and gates listings behind a /sales-disclaimer
-    click-through. Real listings likely require JS execution past the
-    disclaimer. Needs Playwright in CI to re-enable.
+    Parse an MWC sales-list row.
+    Columns: [Sale Date, Sale Time, County, Address, City, State, Mat No, (blank)]
+    Example: ['4/22/2026', '12:30pm', 'Henrico', '7512 Edgewood Avenue',
+              'Richmond', 'VA', '25-701031', '']
     """
-    log.warning("MWC: source disabled (disclaimer gate — needs browser automation)")
-    return []
+    if len(cells) < 7:
+        return None
+    sale_date_raw, sale_time, county_raw, address, city, state, mat_no = \
+        [c.strip() for c in cells[:7]]
+
+    if state.upper() != "VA" or not address or sale_date_raw.lower() == "sale date":
+        return None
+
+    # Normalize sale date to ISO
+    sale_date_iso = None
+    try:
+        sale_date_iso = datetime.strptime(sale_date_raw, "%m/%d/%Y").strftime("%Y-%m-%d")
+    except Exception:
+        sale_date_iso = sale_date_raw or None
+
+    county = normalize_county(county_raw)
+    property_type = detect_property_type(address)
+    pricing = build_pricing(county, property_type, None, None, None)
+
+    return {
+        "id":               make_id("mwc", address, sale_date_iso or ""),
+        "source":           "McCabe, Weisberg & Conway",
+        "source_url":       MWC_VA_URL,
+        "firm_file_number": mat_no or None,
+        "address":          address,
+        "city":             city,
+        "state":            "VA",
+        "zip_code":         "",
+        "county":           county,
+        "lat":              None,
+        "lng":              None,
+        "sale_date":        sale_date_iso,
+        "sale_date_raw":    sale_date_raw,
+        "sale_time":        sale_time or None,
+        "sale_location":    f"{county} Courthouse",
+        "property_type":    property_type,
+        "sqft":             None,
+        "beds":             None,
+        "baths":            None,
+        "year_built":       None,
+        "pricing":          pricing,
+        "tags":             ["VA Foreclosure", "Trustee Sale", county, "McCabe"],
+        "status":           "active",
+        "scraped_at":       datetime.utcnow().isoformat() + "Z",
+        "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
+    }
 
 
 # ── Generic listing parser (BWW / MWC) ───────────────────────────────────────
