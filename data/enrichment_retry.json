@@ -1,0 +1,667 @@
+{
+  "1022 jefferson circle::martinsville::va::24112": {
+    "address": "1022 Jefferson Circle, Martinsville, VA, 24112",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1025 highland avenue se::roanoke::va::24013": {
+    "address": "1025 Highland Avenue SE, Roanoke, VA, 24013",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "103 gilley dr::williamsburg::va::23188": {
+    "address": "103 Gilley Dr, Williamsburg, VA, 23188",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1036 callis road::south hill::va::": {
+    "address": "1036 Callis Road, South Hill, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1038 station lane::concord::va::": {
+    "address": "1038 Station Lane, Concord, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "104 levinson pass::williamsburg::va::23185": {
+    "address": "104 Levinson Pass, Williamsburg, VA, 23185",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "105 bethune drive::williamsburg::va::23185": {
+    "address": "105 Bethune Drive, Williamsburg, VA, 23185",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "105 greenhaven drive::galax::va::24333": {
+    "address": "105 Greenhaven Drive, Galax, VA, 24333",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "105 west road::altavista::va::": {
+    "address": "105 West Road, Altavista, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "106 club drive::wakefield::va::": {
+    "address": "106 Club Drive, Wakefield, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "109 blackburns ford drive::stephens city::va::22655": {
+    "address": "109 Blackburns Ford Drive, Stephens City, VA, 22655",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "109 ginger court::chesapeake::va::": {
+    "address": "109 Ginger Court, Chesapeake, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "111 pembroke street::pembroke::va::24136": {
+    "address": "111 Pembroke Street, Pembroke, VA, 24136",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1114 russell hill st::grundy::va::24614": {
+    "address": "1114 Russell Hill St, Grundy, VA, 24614",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1116 cambell court::virginia beach::va::23453": {
+    "address": "1116 Cambell Court, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "112 tewkesbury quay::yorktown::va::23692": {
+    "address": "112 Tewkesbury Quay, Yorktown, VA, 23692",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1121 35th street::newport news::va::23607": {
+    "address": "1121 35th Street, Newport News, VA, 23607",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1121 oakgrove avenue::martinsville::va::24112": {
+    "address": "1121 Oakgrove Avenue, Martinsville, VA, 24112",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1149 hayes mill road::boydton::va::": {
+    "address": "1149 Hayes Mill Road, Boydton, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "119 sylvan rd::wakefield::va::23888": {
+    "address": "119 Sylvan Rd, Wakefield, VA, 23888",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "12211 hooe road::bristow::va::20136": {
+    "address": "12211 Hooe Road, Bristow, VA, 20136",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "130 devon road::williamsburg::va::": {
+    "address": "130 Devon Road, Williamsburg, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1307 n danville st::arlington::va::22201": {
+    "address": "1307 N Danville St, Arlington, VA, 22201",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1322 lakeridge circle::troutville::va::": {
+    "address": "1322 Lakeridge Circle, Troutville, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1334 morton ave se::roanoke::va::24013": {
+    "address": "1334 Morton Ave SE, Roanoke, VA, 24013",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "13354 feldman place::herndon::va::": {
+    "address": "13354 Feldman Place, Herndon, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1339 wilkie rd::norfolk::va::23503": {
+    "address": "1339 Wilkie Rd, Norfolk, VA, 23503",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "135 knollwood drive::troutville::va::24175": {
+    "address": "135 Knollwood Drive, Troutville, VA, 24175",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "138 shannon ave mount::jackson::va::22842": {
+    "address": "138 Shannon Ave Mount, Jackson, VA, 22842",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "14 westley court::hampton::va::23669": {
+    "address": "14 Westley Court, Hampton, VA, 23669",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1401 wentworth drive::virginia beach::va::23453": {
+    "address": "1401 Wentworth Drive, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1422 bull run dr::richmond::va::23231": {
+    "address": "1422 Bull Run Dr, Richmond, VA, 23231",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "146 hannah circle new::castle::va::24127": {
+    "address": "146 Hannah Circle New, Castle, VA, 24127",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "147 brittany lane::suffolk::va::": {
+    "address": "147 Brittany Lane, Suffolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "14796 arkansas street::woodbridge::va::": {
+    "address": "14796 Arkansas Street, Woodbridge, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "150 baker street::manassas park::va::20111": {
+    "address": "150 Baker Street, Manassas Park, VA, 20111",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1507 langhorne rd::lynchburg::va::24503": {
+    "address": "1507 Langhorne Rd, Lynchburg, VA, 24503",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1528 three gait trail::virginia beach::va::23453": {
+    "address": "1528 Three Gait Trail, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1573 westmoreland street::mclean::va::": {
+    "address": "1573 Westmoreland Street, McLean, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1614 and 1616 berkley avenue extension::norfolk::va::23523": {
+    "address": "1614 and 1616 Berkley Avenue Extension, Norfolk, VA, 23523",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1675 sigmon rd nw::roanoke::va::24017": {
+    "address": "1675 Sigmon Rd NW, Roanoke, VA, 24017",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1693 buzzards neck rd::lancaster::va::22503": {
+    "address": "1693 Buzzards Neck Rd, Lancaster, VA, 22503",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "17 warren drive::newport news::va::23608": {
+    "address": "17 Warren Drive, Newport News, VA, 23608",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1732 schooner strait court::virginia beach::va::23453": {
+    "address": "1732 Schooner Strait Court, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1801 holton ave e big stone::gap::va::24219": {
+    "address": "1801 Holton Ave E Big Stone, Gap, VA, 24219",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1810 laxton road::lynchburg::va::": {
+    "address": "1810 Laxton Road, Lynchburg, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "18521 cameron road::gordonsville::va::22942": {
+    "address": "18521 Cameron Road, Gordonsville, VA, 22942",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "1858 main street::bland::va::24315": {
+    "address": "1858 Main Street, Bland, VA, 24315",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "200 old furnace road::rocky mount::va::24151": {
+    "address": "200 Old Furnace Road, Rocky Mount, VA, 24151",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "200 w 37th street::norfolk::va::23504": {
+    "address": "200 W 37th Street, Norfolk, VA, 23504",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "205 wellons street::suffolk::va::": {
+    "address": "205 Wellons Street, Suffolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "207 fox hill drive::staunton::va::24401": {
+    "address": "207 Fox Hill Drive, Staunton, VA, 24401",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "210 sandpiper dr::portsmouth::va::23704": {
+    "address": "210 Sandpiper Dr, Portsmouth, VA, 23704",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "212 boswell drive::hampton::va::23669": {
+    "address": "212 Boswell Drive, Hampton, VA, 23669",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2127 grandy avenue::norfolk::va::23504": {
+    "address": "2127 Grandy Avenue, Norfolk, VA, 23504",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "216 jacquelyn drive::portsmouth::va::": {
+    "address": "216 Jacquelyn Drive, Portsmouth, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2269 white house cove::newport news::va::": {
+    "address": "2269 White House Cove, Newport News, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "230 woodpecker way::front royal::va::": {
+    "address": "230 Woodpecker Way, Front Royal, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2403 lafayette boulevard::norfolk::va::": {
+    "address": "2403 Lafayette Boulevard, Norfolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "25185 riding center drive::south riding::va::20152": {
+    "address": "25185 Riding Center Drive, South Riding, VA, 20152",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2539 keller ave::norfolk::va::23509": {
+    "address": "2539 Keller Ave, Norfolk, VA, 23509",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "256 sherbrooke drive::newport news::va::23602": {
+    "address": "256 Sherbrooke Drive, Newport News, VA, 23602",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "260 helena lane::shipman::va::": {
+    "address": "260 Helena Lane, Shipman, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2601 bluefield st::hopewell::va::23860": {
+    "address": "2601 Bluefield St, Hopewell, VA, 23860",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2619 forest hills rd::petersburg::va::23805": {
+    "address": "2619 Forest Hills Rd, Petersburg, VA, 23805",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2629 avenel ave sw::roanoke::va::24015": {
+    "address": "2629 Avenel Ave SW, Roanoke, VA, 24015",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "263 phelps branch road::appomattox::va::": {
+    "address": "263 Phelps Branch Road, Appomattox, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2709 maurice walk ct glen::allen::va::23060": {
+    "address": "2709 Maurice Walk Ct Glen, Allen, VA, 23060",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "27847 prince edward highway::rice::va::": {
+    "address": "27847 Prince Edward Highway, Rice, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "2907 leta court::hampton::va::23666": {
+    "address": "2907 Leta Court, Hampton, VA, 23666",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3009 beechwood ln falls::church::va::22042": {
+    "address": "3009 Beechwood Ln Falls, Church, VA, 22042",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "302 deaton drive::hampton::va::": {
+    "address": "302 Deaton Drive, Hampton, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3026 ravine gap drive::suffolk::va::": {
+    "address": "3026 Ravine Gap Drive, Suffolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "303 bexley park way::newport news::va::": {
+    "address": "303 Bexley Park Way, Newport News, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3046 linwood road nw::roanoke::va::": {
+    "address": "3046 Linwood Road NW, Roanoke, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3065 glastonbury drive::virginia beach::va::23453": {
+    "address": "3065 Glastonbury Drive, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "308 tatemstown road::chesapeake::va::": {
+    "address": "308 Tatemstown Road, Chesapeake, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "315 pendleton road::danville::va::": {
+    "address": "315 Pendleton Road, Danville, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3216 bruno drive::chesapeake::va::23323": {
+    "address": "3216 Bruno Drive, Chesapeake, VA, 23323",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3216 riverview dr::triangle::va::22172": {
+    "address": "3216 Riverview Dr, Triangle, VA, 22172",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3307 arlington place::portsmouth::va::": {
+    "address": "3307 Arlington Place, Portsmouth, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3330 verdun avenue::norfolk::va::": {
+    "address": "3330 Verdun Avenue, Norfolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3364 oakham mount drive::triangle::va::22172": {
+    "address": "3364 Oakham Mount Drive, Triangle, VA, 22172",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3424 nansemond parkway::suffolk::va::23435": {
+    "address": "3424 Nansemond Parkway, Suffolk, VA, 23435",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3480 wainscott place::woodbridge::va::22192": {
+    "address": "3480 Wainscott Place, Woodbridge, VA, 22192",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "353 carver circle::portsmouth::va::": {
+    "address": "353 Carver Circle, Portsmouth, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3571 iberis ln::toano::va::23168": {
+    "address": "3571 Iberis Ln, Toano, VA, 23168",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "36 bay front place::hampton::va::": {
+    "address": "36 Bay Front Place, Hampton, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3638 ship chandlers wharf::virginia beach::va::23453": {
+    "address": "3638 Ship Chandlers Wharf, Virginia Beach, VA, 23453",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3808 long point blvd::portsmouth::va::23703": {
+    "address": "3808 Long Point Blvd, Portsmouth, VA, 23703",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3814 virginia ave nw::roanoke::va::24017": {
+    "address": "3814 Virginia Ave NW, Roanoke, VA, 24017",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "3942 churchville avenue::churchville::va::24421": {
+    "address": "3942 Churchville Avenue, Churchville, VA, 24421",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4005 greenway ct w::portsmouth::va::23707": {
+    "address": "4005 Greenway Ct W, Portsmouth, VA, 23707",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4036 ketch dr::portsmouth::va::23703": {
+    "address": "4036 Ketch Dr, Portsmouth, VA, 23703",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "41 barron drive::newport news::va::23608": {
+    "address": "41 Barron Drive, Newport News, VA, 23608",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "425 willowshade ln elk::creek::va::24326": {
+    "address": "425 Willowshade Ln Elk, Creek, VA, 24326",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4419 kendal way::suffolk::va::": {
+    "address": "4419 Kendal Way, Suffolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4429 skyler lane locust::grove::va::22508": {
+    "address": "4429 Skyler Lane Locust, Grove, VA, 22508",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4622 flatlick branch drive::chantilly::va::20151": {
+    "address": "4622 Flatlick Branch Drive, Chantilly, VA, 20151",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "468 slayton rd::sutherlin::va::24594": {
+    "address": "468 Slayton Rd, Sutherlin, VA, 24594",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4714 tarpon lane::alexandria::va::22309": {
+    "address": "4714 Tarpon Lane, Alexandria, VA, 22309",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "47451 sharpskin island square::sterling::va::20165": {
+    "address": "47451 Sharpskin Island Square, Sterling, VA, 20165",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "4917 benecia lane::dumfries::va::22025": {
+    "address": "4917 Benecia Lane, Dumfries, VA, 22025",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "501 carters grove court::hampton::va::23663": {
+    "address": "501 Carters Grove Court, Hampton, VA, 23663",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "515 big bethel road::hampton::va::": {
+    "address": "515 Big Bethel Road, Hampton, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "5203 duke street, unit 302::alexandria::va::22304": {
+    "address": "5203 Duke Street, Unit 302, Alexandria, VA, 22304",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "5427 8th road south::arlington::va::22204": {
+    "address": "5427 8th Road South, Arlington, VA, 22204",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "5514 larch street::fredericksburg::va::": {
+    "address": "5514 Larch Street, Fredericksburg, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "5914 potomac ave::hampton::va::23605": {
+    "address": "5914 Potomac Ave, Hampton, VA, 23605",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6 capps quarters::hampton::va::": {
+    "address": "6 Capps Quarters, Hampton, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6041 23rd street n::arlington::va::": {
+    "address": "6041 23rd Street N, Arlington, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6300 stevenson avenue, unit 216::alexandria::va::22304": {
+    "address": "6300 Stevenson Avenue, Unit 216, Alexandria, VA, 22304",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6325 colgate avenue::norfolk::va::": {
+    "address": "6325 Colgate Avenue, Norfolk, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "645 highland avenue se::roanoke::va::": {
+    "address": "645 Highland Avenue SE, Roanoke, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6466 bareback terrace::richmond::va::23234": {
+    "address": "6466 Bareback Terrace, Richmond, VA, 23234",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6512 ball ave::norfolk::va::23518": {
+    "address": "6512 Ball Ave, Norfolk, VA, 23518",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "66 wood lane::troutville::va::24175": {
+    "address": "66 Wood Lane, Troutville, VA, 24175",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "6810 rigby lane::mclean::va::": {
+    "address": "6810 Rigby Lane, Mclean, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "7021 ravenscraig crescent::henrico::va::23231": {
+    "address": "7021 Ravenscraig Crescent, Henrico, VA, 23231",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "709 fairmount avenue::bristol::va::24201": {
+    "address": "709 Fairmount Avenue, Bristol, VA, 24201",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "7112 falcon street::annandale::va::22003": {
+    "address": "7112 Falcon Street, Annandale, VA, 22003",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "7385 jiri woods court::springfield::va::22153": {
+    "address": "7385 Jiri Woods Court, Springfield, VA, 22153",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "7512 edgewood avenue::richmond::va::": {
+    "address": "7512 Edgewood Avenue, Richmond, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "754 driskill court::virginia beach::va::": {
+    "address": "754 Driskill Court, Virginia Beach, VA",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "8 riverchase dr::hampton::va::23669": {
+    "address": "8 Riverchase Dr, Hampton, VA, 23669",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "810 w 46th st::richmond::va::23225": {
+    "address": "810 W 46th St, Richmond, VA, 23225",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "8317 fulham court::richmond::va::23227": {
+    "address": "8317 Fulham Court, Richmond, VA, 23227",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "832 22nd street::newport news::va::23607": {
+    "address": "832 22nd Street, Newport News, VA, 23607",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "883 homer lane::hiltons::va::24258": {
+    "address": "883 Homer Lane, Hiltons, VA, 24258",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "8907 fort dr::manassas::va::20110": {
+    "address": "8907 Fort Dr, Manassas, VA, 20110",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "9201 brett dr::midlothian::va::23112": {
+    "address": "9201 Brett Dr, Midlothian, VA, 23112",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "9606 lockberry ridge loop north::chesterfield::va::23237": {
+    "address": "9606 Lockberry Ridge Loop North, Chesterfield, VA, 23237",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  },
+  "9905 shadowridge ct::fredericksburg::va::22407": {
+    "address": "9905 Shadowridge Ct, Fredericksburg, VA, 22407",
+    "attempts": 1,
+    "last_attempt": "2026-04-20T19:49:58.935295Z"
+  }
+}
