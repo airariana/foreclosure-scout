@@ -1,7 +1,7 @@
 {
   "metadata": {
     "total_properties": 133,
-    "scraped_at": "2026-04-20T19:52:07.415212Z",
+    "scraped_at": "2026-04-20T20:03:49.639730Z",
     "sources": {
       "Orlans Law Group": 24,
       "Samuel I. White, P.C.": 43,
@@ -64,7 +64,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.159055Z",
+      "scraped_at": "2026-04-20T20:01:42.734514Z",
       "days_to_sale": 0,
       "latitude": 37.4363521,
       "longitude": -77.51354769999999,
@@ -121,7 +121,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363717Z",
+      "scraped_at": "2026-04-20T20:01:38.207559Z",
       "days_to_sale": 1,
       "latitude": 37.0113655,
       "longitude": -76.4158764,
@@ -179,7 +179,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.200043Z",
+      "scraped_at": "2026-04-20T20:01:42.775990Z",
       "days_to_sale": 1,
       "latitude": 36.6669194,
       "longitude": -80.93904739999999,
@@ -237,7 +237,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.926965Z",
+      "scraped_at": "2026-04-20T20:01:54.144643Z",
       "days_to_sale": 1,
       "latitude": 37.0158207,
       "longitude": -76.3427146,
@@ -295,7 +295,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927126Z",
+      "scraped_at": "2026-04-20T20:01:54.144784Z",
       "days_to_sale": 1,
       "latitude": 36.8204207,
       "longitude": -76.337417,
@@ -352,7 +352,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.487095Z",
+      "scraped_at": "2026-04-20T20:01:38.324117Z",
       "days_to_sale": 2,
       "latitude": 37.4895082,
       "longitude": -77.3922236,
@@ -409,7 +409,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.487140Z",
+      "scraped_at": "2026-04-20T20:01:38.324150Z",
       "days_to_sale": 2,
       "latitude": 37.4555343,
       "longitude": -77.3193563,
@@ -466,7 +466,7 @@
         "James City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594237Z",
+      "scraped_at": "2026-04-20T20:01:38.423893Z",
       "days_to_sale": 2,
       "latitude": 37.4265955,
       "longitude": -76.7951188,
@@ -523,7 +523,7 @@
         "York County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.641671Z",
+      "scraped_at": "2026-04-20T20:01:38.469085Z",
       "days_to_sale": 2,
       "latitude": 37.1556674,
       "longitude": -76.45757119999999,
@@ -581,7 +581,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.213983Z",
+      "scraped_at": "2026-04-20T20:01:42.789499Z",
       "days_to_sale": 2,
       "latitude": 38.6806681,
       "longitude": -77.31308,
@@ -639,7 +639,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927261Z",
+      "scraped_at": "2026-04-20T20:01:54.144897Z",
       "days_to_sale": 2,
       "latitude": 37.6267505,
       "longitude": -77.4500336,
@@ -697,7 +697,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927393Z",
+      "scraped_at": "2026-04-20T20:01:54.145004Z",
       "days_to_sale": 3,
       "latitude": 37.383444,
       "longitude": -78.9605222,
@@ -755,7 +755,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.228958Z",
+      "scraped_at": "2026-04-20T20:01:42.804730Z",
       "days_to_sale": 4,
       "latitude": 37.26813,
       "longitude": -79.9258689,
@@ -812,7 +812,7 @@
         "Buchanan County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363358Z",
+      "scraped_at": "2026-04-20T20:01:38.207266Z",
       "days_to_sale": 7,
       "latitude": 37.2572185,
       "longitude": -82.1040323,
@@ -869,7 +869,7 @@
         "Wise County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594820Z",
+      "scraped_at": "2026-04-20T20:01:38.424336Z",
       "days_to_sale": 7,
       "latitude": 36.8765248,
       "longitude": -82.7578216,
@@ -926,7 +926,7 @@
         "Petersburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486528Z",
+      "scraped_at": "2026-04-20T20:01:38.323713Z",
       "days_to_sale": 8,
       "latitude": 37.1954689,
       "longitude": -77.38540800000001,
@@ -983,7 +983,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594538Z",
+      "scraped_at": "2026-04-20T20:01:38.424149Z",
       "days_to_sale": 8,
       "latitude": 38.5530839,
       "longitude": -77.3106592,
@@ -1040,7 +1040,7 @@
         "Spotsylvania County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594717Z",
+      "scraped_at": "2026-04-20T20:01:38.424260Z",
       "days_to_sale": 8,
       "latitude": 38.2305016,
       "longitude": -77.52798969999999,
@@ -1097,7 +1097,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486357Z",
+      "scraped_at": "2026-04-20T20:01:38.323564Z",
       "days_to_sale": 9,
       "latitude": 36.8669364,
       "longitude": -76.2534891,
@@ -1154,7 +1154,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486422Z",
+      "scraped_at": "2026-04-20T20:01:38.323627Z",
       "days_to_sale": 9,
       "latitude": 36.930796,
       "longitude": -76.2375351,
@@ -1211,7 +1211,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486581Z",
+      "scraped_at": "2026-04-20T20:01:38.323754Z",
       "days_to_sale": 9,
       "latitude": 36.8233509,
       "longitude": -76.35132709999999,
@@ -1268,7 +1268,7 @@
         "Richmond City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486746Z",
+      "scraped_at": "2026-04-20T20:01:38.323858Z",
       "days_to_sale": 9,
       "latitude": 37.5157003,
       "longitude": -77.4860738,
@@ -1326,7 +1326,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.278049Z",
+      "scraped_at": "2026-04-20T20:01:42.853532Z",
       "days_to_sale": 9,
       "latitude": 36.8030862,
       "longitude": -76.5134526,
@@ -1383,7 +1383,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486797Z",
+      "scraped_at": "2026-04-20T20:01:38.323896Z",
       "days_to_sale": 10,
       "latitude": 37.2679312,
       "longitude": -79.91878969999999,
@@ -1440,7 +1440,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486843Z",
+      "scraped_at": "2026-04-20T20:01:38.323929Z",
       "days_to_sale": 10,
       "latitude": 37.30757,
       "longitude": -80.0179102,
@@ -1497,7 +1497,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486887Z",
+      "scraped_at": "2026-04-20T20:01:38.323961Z",
       "days_to_sale": 10,
       "latitude": 37.295204,
       "longitude": -79.99847849999999,
@@ -1555,7 +1555,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.284530Z",
+      "scraped_at": "2026-04-20T20:01:42.860058Z",
       "days_to_sale": 10,
       "latitude": 36.60965350000001,
       "longitude": -82.4065342,
@@ -1613,7 +1613,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927522Z",
+      "scraped_at": "2026-04-20T20:01:54.145106Z",
       "days_to_sale": 10,
       "latitude": 38.956365,
       "longitude": -78.0397682,
@@ -1671,7 +1671,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927671Z",
+      "scraped_at": "2026-04-20T20:01:54.145205Z",
       "days_to_sale": 10,
       "latitude": 36.9769156,
       "longitude": -76.98297509999999,
@@ -1728,7 +1728,7 @@
         "Bristol City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363586Z",
+      "scraped_at": "2026-04-20T20:01:38.207480Z",
       "days_to_sale": 14,
       "latitude": 36.6043841,
       "longitude": -82.184519,
@@ -1785,7 +1785,7 @@
         "Grayson County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.487041Z",
+      "scraped_at": "2026-04-20T20:01:38.324077Z",
       "days_to_sale": 14,
       "latitude": 36.7046345,
       "longitude": -81.1734815,
@@ -1842,7 +1842,7 @@
         "Sussex County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594768Z",
+      "scraped_at": "2026-04-20T20:01:38.424297Z",
       "days_to_sale": 14,
       "latitude": 36.9725812,
       "longitude": -76.9828212,
@@ -1900,7 +1900,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.294022Z",
+      "scraped_at": "2026-04-20T20:01:42.869611Z",
       "days_to_sale": 14,
       "latitude": 37.0487627,
       "longitude": -76.3530071,
@@ -1958,7 +1958,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.297358Z",
+      "scraped_at": "2026-04-20T20:01:42.873030Z",
       "days_to_sale": 14,
       "latitude": 37.09985289999999,
       "longitude": -76.5313439,
@@ -2016,7 +2016,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.300801Z",
+      "scraped_at": "2026-04-20T20:01:42.876335Z",
       "days_to_sale": 14,
       "latitude": 36.9931959,
       "longitude": -76.4121633,
@@ -2074,7 +2074,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.310314Z",
+      "scraped_at": "2026-04-20T20:01:42.885992Z",
       "days_to_sale": 14,
       "latitude": 36.8615026,
       "longitude": -76.2493995,
@@ -2132,7 +2132,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.315207Z",
+      "scraped_at": "2026-04-20T20:01:42.891024Z",
       "days_to_sale": 14,
       "latitude": 36.8247723,
       "longitude": -76.26597910000001,
@@ -2190,7 +2190,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.318576Z",
+      "scraped_at": "2026-04-20T20:01:42.894259Z",
       "days_to_sale": 14,
       "latitude": 36.8782843,
       "longitude": -76.397548,
@@ -2248,7 +2248,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.321845Z",
+      "scraped_at": "2026-04-20T20:01:42.897497Z",
       "days_to_sale": 14,
       "latitude": 36.7816793,
       "longitude": -76.0853704,
@@ -2306,7 +2306,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.325081Z",
+      "scraped_at": "2026-04-20T20:01:42.900686Z",
       "days_to_sale": 14,
       "latitude": 36.8000413,
       "longitude": -76.100623,
@@ -2364,7 +2364,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.329562Z",
+      "scraped_at": "2026-04-20T20:01:42.904058Z",
       "days_to_sale": 14,
       "latitude": 36.7991885,
       "longitude": -76.1095242,
@@ -2421,7 +2421,7 @@
         "Arlington County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.362985Z",
+      "scraped_at": "2026-04-20T20:01:38.206973Z",
       "days_to_sale": 15,
       "latitude": 38.88784649999999,
       "longitude": -77.0902032,
@@ -2478,7 +2478,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363428Z",
+      "scraped_at": "2026-04-20T20:01:38.207326Z",
       "days_to_sale": 15,
       "latitude": 37.392346,
       "longitude": -77.6285233,
@@ -2535,7 +2535,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363480Z",
+      "scraped_at": "2026-04-20T20:01:38.207370Z",
       "days_to_sale": 15,
       "latitude": 37.3866598,
       "longitude": -77.47632779999999,
@@ -2592,7 +2592,7 @@
         "Alexandria City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363533Z",
+      "scraped_at": "2026-04-20T20:01:38.207413Z",
       "days_to_sale": 15,
       "latitude": 38.8125005,
       "longitude": -77.1216638,
@@ -2649,7 +2649,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363765Z",
+      "scraped_at": "2026-04-20T20:01:38.207594Z",
       "days_to_sale": 15,
       "latitude": 37.0536325,
       "longitude": -76.34610239999999,
@@ -2706,7 +2706,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363810Z",
+      "scraped_at": "2026-04-20T20:01:38.207628Z",
       "days_to_sale": 15,
       "latitude": 37.0333577,
       "longitude": -76.4209772,
@@ -2763,7 +2763,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.487185Z",
+      "scraped_at": "2026-04-20T20:01:38.324185Z",
       "days_to_sale": 15,
       "latitude": 37.65275,
       "longitude": -77.5030799,
@@ -2820,7 +2820,7 @@
         "Shenandoah County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594639Z",
+      "scraped_at": "2026-04-20T20:01:38.424224Z",
       "days_to_sale": 15,
       "latitude": 38.7446448,
       "longitude": -78.6408747,
@@ -2878,7 +2878,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.339093Z",
+      "scraped_at": "2026-04-20T20:01:42.913448Z",
       "days_to_sale": 15,
       "latitude": 38.2284714,
       "longitude": -79.1676545,
@@ -2936,7 +2936,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.345436Z",
+      "scraped_at": "2026-04-20T20:01:42.919914Z",
       "days_to_sale": 15,
       "latitude": 38.1485612,
       "longitude": -78.20365559999999,
@@ -2993,7 +2993,7 @@
         "Lynchburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363910Z",
+      "scraped_at": "2026-04-20T20:01:38.207705Z",
       "days_to_sale": 16,
       "latitude": 37.4282245,
       "longitude": -79.1839297,
@@ -3050,7 +3050,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486473Z",
+      "scraped_at": "2026-04-20T20:01:38.323669Z",
       "days_to_sale": 16,
       "latitude": 36.9007666,
       "longitude": -76.22326199999999,
@@ -3107,7 +3107,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486626Z",
+      "scraped_at": "2026-04-20T20:01:38.323788Z",
       "days_to_sale": 16,
       "latitude": 36.8799822,
       "longitude": -76.4027122,
@@ -3164,7 +3164,7 @@
         "Martinsville City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363959Z",
+      "scraped_at": "2026-04-20T20:01:38.207742Z",
       "days_to_sale": 17,
       "latitude": 36.6824568,
       "longitude": -79.8568197,
@@ -3221,7 +3221,7 @@
         "Orange County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594434Z",
+      "scraped_at": "2026-04-20T20:01:38.424068Z",
       "days_to_sale": 17,
       "latitude": 38.3392567,
       "longitude": -77.849083,
@@ -3278,7 +3278,7 @@
         "Pittsylvania County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594486Z",
+      "scraped_at": "2026-04-20T20:01:38.424109Z",
       "days_to_sale": 17,
       "latitude": 36.6721466,
       "longitude": -79.2498365,
@@ -3336,7 +3336,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927807Z",
+      "scraped_at": "2026-04-20T20:01:54.145302Z",
       "days_to_sale": 17,
       "latitude": 37.0348392,
       "longitude": -76.4255992,
@@ -3394,7 +3394,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.927932Z",
+      "scraped_at": "2026-04-20T20:01:54.145400Z",
       "days_to_sale": 17,
       "latitude": 37.0626664,
       "longitude": -76.33646209999999,
@@ -3452,7 +3452,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.469077Z",
+      "scraped_at": "2026-04-20T20:01:43.047564Z",
       "days_to_sale": 18,
       "latitude": 36.6733038,
       "longitude": -79.8744409,
@@ -3510,7 +3510,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.478818Z",
+      "scraped_at": "2026-04-20T20:01:43.057268Z",
       "days_to_sale": 21,
       "latitude": 38.8126872,
       "longitude": -77.14127529999999,
@@ -3568,7 +3568,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.487061Z",
+      "scraped_at": "2026-04-20T20:01:43.064560Z",
       "days_to_sale": 21,
       "latitude": 38.7031757,
       "longitude": -77.1164813,
@@ -3626,7 +3626,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.490266Z",
+      "scraped_at": "2026-04-20T20:01:43.067746Z",
       "days_to_sale": 21,
       "latitude": 38.60856589999999,
       "longitude": -77.3546338,
@@ -3683,7 +3683,7 @@
         "Fairfax County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486991Z",
+      "scraped_at": "2026-04-20T20:01:38.324039Z",
       "days_to_sale": 22,
       "latitude": 38.86917529999999,
       "longitude": -77.1631879,
@@ -3741,7 +3741,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.533575Z",
+      "scraped_at": "2026-04-20T20:01:43.110612Z",
       "days_to_sale": 22,
       "latitude": 38.1636993,
       "longitude": -79.1087902,
@@ -3798,7 +3798,7 @@
         "Chesapeake City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363638Z",
+      "scraped_at": "2026-04-20T20:01:38.207520Z",
       "days_to_sale": 23,
       "latitude": 36.7822369,
       "longitude": -76.3571549,
@@ -3855,7 +3855,7 @@
         "James City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594301Z",
+      "scraped_at": "2026-04-20T20:01:38.423955Z",
       "days_to_sale": 23,
       "latitude": 37.260007,
       "longitude": -76.7490779,
@@ -3912,7 +3912,7 @@
         "Lancaster County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594371Z",
+      "scraped_at": "2026-04-20T20:01:38.424017Z",
       "days_to_sale": 23,
       "latitude": 37.7203915,
       "longitude": -76.4649123,
@@ -3969,7 +3969,7 @@
         "York County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.641732Z",
+      "scraped_at": "2026-04-20T20:01:38.469145Z",
       "days_to_sale": 23,
       "latitude": 37.3578819,
       "longitude": -76.69229,
@@ -4027,7 +4027,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.536885Z",
+      "scraped_at": "2026-04-20T20:01:43.113816Z",
       "days_to_sale": 24,
       "latitude": 36.9886272,
       "longitude": -79.8941615,
@@ -4085,7 +4085,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:48.546998Z",
+      "scraped_at": "2026-04-20T20:01:43.123174Z",
       "days_to_sale": 25,
       "latitude": 39.0910456,
       "longitude": -78.17205969999999,
@@ -4142,7 +4142,7 @@
         "Craig County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486937Z",
+      "scraped_at": "2026-04-20T20:01:38.323999Z",
       "days_to_sale": 28,
       "latitude": 37.5330326,
       "longitude": -80.149717,
@@ -4199,7 +4199,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.594583Z",
+      "scraped_at": "2026-04-20T20:01:38.424183Z",
       "days_to_sale": 29,
       "latitude": 38.7617727,
       "longitude": -77.46661329999999,
@@ -4257,7 +4257,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928057Z",
+      "scraped_at": "2026-04-20T20:01:54.145536Z",
       "days_to_sale": 30,
       "latitude": 38.8919859,
       "longitude": -77.1475367,
@@ -4315,7 +4315,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928182Z",
+      "scraped_at": "2026-04-20T20:01:54.145638Z",
       "days_to_sale": 30,
       "latitude": 37.3033174,
       "longitude": -76.7599839,
@@ -4373,7 +4373,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928305Z",
+      "scraped_at": "2026-04-20T20:01:54.145737Z",
       "days_to_sale": 30,
       "latitude": 38.9632318,
       "longitude": -77.40933199999999,
@@ -4431,7 +4431,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928429Z",
+      "scraped_at": "2026-04-20T20:01:54.145833Z",
       "days_to_sale": 31,
       "latitude": 37.1409171,
       "longitude": -76.5510489,
@@ -4489,7 +4489,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928551Z",
+      "scraped_at": "2026-04-20T20:01:54.145928Z",
       "days_to_sale": 31,
       "latitude": 36.82346070000001,
       "longitude": -76.3869642,
@@ -4547,7 +4547,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928701Z",
+      "scraped_at": "2026-04-20T20:01:54.146024Z",
       "days_to_sale": 31,
       "latitude": 36.8985488,
       "longitude": -76.2253058,
@@ -4605,7 +4605,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928830Z",
+      "scraped_at": "2026-04-20T20:01:54.146121Z",
       "days_to_sale": 32,
       "latitude": 38.2503229,
       "longitude": -77.5382362,
@@ -4663,7 +4663,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.928955Z",
+      "scraped_at": "2026-04-20T20:01:54.146221Z",
       "days_to_sale": 43,
       "latitude": 37.2645717,
       "longitude": -79.9313633,
@@ -4721,7 +4721,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929081Z",
+      "scraped_at": "2026-04-20T20:01:54.146325Z",
       "days_to_sale": 46,
       "latitude": 36.8368454,
       "longitude": -76.5087745,
@@ -4779,7 +4779,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929206Z",
+      "scraped_at": "2026-04-20T20:01:54.146440Z",
       "days_to_sale": 46,
       "latitude": 36.824119,
       "longitude": -76.2503191,
@@ -4837,7 +4837,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929329Z",
+      "scraped_at": "2026-04-20T20:01:54.146542Z",
       "days_to_sale": 46,
       "latitude": 36.8787631,
       "longitude": -76.2543929,
@@ -4894,7 +4894,7 @@
         "Hopewell City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.363860Z",
+      "scraped_at": "2026-04-20T20:01:38.207667Z",
       "days_to_sale": 50,
       "latitude": 37.2927325,
       "longitude": -77.3097453,
@@ -4952,7 +4952,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929451Z",
+      "scraped_at": "2026-04-20T20:01:54.146639Z",
       "days_to_sale": 50,
       "latitude": 37.7356619,
       "longitude": -78.87582669999999,
@@ -5009,7 +5009,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:43.486695Z",
+      "scraped_at": "2026-04-20T20:01:38.323822Z",
       "days_to_sale": 52,
       "latitude": 36.8422021,
       "longitude": -76.3261371,
@@ -5067,7 +5067,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929573Z",
+      "scraped_at": "2026-04-20T20:01:54.146737Z",
       "days_to_sale": 57,
       "latitude": 37.2909653,
       "longitude": -79.98543699999999,
@@ -5125,7 +5125,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929719Z",
+      "scraped_at": "2026-04-20T20:01:54.146833Z",
       "days_to_sale": 57,
       "latitude": 37.3609355,
       "longitude": -79.85372269999999,
@@ -5183,7 +5183,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929850Z",
+      "scraped_at": "2026-04-20T20:01:54.146930Z",
       "days_to_sale": 63,
       "latitude": 36.8351556,
       "longitude": -76.49229079999999,
@@ -5241,7 +5241,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.929977Z",
+      "scraped_at": "2026-04-20T20:01:54.147030Z",
       "days_to_sale": 63,
       "latitude": 37.0593614,
       "longitude": -76.2829515,
@@ -5299,7 +5299,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.573282Z",
+      "scraped_at": "2026-04-20T20:01:51.879258Z",
       "days_to_sale": 65,
       "latitude": 37.0516185,
       "longitude": -76.3202797,
@@ -5357,7 +5357,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.576559Z",
+      "scraped_at": "2026-04-20T20:01:51.889705Z",
       "days_to_sale": 65,
       "latitude": 38.7857969,
       "longitude": -77.4746352,
@@ -5415,7 +5415,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.579694Z",
+      "scraped_at": "2026-04-20T20:01:51.900959Z",
       "days_to_sale": 65,
       "latitude": 38.5392786,
       "longitude": -77.3141907,
@@ -5473,7 +5473,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.582804Z",
+      "scraped_at": "2026-04-20T20:01:51.912164Z",
       "days_to_sale": 65,
       "latitude": 39.0372106,
       "longitude": -77.352006,
@@ -5531,7 +5531,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.585831Z",
+      "scraped_at": "2026-04-20T20:01:51.915555Z",
       "days_to_sale": 65,
       "latitude": 37.1444687,
       "longitude": -76.5562748,
@@ -5589,7 +5589,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.588831Z",
+      "scraped_at": "2026-04-20T20:01:51.918804Z",
       "days_to_sale": 65,
       "latitude": 36.9820357,
       "longitude": -76.413116,
@@ -5647,7 +5647,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.591847Z",
+      "scraped_at": "2026-04-20T20:01:51.921896Z",
       "days_to_sale": 65,
       "latitude": 37.2514091,
       "longitude": -76.658234,
@@ -5705,7 +5705,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.594860Z",
+      "scraped_at": "2026-04-20T20:01:51.924972Z",
       "days_to_sale": 65,
       "latitude": 37.0458586,
       "longitude": -76.3355414,
@@ -5763,7 +5763,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.597856Z",
+      "scraped_at": "2026-04-20T20:01:51.928029Z",
       "days_to_sale": 65,
       "latitude": 37.1468072,
       "longitude": -76.5554968,
@@ -5821,7 +5821,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.600875Z",
+      "scraped_at": "2026-04-20T20:01:51.931067Z",
       "days_to_sale": 65,
       "latitude": 38.9205292,
       "longitude": -77.5341893,
@@ -5879,7 +5879,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.603890Z",
+      "scraped_at": "2026-04-20T20:01:51.934077Z",
       "days_to_sale": 65,
       "latitude": 38.826153,
       "longitude": -77.1914514,
@@ -5937,7 +5937,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930099Z",
+      "scraped_at": "2026-04-20T20:01:54.147128Z",
       "days_to_sale": 65,
       "latitude": 37.2371664,
       "longitude": -78.2419949,
@@ -5995,7 +5995,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930221Z",
+      "scraped_at": "2026-04-20T20:01:54.147224Z",
       "days_to_sale": 65,
       "latitude": 37.3902021,
       "longitude": -78.8672551,
@@ -6053,7 +6053,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930340Z",
+      "scraped_at": "2026-04-20T20:01:54.147320Z",
       "days_to_sale": 65,
       "latitude": 38.9388314,
       "longitude": -77.180724,
@@ -6111,7 +6111,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930466Z",
+      "scraped_at": "2026-04-20T20:01:54.147429Z",
       "days_to_sale": 65,
       "latitude": 38.9268542,
       "longitude": -77.18251699999999,
@@ -6169,7 +6169,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930590Z",
+      "scraped_at": "2026-04-20T20:01:54.147526Z",
       "days_to_sale": 65,
       "latitude": 37.3564079,
       "longitude": -79.24852920000001,
@@ -6227,7 +6227,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.527612Z",
+      "scraped_at": "2026-04-20T20:01:51.859629Z",
       "days_to_sale": 66,
       "latitude": 37.2594145,
       "longitude": -79.9939243,
@@ -6285,7 +6285,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.537003Z",
+      "scraped_at": "2026-04-20T20:01:51.862985Z",
       "days_to_sale": 66,
       "latitude": 37.0925448,
       "longitude": -81.1009672,
@@ -6343,7 +6343,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.543626Z",
+      "scraped_at": "2026-04-20T20:01:51.866058Z",
       "days_to_sale": 66,
       "latitude": 37.3198573,
       "longitude": -80.64772529999999,
@@ -6401,7 +6401,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.557061Z",
+      "scraped_at": "2026-04-20T20:01:51.869138Z",
       "days_to_sale": 66,
       "latitude": 37.3496361,
       "longitude": -79.8443039,
@@ -6459,7 +6459,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.569232Z",
+      "scraped_at": "2026-04-20T20:01:51.874740Z",
       "days_to_sale": 66,
       "latitude": 37.4496191,
       "longitude": -79.9575909,
@@ -6517,7 +6517,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.524424Z",
+      "scraped_at": "2026-04-20T20:01:51.856448Z",
       "days_to_sale": 67,
       "latitude": 38.8563594,
       "longitude": -77.122498,
@@ -6575,7 +6575,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.521141Z",
+      "scraped_at": "2026-04-20T20:01:51.853144Z",
       "days_to_sale": 70,
       "latitude": 37.6293938,
       "longitude": -77.4192235,
@@ -6633,7 +6633,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.507931Z",
+      "scraped_at": "2026-04-20T20:01:51.839513Z",
       "days_to_sale": 71,
       "latitude": 36.7947176,
       "longitude": -76.09905119999999,
@@ -6691,7 +6691,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.511371Z",
+      "scraped_at": "2026-04-20T20:01:51.843373Z",
       "days_to_sale": 71,
       "latitude": 36.7946496,
       "longitude": -76.0824349,
@@ -6749,7 +6749,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.514697Z",
+      "scraped_at": "2026-04-20T20:01:51.846896Z",
       "days_to_sale": 71,
       "latitude": 36.7805058,
       "longitude": -76.076776,
@@ -6807,7 +6807,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.517950Z",
+      "scraped_at": "2026-04-20T20:01:51.850079Z",
       "days_to_sale": 71,
       "latitude": 36.8801145,
       "longitude": -76.2833038,
@@ -6865,7 +6865,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.497385Z",
+      "scraped_at": "2026-04-20T20:01:51.828578Z",
       "days_to_sale": 72,
       "latitude": 38.6894912,
       "longitude": -77.5165617,
@@ -6923,7 +6923,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.504352Z",
+      "scraped_at": "2026-04-20T20:01:51.835999Z",
       "days_to_sale": 72,
       "latitude": 38.7560163,
       "longitude": -77.2166124,
@@ -6981,7 +6981,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930742Z",
+      "scraped_at": "2026-04-20T20:01:54.147621Z",
       "days_to_sale": 72,
       "latitude": 36.6958052,
       "longitude": -78.338201,
@@ -7039,7 +7039,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930868Z",
+      "scraped_at": "2026-04-20T20:01:54.147716Z",
       "days_to_sale": 72,
       "latitude": 36.7619794,
       "longitude": -78.15552629999999,
@@ -7097,7 +7097,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.930991Z",
+      "scraped_at": "2026-04-20T20:01:54.147813Z",
       "days_to_sale": 73,
       "latitude": 36.558459,
       "longitude": -79.3915971,
@@ -7155,7 +7155,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931120Z",
+      "scraped_at": "2026-04-20T20:01:54.147906Z",
       "days_to_sale": 73,
       "latitude": 37.1240983,
       "longitude": -79.3029092,
@@ -7213,7 +7213,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931245Z",
+      "scraped_at": "2026-04-20T20:01:54.148001Z",
       "days_to_sale": 79,
       "latitude": 36.7548038,
       "longitude": -76.552953,
@@ -7271,7 +7271,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931370Z",
+      "scraped_at": "2026-04-20T20:01:54.148104Z",
       "days_to_sale": 79,
       "latitude": 36.7271559,
       "longitude": -76.5905806,
@@ -7329,7 +7329,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931494Z",
+      "scraped_at": "2026-04-20T20:01:54.148209Z",
       "days_to_sale": 79,
       "latitude": 36.8149398,
       "longitude": -76.1954533,
@@ -7387,7 +7387,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931628Z",
+      "scraped_at": "2026-04-20T20:01:54.148304Z",
       "days_to_sale": 79,
       "latitude": 36.7736113,
       "longitude": -76.2608096,
@@ -7445,7 +7445,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931776Z",
+      "scraped_at": "2026-04-20T20:01:54.148402Z",
       "days_to_sale": 79,
       "latitude": 37.1193719,
       "longitude": -76.48727439999999,
@@ -7503,7 +7503,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.931901Z",
+      "scraped_at": "2026-04-20T20:01:54.148512Z",
       "days_to_sale": 79,
       "latitude": 38.6312962,
       "longitude": -77.2591705,
@@ -7561,7 +7561,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.932028Z",
+      "scraped_at": "2026-04-20T20:01:54.148610Z",
       "days_to_sale": 79,
       "latitude": 36.8251397,
       "longitude": -76.3422207,
@@ -7619,7 +7619,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:58.932157Z",
+      "scraped_at": "2026-04-20T20:01:54.148716Z",
       "days_to_sale": 79,
       "latitude": 36.8764108,
       "longitude": -76.2592634,
@@ -7677,7 +7677,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-20T19:49:56.500826Z",
+      "scraped_at": "2026-04-20T20:01:51.832291Z",
       "days_to_sale": 86,
       "latitude": 38.8772512,
       "longitude": -77.4348062,
