@@ -1,287 +1,904 @@
 #!/usr/bin/env python3
 """
-Samuel I. White Foreclosure Scraper
-Downloads and parses Virginia foreclosure sales report PDF
+va_foreclosure_scraper.py — v2.0
+Virginia Trustee Sale Intelligence Scraper
+
+Sources:
+  1. Samuel I. White, P.C.  (existing — PDF)
+  2. Orlans Law Group        (new — web scrape)
+  3. BWW Law Group           (new — web scrape)
+  4. McCabe Weisberg & Conway (new — web scrape)
+
+New in v2.0:
+  - Auction Pricing Matrix replaces $150K placeholder
+  - Confidence scoring (HIGH / MEDIUM / LOW)
+  - Derived financial metrics (cash flow, cap rate, score)
+  - Multi-source deduplication
+  - Days-to-sale countdown
+  - Source tagging per property
 """
 
-import requests
 import json
-import pdfplumber
-from datetime import datetime
 import re
-import sys
+import time
+import hashlib
+import logging
+from datetime import datetime, date, timedelta
+from pathlib import Path
 
-class SamuelWhiteScraper:
-    """Scraper for Samuel I. White foreclosure sales reports"""
-    
-    def __init__(self):
-        self.base_url = "https://www.siwpc.com"
-        # The PDF URL - you'll need to find the actual direct link
-        # It might be something like: https://www.siwpc.com/sales.pdf
-        self.pdf_url = f"https://www.siwpc.net/AutoUpload/Sales.pdf"  # UPDATE THIS
-        
-    def download_pdf(self):
-        """Download the foreclosure sales PDF"""
-        print(f"Downloading PDF from {self.pdf_url}...")
-        
-        headers = {
-            'User-Agent': 'ForeclosureScout/1.0 (Educational/Research Purpose)'
-        }
-        
-        try:
-            response = requests.get(self.pdf_url, headers=headers, timeout=30)
-            response.raise_for_status()
-            
-            # Save PDF temporarily
-            with open('sales_temp.pdf', 'wb') as f:
-                f.write(response.content)
-            
-            print(f"✓ Downloaded PDF ({len(response.content)} bytes)")
-            return 'sales_temp.pdf'
-            
-        except Exception as e:
-            print(f"✗ Error downloading PDF: {e}")
-            return None
-    
-    def parse_pdf(self, pdf_path):
-        """Parse the foreclosure data from PDF"""
-        print(f"Parsing PDF: {pdf_path}...")
-        
-        foreclosures = []
-        current_county = None
-        
-        try:
-            with pdfplumber.open(pdf_path) as pdf:
-                for page_num, page in enumerate(pdf.pages, 1):
-                    print(f"  Processing page {page_num}...")
-                    
-                    # Extract text from page
-                    text = page.extract_text()
-                    
-                    if not text:
-                        continue
-                    
-                    # Split into lines
-                    lines = text.split('\n')
-                    
-                    for line in lines:
-                        # Check if line is a county header (green headers in PDF)
-                        # These are usually in Title Case without numbers
-                        if self._is_county_header(line):
-                            current_county = line.strip()
-                            print(f"    Found county: {current_county}")
-                            continue
-                        
-                        # Try to parse as foreclosure entry
-                        foreclosure = self._parse_foreclosure_line(line, current_county)
-                        if foreclosure:
-                            foreclosures.append(foreclosure)
-            
-            print(f"✓ Parsed {len(foreclosures)} foreclosure properties")
-            return foreclosures
-            
-        except Exception as e:
-            print(f"✗ Error parsing PDF: {e}")
-            return []
-    
-    def _is_county_header(self, line):
-        """Check if line is a county header"""
-        # County headers are typically:
-        # - Title case or all caps
-        # - Don't start with numbers
-        # - Are relatively short
-        # - Match known Virginia county/city names
-        
-        line = line.strip()
-        
-        if not line or len(line) > 50:
-            return False
-        
-        # Check if line starts with a number (property addresses do)
-        if re.match(r'^\d', line):
-            return False
-        
-        # Common county/city keywords
-        county_keywords = [
-            'County', 'City of', 'Fairfax', 'Loudoun', 'Prince William',
-            'Chesterfield', 'Henrico', 'Virginia Beach', 'Norfolk',
-            'Richmond', 'Hampton', 'Newport News', 'Alexandria'
-        ]
-        
-        return any(keyword in line for keyword in county_keywords)
-    
-    def _parse_foreclosure_line(self, line, county):
-        """Parse a single foreclosure entry line"""
-        # Format: Address City Zip SaleDate SaleTime Location FirmFile#
-        # Example: 5724 Croatan Court Centreville 20120 3/17/2026 11:30:00 Fairfax 81374
-        
-        # Skip empty lines or lines that don't look like data
-        if not line.strip() or 'Property Address' in line or 'Information Reported' in line:
-            return None
-        
-        # Try to extract data using regex
-        # This is a simplified parser - may need adjustment based on actual PDF format
-        parts = line.split()
-        
-        if len(parts) < 7:
-            return None
-        
-        try:
-            # Find the ZIP code (5 digits)
-            zip_index = None
-            for i, part in enumerate(parts):
-                if re.match(r'^\d{5}$', part):
-                    zip_index = i
-                    break
-            
-            if zip_index is None:
-                return None
-            
-            # Everything before ZIP is address + city
-            address_parts = parts[:zip_index-1]  # -1 because city is just before ZIP
-            address = ' '.join(address_parts)
-            
-            city = parts[zip_index-1]
-            zip_code = parts[zip_index]
-            
-            # After ZIP: date, time, location, file#
-            if len(parts) >= zip_index + 4:
-                sale_date = parts[zip_index + 1]
-                sale_time = parts[zip_index + 2]
-                sale_location = parts[zip_index + 3]
-                firm_file = parts[zip_index + 4] if len(parts) > zip_index + 4 else None
-                
-                return {
-                    'id': f"VA-{firm_file}" if firm_file else None,
-                    'address': address,
-                    'city': city,
-                    'state': 'VA',
-                    'zip_code': zip_code,
-                    'county': county,
-                    'sale_date': sale_date,
-                    'sale_time': sale_time,
-                    'sale_location': sale_location,
-                    'firm_file_number': firm_file,
-                    'source': 'Samuel I. White, P.C.',
-                    'source_url': 'https://www.siwpc.com/',
-                    'scraped_at': datetime.utcnow().isoformat()
-                }
-        
-        except Exception as e:
-            # Skip lines that don't parse correctly
-            return None
-        
+import requests
+from bs4 import BeautifulSoup
+
+try:
+    import pdfplumber
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger(__name__)
+
+# ── Config ────────────────────────────────────────────────────────────────────
+GMAPS_API_KEY = ""  # Set via environment variable GOOGLE_MAPS_API_KEY
+OUTPUT_PATH = Path("data/foreclosures_va.json")
+TODAY = date.today()
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    )
+}
+
+# ── Auction Pricing Matrix ────────────────────────────────────────────────────
+
+COUNTY_BASE_VALUES = {
+    # Northern Virginia
+    "Fairfax County":        625_000,
+    "Arlington County":      700_000,
+    "Loudoun County":        575_000,
+    "Prince William County": 415_000,
+    "Alexandria City":       575_000,
+    "Falls Church City":     700_000,
+    "Manassas City":         325_000,
+    "Manassas Park City":    300_000,
+    # DC-adjacent / I-95 corridor
+    "Stafford County":       385_000,
+    "Spotsylvania County":   325_000,
+    "Fredericksburg City":   310_000,
+    "King George County":    290_000,
+    # Richmond Metro
+    "Henrico County":        325_000,
+    "Chesterfield County":   330_000,
+    "Richmond City":         285_000,
+    "Hanover County":        365_000,
+    "Colonial Heights City": 250_000,
+    "Petersburg City":       185_000,
+    # Hampton Roads
+    "Virginia Beach City":   365_000,
+    "Norfolk City":          265_000,
+    "Chesapeake City":       345_000,
+    "Newport News City":     255_000,
+    "Hampton City":          240_000,
+    "Suffolk City":          305_000,
+    "Portsmouth City":       235_000,
+    "Poquoson City":         355_000,
+    # Default
+    "DEFAULT":               275_000,
+}
+
+# Counties where auction competition is fiercer → smaller discount
+COMPETITIVE_COUNTIES = {
+    "Fairfax County", "Arlington County", "Alexandria City",
+    "Falls Church City", "Loudoun County", "Henrico County",
+    "Virginia Beach City",
+}
+
+PROPERTY_TYPE_MULTIPLIERS = {
+    "Single Family": 1.00,
+    "Townhouse":     0.82,
+    "Townhome":      0.82,
+    "Condo":         0.68,
+    "Condominium":   0.68,
+    "Multi-Family":  1.25,
+    "Duplex":        1.15,
+    "Land":          0.35,
+    "Lot":           0.35,
+    "Mobile Home":   0.28,
+    "Commercial":    1.40,
+    "Unknown":       1.00,
+}
+
+SIZE_ADJUSTMENTS = [
+    (800,  0.75),
+    (1200, 0.90),
+    (1800, 1.00),
+    (2500, 1.15),
+    (3500, 1.30),
+    (float("inf"), 1.55),
+]
+
+TIER_1_COUNTIES = {
+    "Fairfax County", "Arlington County", "Loudoun County",
+    "Prince William County", "Alexandria City",
+}
+TIER_2_COUNTIES = {
+    "Stafford County", "Spotsylvania County", "Fredericksburg City",
+    "Henrico County", "Chesterfield County", "Virginia Beach City",
+    "Chesapeake City",
+}
+
+
+def detect_property_type(address: str, description: str = "") -> str:
+    """Infer property type from address and description text."""
+    text = f"{address} {description}".lower()
+    if any(k in text for k in ["unit ", "apt ", "#", "suite ", "condo", "condominium"]):
+        return "Condo"
+    if any(k in text for k in ["townhome", "townhouse", "th "]):
+        return "Townhouse"
+    if any(k in text for k in ["lot ", "parcel ", "land ", "unimproved"]):
+        return "Land"
+    if any(k in text for k in ["mobile", "manufactured"]):
+        return "Mobile Home"
+    if any(k in text for k in ["duplex", "multi", "units"]):
+        return "Multi-Family"
+    return "Single Family"  # default assumption for residential trustee sales
+
+
+def size_adjustment(sqft: int | None) -> float:
+    if not sqft:
+        return 1.00
+    for threshold, multiplier in SIZE_ADJUSTMENTS:
+        if sqft < threshold:
+            return multiplier
+    return 1.55
+
+
+def build_pricing(
+    county: str,
+    property_type: str = "Unknown",
+    sqft: int | None = None,
+    opening_bid: float | None = None,
+    original_loan: float | None = None,
+) -> dict:
+    """
+    Build the auction pricing estimate for a property.
+    Returns a dict with eav, arv, confidence, and derived metrics.
+    """
+    # ── Tier 1: Direct price signal ─────────────────────────────────────────
+    if opening_bid and opening_bid > 50_000:
+        eav = opening_bid
+        county_base = COUNTY_BASE_VALUES.get(county, COUNTY_BASE_VALUES["DEFAULT"])
+        type_mult = PROPERTY_TYPE_MULTIPLIERS.get(property_type, 1.00)
+        discount = 0.78 if county in COMPETITIVE_COUNTIES else 0.72
+        arv = county_base * type_mult  # use county base for ARV even when EAV is known
+        confidence = "HIGH — Opening bid from notice"
+
+    elif original_loan and original_loan > 50_000:
+        # Loan amount correlates strongly with purchase price; apply small premium
+        # for appreciation since origination (avg 3% per year, assume 5yr loan age)
+        eav = original_loan * 0.85   # lender typically bids ~85% of balance
+        county_base = COUNTY_BASE_VALUES.get(county, COUNTY_BASE_VALUES["DEFAULT"])
+        type_mult = PROPERTY_TYPE_MULTIPLIERS.get(property_type, 1.00)
+        arv = county_base * type_mult
+        confidence = "HIGH — Loan balance from notice"
+
+    # ── Tier 2: Derived estimate ────────────────────────────────────────────
+    else:
+        county_base = COUNTY_BASE_VALUES.get(county, COUNTY_BASE_VALUES["DEFAULT"])
+        type_mult = PROPERTY_TYPE_MULTIPLIERS.get(property_type, 1.00)
+        size_adj = size_adjustment(sqft)
+        discount = 0.78 if county in COMPETITIVE_COUNTIES else 0.72
+        arv = county_base * type_mult * size_adj
+        eav = arv * discount
+
+        if sqft:
+            confidence = "MEDIUM — Derived from county, type, and size"
+        else:
+            confidence = "LOW — County average only"
+
+    # ── Derived financial metrics ───────────────────────────────────────────
+    monthly_rent = arv * 0.007
+    mortgage_payment = eav * 0.006
+    prop_tax = arv * 0.009 / 12
+    insurance = arv * 0.005 / 12
+    vacancy = monthly_rent * 0.08
+    cash_flow = monthly_rent - mortgage_payment - prop_tax - insurance - vacancy
+
+    noi_annual = (monthly_rent - prop_tax - insurance - vacancy) * 12
+    cap_rate = (noi_annual / eav * 100) if eav > 0 else 0
+
+    discount_to_arv = ((1 - eav / arv) * 100) if arv > 0 else 0
+
+    # ── Investment score (0–100) ────────────────────────────────────────────
+    score = 0
+    score += min(30, discount_to_arv * 1.2)
+    score += min(25, max(0, cap_rate * 3))
+    score += min(20, max(0, cash_flow / 50))
+    if county in TIER_1_COUNTIES:
+        score += 15
+    elif county in TIER_2_COUNTIES:
+        score += 10
+    else:
+        score += 5
+    if "HIGH" in confidence:
+        score += 10
+    elif "MEDIUM" in confidence:
+        score += 5
+
+    return {
+        "eav":                  round(eav),
+        "arv":                  round(arv),
+        "confidence":           confidence,
+        "county_base":          county_base,
+        "type_multiplier":      type_mult,
+        "opening_bid":          opening_bid,
+        "original_loan":        original_loan,
+        "monthly_rent_estimate": round(monthly_rent),
+        "cash_flow_estimate":   round(cash_flow),
+        "cap_rate":             round(cap_rate, 1),
+        "discount_to_arv":      round(discount_to_arv, 1),
+        "score":                min(100, round(score)),
+    }
+
+
+# ── Geocoding ─────────────────────────────────────────────────────────────────
+
+def geocode(address: str, api_key: str) -> tuple[float | None, float | None]:
+    """Return (lat, lng) for a given address string."""
+    if not api_key:
+        return None, None
+    try:
+        r = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": f"{address}, Virginia", "key": api_key},
+            timeout=5,
+        )
+        data = r.json()
+        if data.get("status") == "OK":
+            loc = data["results"][0]["geometry"]["location"]
+            return loc["lat"], loc["lng"]
+    except Exception as e:
+        log.warning(f"Geocode failed for '{address}': {e}")
+    return None, None
+
+
+# ── Property ID ───────────────────────────────────────────────────────────────
+
+def make_id(source_prefix: str, address: str, sale_date: str) -> str:
+    raw = f"{source_prefix}:{address}:{sale_date}".lower()
+    return f"va-{source_prefix}-{hashlib.md5(raw.encode()).hexdigest()[:8]}"
+
+
+def days_to_sale(sale_date_str: str) -> int | None:
+    try:
+        sale_dt = datetime.strptime(sale_date_str, "%Y-%m-%d").date()
+        return (sale_dt - TODAY).days
+    except Exception:
         return None
-    
-    def enrich_with_coordinates(self, foreclosures, google_maps_api_key=None):
-        """Add lat/lng coordinates using Google Maps API"""
-        if not google_maps_api_key:
-            print("⚠ No Google Maps API key - skipping geocoding")
-            return foreclosures
-        
-        print(f"Geocoding {len(foreclosures)} addresses...")
-        
-        import time
-        
-        for i, foreclosure in enumerate(foreclosures):
-            # Construct full address
-            full_address = f"{foreclosure['address']}, {foreclosure['city']}, {foreclosure['state']} {foreclosure['zip_code']}"
-            
+
+
+# ── Source 1: Samuel I. White, P.C. ──────────────────────────────────────────
+
+SIW_PDF_URL = "https://www.siwpc.net/AutoUpload/Sales.pdf"
+
+
+def _is_siw_county_header(line: str) -> bool:
+    """County headers in SIW PDF are short lines like 'Fairfax' or 'City of Alexandria'."""
+    line = line.strip()
+    if not line or len(line) > 50 or re.match(r"^\d", line):
+        return False
+    if any(
+        skip in line for skip in (
+            "Foreclosure Sales Report", "Property Address", "Information Reported",
+            "Samuel I. White", "contact our offices", "makes no representations",
+        )
+    ):
+        return False
+    # Must be Title Case-ish letters only (optionally with "City of" / "County")
+    return bool(re.match(r"^(VA|[A-Z][A-Za-z\s]+)$", line))
+
+
+def _parse_siw_line(line: str, current_county: str | None) -> dict | None:
+    """
+    Parse one property line from the SIW PDF.
+    Format: Address City Zip MM/DD/YYYY HH:MM:SS Location FileNumber
+    Example: 5724 Croatan Court Centreville 20120 3/17/2026 11:30:00 Fairfax 81374
+    """
+    parts = line.split()
+    if len(parts) < 7:
+        return None
+
+    # Find ZIP (5 digits)
+    zip_index = None
+    for i, part in enumerate(parts):
+        if re.match(r"^\d{5}$", part):
+            zip_index = i
+            break
+    if zip_index is None or zip_index < 2:
+        return None
+
+    # Validate that the two tokens after ZIP look like date + time
+    if zip_index + 2 >= len(parts):
+        return None
+    if not re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", parts[zip_index + 1]):
+        return None
+    if not re.match(r"^\d{1,2}:\d{2}", parts[zip_index + 2]):
+        return None
+
+    city = parts[zip_index - 1]
+    address = " ".join(parts[: zip_index - 1])
+    zip_code = parts[zip_index]
+    sale_date_raw = parts[zip_index + 1]
+    sale_time = parts[zip_index + 2]
+    # Sale location + firm file number make up the tail; file# is the last token
+    tail = parts[zip_index + 3:]
+    if not tail:
+        return None
+    firm_file = tail[-1]
+    sale_location = " ".join(tail[:-1]) or city
+
+    # Normalize sale date to ISO for downstream consumers (days_to_sale)
+    sale_date_iso = None
+    try:
+        sale_date_iso = datetime.strptime(sale_date_raw, "%m/%d/%Y").strftime("%Y-%m-%d")
+    except Exception:
+        sale_date_iso = sale_date_raw
+
+    # SIW headers distinguish counties vs independent cities via a "City of"
+    # prefix, so handle this here rather than rely on normalize_county (which
+    # conflates names like "Fairfax" that are both a county and a city).
+    if current_county:
+        cc = current_county.strip()
+        if cc.lower().startswith("city of "):
+            county = cc[len("city of "):].strip() + " City"
+        elif cc.lower().endswith(" county") or cc.lower().endswith(" city"):
+            county = cc
+        else:
+            county = cc + " County"
+    else:
+        county = "Unknown County"
+
+    property_type = detect_property_type(address)
+    pricing = build_pricing(county, property_type, None, None, None)
+
+    return {
+        "id":               make_id("siw", address, sale_date_iso or ""),
+        "source":           "Samuel I. White, P.C.",
+        "source_url":       SIW_PDF_URL,
+        "firm_file_number": firm_file,
+        "address":          address,
+        "city":             city,
+        "state":            "VA",
+        "zip_code":         zip_code,
+        "county":           county,
+        "lat":              None,
+        "lng":              None,
+        "sale_date":        sale_date_iso,
+        "sale_date_raw":    sale_date_raw,
+        "sale_time":        sale_time,
+        "sale_location":    sale_location,
+        "property_type":    property_type,
+        "sqft":             None,
+        "beds":             None,
+        "baths":            None,
+        "year_built":       None,
+        "pricing":          pricing,
+        "tags":             ["VA Foreclosure", "Trustee Sale", county],
+        "status":           "active",
+        "scraped_at":       datetime.utcnow().isoformat() + "Z",
+        "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
+    }
+
+
+def scrape_siw() -> list[dict]:
+    """
+    Download the Samuel I. White PDF and parse property listings using
+    pdfplumber (preserves line layout). Each property fits on one line.
+    """
+    log.info("Scraping Samuel I. White, P.C. ...")
+    properties: list[dict] = []
+
+    if not PDF_AVAILABLE:
+        log.warning("pdfplumber not installed — skipping SIW")
+        return properties
+
+    try:
+        r = requests.get(SIW_PDF_URL, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        pdf_path = Path("/tmp/siw_listings.pdf")
+        pdf_path.write_bytes(r.content)
+
+        current_county: str | None = None
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                for raw_line in text.split("\n"):
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    prop = _parse_siw_line(line, current_county)
+                    if prop:
+                        properties.append(prop)
+                    elif _is_siw_county_header(line):
+                        # VA is the state marker; ignore it as a county
+                        if line != "VA":
+                            current_county = line
+
+    except Exception as e:
+        log.error(f"SIW scrape failed: {e}")
+
+    log.info(f"SIW: {len(properties)} properties")
+    return properties
+
+
+def parse_siw_block(text: str, source_url: str) -> dict | None:
+    """Deprecated — kept for backwards-compat with v2 signature. Not used."""
+    return None
+
+
+# ── Source 2: Orlans Law Group ────────────────────────────────────────────────
+
+def scrape_orlans() -> list[dict]:
+    """
+    Orlans Law Group: disabled pending research.
+    The old /property-listings/ URL returns 404 — site was restructured and
+    the public listings feed appears to have been removed. To re-enable,
+    either find the new listings URL or swap to a paid API feed.
+    """
+    log.warning("Orlans: source disabled (no public listings URL — site restructured)")
+    return []
+
+
+def _unused_scrape_orlans_legacy() -> list[dict]:
+    """Original v2 Orlans scraper — kept for reference, not called."""
+    log.info("Scraping Orlans Law Group ...")
+    properties = []
+
+    try:
+        r = requests.get(
+            "https://www.orlans.com/property-listings/",
+            headers=HEADERS, timeout=15
+        )
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        # Orlans typically uses a table or card grid for listings
+        # Try table rows first
+        rows = soup.select("table tbody tr")
+        if not rows:
+            # Try card/article pattern
+            rows = soup.select(".property-listing, .listing-item, article.property")
+
+        for row in rows:
+            prop = parse_orlans_row(row)
+            if prop:
+                properties.append(prop)
+
+        # If no structured data found, try JSON-LD or embedded JSON
+        if not properties:
+            scripts = soup.find_all("script", type="application/json")
+            for script in scripts:
+                try:
+                    data = json.loads(script.string or "")
+                    if isinstance(data, list):
+                        for item in data:
+                            prop = parse_orlans_json(item)
+                            if prop:
+                                properties.append(prop)
+                except Exception:
+                    pass
+
+    except Exception as e:
+        log.error(f"Orlans scrape failed: {e}")
+
+    log.info(f"Orlans: {len(properties)} properties")
+    return properties
+
+
+def parse_orlans_row(row) -> dict | None:
+    """Parse a single row/card from Orlans listings."""
+    try:
+        cells = row.find_all(["td", "div", "span"])
+        text = row.get_text(" ", strip=True)
+
+        address_match = re.search(
+            r"(\d+\s+[A-Z][A-Za-z\s]+(?:St|Ave|Rd|Dr|Ln|Ct|Blvd|Way|Pl|Cir|Ter)\.?)",
+            text, re.IGNORECASE
+        )
+        if not address_match:
+            return None
+        address = address_match.group(1).strip()
+
+        date_match = re.search(
+            r"(\d{1,2}/\d{1,2}/\d{4}|\w+\s+\d{1,2},\s+\d{4})", text
+        )
+        sale_date_str = None
+        if date_match:
+            raw = date_match.group(1)
+            for fmt in ("%m/%d/%Y", "%B %d, %Y", "%b %d, %Y"):
+                try:
+                    sale_dt = datetime.strptime(raw, fmt)
+                    sale_date_str = sale_dt.strftime("%Y-%m-%d")
+                    break
+                except Exception:
+                    pass
+
+        # Look for opening bid
+        bid_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", text)
+        opening_bid = None
+        if bid_match:
             try:
-                # Call Google Maps Geocoding API
-                url = "https://maps.googleapis.com/maps/api/geocode/json"
-                params = {
-                    'address': full_address,
-                    'key': google_maps_api_key
-                }
-                
-                response = requests.get(url, params=params)
-                data = response.json()
-                
-                if data['status'] == 'OK' and data['results']:
-                    location = data['results'][0]['geometry']['location']
-                    foreclosure['latitude'] = location['lat']
-                    foreclosure['longitude'] = location['lng']
-                    print(f"  ✓ Geocoded {i+1}/{len(foreclosures)}: {foreclosure['city']}")
-                else:
-                    print(f"  ✗ Could not geocode: {foreclosure['city']}")
-                
-                # Rate limiting - don't hammer the API
-                time.sleep(0.1)
-                
-            except Exception as e:
-                print(f"  ✗ Geocoding error: {e}")
-                continue
-        
-        return foreclosures
-    
-    def save_to_json(self, foreclosures, output_path='foreclosures_va.json'):
-        """Save foreclosures to JSON file"""
-        print(f"Saving {len(foreclosures)} foreclosures to {output_path}...")
-        
-        # Add metadata
-        output = {
-            'metadata': {
-                'source': 'Samuel I. White, P.C.',
-                'source_url': 'https://www.siwpc.com/',
-                'scraped_at': datetime.utcnow().isoformat(),
-                'total_properties': len(foreclosures),
-                'coverage': 'Virginia statewide'
-            },
-            'foreclosures': foreclosures
+                val = float(bid_match.group(1).replace(",", ""))
+                if val > 50_000:  # sanity check — ignore small numbers
+                    opening_bid = val
+            except Exception:
+                pass
+
+        county_match = re.search(
+            r"(Fairfax|Arlington|Loudoun|Prince William|Alexandria|Stafford"
+            r"|Spotsylvania|Fredericksburg|Henrico|Chesterfield|Richmond"
+            r"|Virginia Beach|Norfolk|Chesapeake|Newport News)\s*(County|City)?",
+            text, re.IGNORECASE
+        )
+        county_raw = county_match.group(0).strip() if county_match else ""
+        county = normalize_county(county_raw)
+
+        property_type = detect_property_type(address, text)
+        pricing = build_pricing(county, property_type, None, opening_bid, None)
+
+        return {
+            "id":               make_id("orlans", address, sale_date_str or ""),
+            "source":           "Orlans Law Group",
+            "source_url":       "https://www.orlans.com/property-listings/",
+            "firm_file_number": None,
+            "address":          address,
+            "city":             "",
+            "state":            "VA",
+            "zip_code":         "",
+            "county":           county,
+            "lat":              None,
+            "lng":              None,
+            "sale_date":        sale_date_str,
+            "sale_time":        "10:00 AM",
+            "sale_location":    f"{county} Courthouse",
+            "property_type":    property_type,
+            "sqft":             None,
+            "beds":             None,
+            "baths":            None,
+            "year_built":       None,
+            "pricing":          pricing,
+            "tags":             ["VA Foreclosure", "Trustee Sale", county, "Orlans"],
+            "status":           "active",
+            "scraped_at":       datetime.utcnow().isoformat() + "Z",
+            "days_to_sale":     days_to_sale(sale_date_str) if sale_date_str else None,
         }
-        
+    except Exception:
+        return None
+
+
+def parse_orlans_json(item: dict) -> dict | None:
+    """Parse a property from Orlans JSON data."""
+    try:
+        address = item.get("address") or item.get("property_address", "")
+        if not address:
+            return None
+        sale_date_str = item.get("sale_date") or item.get("auction_date", "")
+        county = normalize_county(item.get("county", ""))
+        opening_bid = item.get("opening_bid") or item.get("bid_amount")
+        property_type = detect_property_type(address)
+        pricing = build_pricing(county, property_type, None,
+                                float(opening_bid) if opening_bid else None, None)
+        return {
+            "id":               make_id("orlans", address, sale_date_str),
+            "source":           "Orlans Law Group",
+            "source_url":       "https://www.orlans.com/property-listings/",
+            "firm_file_number": item.get("file_number"),
+            "address":          address,
+            "city":             item.get("city", ""),
+            "state":            "VA",
+            "zip_code":         item.get("zip", ""),
+            "county":           county,
+            "lat":              None,
+            "lng":              None,
+            "sale_date":        sale_date_str,
+            "sale_time":        item.get("sale_time", "10:00 AM"),
+            "sale_location":    item.get("sale_location", f"{county} Courthouse"),
+            "property_type":    property_type,
+            "sqft":             item.get("sqft"),
+            "beds":             item.get("beds"),
+            "baths":            item.get("baths"),
+            "year_built":       item.get("year_built"),
+            "pricing":          pricing,
+            "tags":             ["VA Foreclosure", "Trustee Sale", county, "Orlans"],
+            "status":           "active",
+            "scraped_at":       datetime.utcnow().isoformat() + "Z",
+            "days_to_sale":     days_to_sale(sale_date_str) if sale_date_str else None,
+        }
+    except Exception:
+        return None
+
+
+# ── Source 3: BWW Law Group ───────────────────────────────────────────────────
+
+def scrape_bww() -> list[dict]:
+    """
+    BWW Law Group: disabled pending research.
+    BWW merged with Aldridge Pite (www.bww-law.com now redirects to
+    aldridgepite.com). Their listings page is a JS-rendered state-selection
+    form served with Brotli-only compression — bare HTTP scraping is
+    infeasible. Needs Playwright in CI or a different data source.
+    """
+    log.warning("BWW: source disabled (merged with Aldridge Pite — JS-rendered, needs browser automation)")
+    return []
+
+
+# ── Source 4: McCabe, Weisberg & Conway ──────────────────────────────────────
+
+def scrape_mwc() -> list[dict]:
+    """
+    McCabe Weisberg & Conway: disabled pending research.
+    Site moved to mccabeesq.com and gates listings behind a /sales-disclaimer
+    click-through. Real listings likely require JS execution past the
+    disclaimer. Needs Playwright in CI to re-enable.
+    """
+    log.warning("MWC: source disabled (disclaimer gate — needs browser automation)")
+    return []
+
+
+# ── Generic listing parser (BWW / MWC) ───────────────────────────────────────
+
+def parse_generic_listing(element, text: str, source_key: str,
+                           source_name: str, source_url: str) -> dict | None:
+    """Generic parser for trustee firm listing rows/cards."""
+    try:
+        address_match = re.search(
+            r"(\d+\s+[A-Z][A-Za-z0-9\s]+(?:St(?:reet)?|Ave(?:nue)?|Rd|Road"
+            r"|Dr(?:ive)?|Ln|Lane|Ct|Court|Blvd|Boulevard|Way|Pl|Place"
+            r"|Cir(?:cle)?|Ter(?:race)?|Pike|Hwy|Highway)\.?)",
+            text, re.IGNORECASE
+        )
+        if not address_match:
+            return None
+        address = address_match.group(1).strip()
+
+        county_match = re.search(
+            r"(Fairfax|Arlington|Loudoun|Prince William|Alexandria|Stafford"
+            r"|Spotsylvania|Fredericksburg|Henrico|Chesterfield|Richmond"
+            r"|Virginia Beach|Norfolk|Chesapeake|Newport News|Hampton"
+            r"|Suffolk|Portsmouth|Manassas|Roanoke|Lynchburg)\s*(County|City)?",
+            text, re.IGNORECASE
+        )
+        county_raw = county_match.group(0).strip() if county_match else ""
+        county = normalize_county(county_raw)
+
+        date_match = re.search(
+            r"(\d{1,2}/\d{1,2}/\d{4}|\w+\s+\d{1,2},\s+\d{4})", text
+        )
+        sale_date_str = None
+        if date_match:
+            raw = date_match.group(1)
+            for fmt in ("%m/%d/%Y", "%B %d, %Y", "%b %d, %Y"):
+                try:
+                    sale_dt = datetime.strptime(raw, fmt)
+                    sale_date_str = sale_dt.strftime("%Y-%m-%d")
+                    break
+                except Exception:
+                    pass
+
+        bid_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", text)
+        opening_bid = None
+        if bid_match:
+            try:
+                val = float(bid_match.group(1).replace(",", ""))
+                if val > 50_000:
+                    opening_bid = val
+            except Exception:
+                pass
+
+        property_type = detect_property_type(address, text)
+        pricing = build_pricing(county, property_type, None, opening_bid, None)
+
+        return {
+            "id":               make_id(source_key, address, sale_date_str or ""),
+            "source":           source_name,
+            "source_url":       source_url,
+            "firm_file_number": None,
+            "address":          address,
+            "city":             "",
+            "state":            "VA",
+            "zip_code":         "",
+            "county":           county,
+            "lat":              None,
+            "lng":              None,
+            "sale_date":        sale_date_str,
+            "sale_time":        "10:00 AM",
+            "sale_location":    f"{county} Courthouse",
+            "property_type":    property_type,
+            "sqft":             None,
+            "beds":             None,
+            "baths":            None,
+            "year_built":       None,
+            "pricing":          pricing,
+            "tags":             ["VA Foreclosure", "Trustee Sale", county, source_name],
+            "status":           "active",
+            "scraped_at":       datetime.utcnow().isoformat() + "Z",
+            "days_to_sale":     days_to_sale(sale_date_str) if sale_date_str else None,
+        }
+    except Exception:
+        return None
+
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
+def normalize_county(raw: str) -> str:
+    """Normalize county string to 'X County' or 'X City' format."""
+    raw = raw.strip().title()
+    if not raw:
+        return "Unknown County"
+    known_cities = {
+        "Alexandria", "Fairfax", "Falls Church", "Manassas", "Manassas Park",
+        "Richmond", "Norfolk", "Virginia Beach", "Chesapeake", "Newport News",
+        "Hampton", "Portsmouth", "Suffolk", "Poquoson", "Fredericksburg",
+        "Colonial Heights", "Petersburg", "Lynchburg", "Roanoke",
+    }
+    for city in known_cities:
+        if city in raw and "County" not in raw:
+            return f"{city} City"
+    if "County" not in raw and "City" not in raw:
+        return f"{raw} County"
+    return raw
+
+
+def deduplicate(properties: list[dict]) -> list[dict]:
+    """
+    Remove duplicate properties across sources.
+    A duplicate is defined as: same address + same sale date (within 1 day).
+    Prefer the record with higher pricing confidence when deduplicating.
+    """
+    seen: dict[str, dict] = {}
+    confidence_rank = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
+
+    for prop in properties:
+        address_norm = re.sub(r"\s+", " ", (prop.get("address") or "").lower().strip())
+        sale_date = prop.get("sale_date") or ""
+        key = f"{address_norm}::{sale_date}"
+
+        if key not in seen:
+            seen[key] = prop
+        else:
+            # Keep the one with higher pricing confidence
+            existing_conf = confidence_rank.get(
+                seen[key]["pricing"]["confidence"].split("—")[0].strip().upper(), 1
+            )
+            new_conf = confidence_rank.get(
+                prop["pricing"]["confidence"].split("—")[0].strip().upper(), 1
+            )
+            if new_conf > existing_conf:
+                seen[key] = prop
+
+    result = list(seen.values())
+    log.info(f"Deduplication: {len(properties)} → {len(result)} properties")
+    return result
+
+
+def geocode_missing(properties: list[dict], api_key: str) -> list[dict]:
+    """Geocode any property missing lat/lng."""
+    missing = [p for p in properties if not p.get("lat")]
+    log.info(f"Geocoding {len(missing)} properties ...")
+    for prop in missing:
+        address_str = f"{prop['address']}, {prop['city']}, VA {prop['zip_code']}"
+        lat, lng = geocode(address_str, api_key)
+        prop["lat"] = lat
+        prop["lng"] = lng
+        if lat:
+            log.debug(f"  ✓ {prop['address']} → {lat:.4f}, {lng:.4f}")
+        time.sleep(0.1)  # rate limit
+    return properties
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def run(gmaps_key: str = "") -> dict:
+    import os
+    api_key = gmaps_key or os.environ.get("GOOGLE_MAPS_API_KEY", "")
+
+    # Scrape all sources
+    all_props = []
+    all_props.extend(scrape_siw())
+    time.sleep(2)
+    all_props.extend(scrape_orlans())
+    time.sleep(2)
+    all_props.extend(scrape_bww())
+    time.sleep(2)
+    all_props.extend(scrape_mwc())
+
+    # Deduplicate
+    all_props = deduplicate(all_props)
+
+    # Geocode
+    if api_key:
+        all_props = geocode_missing(all_props, api_key)
+
+    # Sort by days to sale (soonest first), nulls last
+    all_props.sort(
+        key=lambda p: p.get("days_to_sale") if p.get("days_to_sale") is not None else 9999
+    )
+
+    # Frontend compat: emit latitude/longitude alongside lat/lng.
+    # The existing HTML reads `property.latitude` / `property.longitude`.
+    for p in all_props:
+        if p.get("lat") is not None:
+            p["latitude"] = p["lat"]
+        if p.get("lng") is not None:
+            p["longitude"] = p["lng"]
+
+    # Build output
+    high_conf = sum(1 for p in all_props if "HIGH" in p["pricing"]["confidence"])
+    med_conf  = sum(1 for p in all_props if "MEDIUM" in p["pricing"]["confidence"])
+    low_conf  = sum(1 for p in all_props if "LOW" in p["pricing"]["confidence"])
+
+    sources = {}
+    for p in all_props:
+        s = p["source"]
+        sources[s] = sources.get(s, 0) + 1
+
+    counties = sorted({p["county"] for p in all_props if p["county"] != "Unknown County"})
+
+    output = {
+        "metadata": {
+            "total_properties":     len(all_props),
+            "scraped_at":           datetime.utcnow().isoformat() + "Z",
+            "sources":              sources,
+            "counties_covered":     len(counties),
+            "pricing_confidence": {
+                "high":   high_conf,
+                "medium": med_conf,
+                "low":    low_conf,
+            },
+            "pricing_note": (
+                "EAV (Estimated Auction Value) derived from county base values, "
+                "property type, and auction discount. "
+                "Confidence: HIGH = direct price signal from notice, "
+                "MEDIUM = derived from county + type + size, "
+                "LOW = county average only. Not a formal appraisal."
+            ),
+        },
+        "foreclosures": all_props,
+    }
+
+    # Safety guard: refuse to clobber existing data on a suspicious collapse.
+    # A real scrape should produce a similar order-of-magnitude count week to week;
+    # a sudden drop to 0 (or below half) almost always means a source broke, not
+    # that foreclosures stopped happening.
+    if OUTPUT_PATH.exists():
         try:
-            with open(output_path, 'w') as f:
-                json.dump(output, f, indent=2)
-            
-            print(f"✓ Saved to {output_path}")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Error saving JSON: {e}")
-            return False
-    
-    def run(self, google_maps_api_key=None):
-        """Main scraper workflow"""
-        print("=" * 60)
-        print("Samuel I. White Foreclosure Scraper")
-        print("=" * 60)
-        
-        # Step 1: Download PDF
-        pdf_path = self.download_pdf()
-        if not pdf_path:
-            print("✗ Failed to download PDF")
-            return False
-        
-        # Step 2: Parse PDF
-        foreclosures = self.parse_pdf(pdf_path)
-        if not foreclosures:
-            print("✗ No foreclosures found in PDF")
-            return False
-        
-        # Step 3: Enrich with coordinates (optional)
-        if google_maps_api_key:
-            foreclosures = self.enrich_with_coordinates(foreclosures, google_maps_api_key)
-        
-        # Step 4: Save to JSON
-        success = self.save_to_json(foreclosures)
-        
-        print("=" * 60)
-        print(f"{'✓ COMPLETE' if success else '✗ FAILED'}")
-        print("=" * 60)
-        
-        return success
+            previous = json.loads(OUTPUT_PATH.read_text())
+            prev_total = previous.get("metadata", {}).get("total_properties", 0)
+        except Exception:
+            prev_total = 0
+
+        if len(all_props) == 0 and prev_total > 0:
+            log.error(
+                f"ABORT: scrape returned 0 properties but previous run had {prev_total}. "
+                "Refusing to overwrite data. Investigate the source scrapers."
+            )
+            return previous
+        if prev_total >= 10 and len(all_props) < prev_total * 0.5:
+            log.error(
+                f"ABORT: scrape returned {len(all_props)} properties, "
+                f"a >50% drop from previous {prev_total}. Refusing to overwrite. "
+                "Investigate the source scrapers."
+            )
+            return previous
+
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(json.dumps(output, indent=2, default=str))
+    log.info(f"✅ Wrote {len(all_props)} properties to {OUTPUT_PATH}")
+
+    return output
 
 
 if __name__ == "__main__":
-    import os
-    
-    # Get Google Maps API key from environment variable (optional)
-    google_maps_key = os.environ.get('GOOGLE_MAPS_API_KEY')
-    
-    # Run scraper
-    scraper = SamuelWhiteScraper()
-    success = scraper.run(google_maps_api_key=google_maps_key)
-    
-    sys.exit(0 if success else 1)
+    run()

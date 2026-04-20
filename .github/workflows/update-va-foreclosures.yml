@@ -21,20 +21,14 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd scraper
-        pip install --break-system-packages -r requirements.txt
-    
+        pip install --break-system-packages -r scraper/requirements.txt
+
     - name: Run VA foreclosure scraper
       env:
         GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       run: |
-        cd scraper
-        python3 va_foreclosure_scraper.py
-    
-    - name: Move output to data folder
-      run: |
-        mv scraper/foreclosures_va.json data/foreclosures_va.json
-    
+        python3 scraper/va_foreclosure_scraper.py
+
     - name: Commit and push if changed
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"

@@ -1,14 +1,10 @@
-# Python dependencies for Virginia foreclosure scraper
+# Python dependencies for Virginia foreclosure scraper (v2.0)
 
-# PDF parsing
+# PDF parsing (Samuel I. White source)
 pdfplumber==0.10.3
-PyPDF2==3.0.1
+
+# HTML parsing (Orlans / BWW / McCabe sources)
+beautifulsoup4==4.12.3
 
 # HTTP requests
 requests==2.31.0
-
-# JSON handling (built-in, but listing for clarity)
-# json - built-in
-
-# Date/time handling (built-in)
-# datetime - built-in
