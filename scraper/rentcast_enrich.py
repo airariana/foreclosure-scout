@@ -67,6 +67,24 @@ def _normalize_key(address: str, city: str, state: str, zip_code: str) -> str:
 
 # ── API calls ────────────────────────────────────────────────────────────────
 
+# Diagnostic counter — log verbose details for the first N calls per run so
+# failures are debuggable in CI without drowning the log on cache-hit runs.
+_DIAG_CALLS_LEFT = 3
+
+
+def _log_response(label: str, r: requests.Response, full_addr: str) -> None:
+    """Emit diagnostic info for the first few API calls of a run."""
+    global _DIAG_CALLS_LEFT
+    if _DIAG_CALLS_LEFT <= 0:
+        return
+    _DIAG_CALLS_LEFT -= 1
+    body_snippet = (r.text or "")[:300].replace("\n", " ")
+    log.info(
+        f"[RentCast diag] {label} status={r.status_code} "
+        f"addr={full_addr!r} body={body_snippet!r}"
+    )
+
+
 def _fetch_property(full_addr: str, api_key: str) -> dict | None:
     """Look up property details (beds/baths/sqft/yearBuilt/lotSize/propertyType)."""
     try:
@@ -76,6 +94,7 @@ def _fetch_property(full_addr: str, api_key: str) -> dict | None:
             headers={"X-Api-Key": api_key, "Accept": "application/json"},
             timeout=15,
         )
+        _log_response("property", r, full_addr)
         if r.status_code == 404:
             return None
         if r.status_code == 401:
@@ -85,7 +104,12 @@ def _fetch_property(full_addr: str, api_key: str) -> dict | None:
             log.warning("RentCast rate-limited; backing off")
             time.sleep(2)
             return None
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # Surface HTTP errors so we stop silently-swallowing them.
+            log.warning(
+                f"RentCast property {r.status_code}: {r.text[:200]!r} (addr={full_addr!r})"
+            )
+            return None
         data = r.json()
         if isinstance(data, list) and data:
             return data[0]
@@ -93,7 +117,7 @@ def _fetch_property(full_addr: str, api_key: str) -> dict | None:
             return data
         return None
     except Exception as e:
-        log.debug(f"RentCast property lookup failed for {full_addr}: {e}")
+        log.warning(f"RentCast property lookup exception for {full_addr}: {e}")
         return None
 
 
@@ -106,13 +130,18 @@ def _fetch_rent(full_addr: str, api_key: str) -> float | None:
             headers={"X-Api-Key": api_key, "Accept": "application/json"},
             timeout=15,
         )
+        _log_response("rent", r, full_addr)
         if r.status_code in (404, 401, 429):
             return None
-        r.raise_for_status()
+        if r.status_code >= 400:
+            log.warning(
+                f"RentCast rent {r.status_code}: {r.text[:200]!r} (addr={full_addr!r})"
+            )
+            return None
         data = r.json()
         return data.get("rent") or data.get("rentEstimate")
     except Exception as e:
-        log.debug(f"RentCast rent lookup failed for {full_addr}: {e}")
+        log.warning(f"RentCast rent lookup exception for {full_addr}: {e}")
         return None
 
 
