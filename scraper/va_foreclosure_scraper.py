@@ -1166,6 +1166,34 @@ def run(gmaps_key: str = "") -> dict:
         if p.get("lng") is not None:
             p["longitude"] = p["lng"]
 
+    # Frontend compat: flatten pricing object into top-level fields.
+    # The HTML reads `p.price`, `p.arv`, `p.monthlyRent`, `p.cashFlow`, `p.capRate`,
+    # `p.score`, `p.zip`, `p.listingType`, `p.rehabEstimate`, `p.beds`, `p.baths`,
+    # `p.sqft`. Provide sensible defaults so cards/filters/calculators don't break;
+    # the frontend's in-browser enrichment step (Estated, HUD FMR) fills in real
+    # beds/baths/sqft for properties it can resolve.
+    for p in all_props:
+        pr = p.get("pricing", {}) or {}
+        p["price"]          = pr.get("eav") or 0
+        p["arv"]            = pr.get("arv") or 0
+        p["monthlyRent"]    = pr.get("monthly_rent_estimate") or 0
+        p["cashFlow"]       = pr.get("cash_flow_estimate") or 0
+        p["capRate"]        = pr.get("cap_rate") or 0
+        p["score"]          = pr.get("score") or 0
+        p["zip"]            = p.get("zip_code") or ""
+        # Trustee sales are classified as "Pre-Foreclosure" in the UI's type filter.
+        p["listingType"]    = p.get("listingType") or "Pre-Foreclosure"
+        # Rehab default: assume 8% of ARV for a typical foreclosure ($20K on a
+        # $250K home). User can override in the calculator drawer per-property.
+        p["rehabEstimate"]  = p.get("rehabEstimate") or round((pr.get("arv") or 0) * 0.08)
+        # Property specs — 0/null until enrichment API (Estated) populates them.
+        # Frontend uses `(p.sqft||0)` and numeric comparisons like `p.beds<minB`
+        # which would misbehave on null (null<3 is true), so default to 0.
+        if p.get("beds") is None:  p["beds"] = 0
+        if p.get("baths") is None: p["baths"] = 0
+        if p.get("sqft") is None:  p["sqft"] = 0
+        if p.get("yearBuilt") is None: p["yearBuilt"] = p.get("year_built")
+
     # Build output
     high_conf = sum(1 for p in all_props if "HIGH" in p["pricing"]["confidence"])
     med_conf  = sum(1 for p in all_props if "MEDIUM" in p["pricing"]["confidence"])
