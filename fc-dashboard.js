@@ -601,6 +601,27 @@
 
     // Source-specific closing playbook
     const isHUD = p.source === 'HUD HomeStore';
+
+    // Street View + static map (Google Maps key is exposed client-side
+    // in the main HTML so we can use the same for these static endpoints).
+    const GMAPS_KEY = (typeof GOOGLE_MAPS_API_KEY !== 'undefined')
+      ? GOOGLE_MAPS_API_KEY
+      : (window.GOOGLE_MAPS_API_KEY || '');
+    const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+    const encAddr = encodeURIComponent(fullAddress);
+    const streetViewUrl = GMAPS_KEY
+      ? `https://maps.googleapis.com/maps/api/streetview?size=520x220&location=${encAddr}&fov=80&key=${GMAPS_KEY}&return_error_codes=true`
+      : '';
+    const staticMapUrl = (GMAPS_KEY && p.lat && p.lng)
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${p.lat},${p.lng}&zoom=15&size=520x200&maptype=roadmap&markers=color:0xD4A93A%7C${p.lat},${p.lng}&style=feature:poi%7Celement:labels%7Cvisibility:off&key=${GMAPS_KEY}`
+      : (GMAPS_KEY ? `https://maps.googleapis.com/maps/api/staticmap?center=${encAddr}&zoom=15&size=520x200&maptype=roadmap&markers=color:0xD4A93A%7C${encAddr}&style=feature:poi%7Celement:labels%7Cvisibility:off&key=${GMAPS_KEY}` : '');
+
+    // External listing link — HUD has a deep link via case number, other
+    // sources link to the firm's general listings page.
+    const listingUrl = isHUD && p.firm_file_number
+      ? `https://www.hudhomestore.gov/listing/?caseNumber=${encodeURIComponent(p.firm_file_number)}`
+      : (p.source_url || '');
+    const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
     const playbook = isHUD ? {
       title: 'HUD REO Purchase',
       icon: 'H',
@@ -645,6 +666,30 @@
       </div>
 
       <div class="fc-drawer-body">
+        ${streetViewUrl ? `
+          <div class="fc-drawer-media">
+            <img src="${streetViewUrl}" alt="Street view of ${escapeHtml(p.address || '')}"
+                 class="fc-streetview"
+                 onerror="this.style.display='none'; const n=this.nextElementSibling; if(n) n.style.display='flex';" />
+            <div class="fc-streetview-fallback">
+              <div class="fc-eyebrow" style="margin-bottom:6px">Street view unavailable</div>
+              <div style="font-size:12px;color:var(--muted)">No Street View coverage for this address.</div>
+            </div>
+            <div class="fc-streetview-actions">
+              ${listingUrl ? `<a href="${escapeAttr(listingUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm fc-btn-gold">
+                ${isHUD ? 'View on HUD.gov →' : 'View source listing →'}
+              </a>` : ''}
+              <a href="${escapeAttr(openOnGMaps)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Open in Google Maps →</a>
+            </div>
+          </div>
+        ` : ''}
+
+        ${staticMapUrl ? `
+          <div class="fc-drawer-map">
+            <img src="${staticMapUrl}" alt="Map of ${escapeHtml(p.address || '')}" class="fc-staticmap" />
+          </div>
+        ` : ''}
+
         ${section('Deal summary', `
           ${kvRow('Purchase Price', '$' + (p.price || 0).toLocaleString())}
           ${kvRow('After Repair Value (ARV)', '$' + (p.arv || 0).toLocaleString())}
@@ -693,7 +738,14 @@
         ${section('Source', `
           ${kvRow('Trustee / Firm', p.source || '—')}
           ${p.firm_file_number ? kvRow('File Number', p.firm_file_number) : ''}
-          ${p.source_url ? `<div class="fc-kv"><a href="${escapeAttr(p.source_url)}" target="_blank" rel="noopener" style="color:var(--gold-ink);font-size:12px;font-weight:500">View on source →</a></div>` : ''}
+          ${listingUrl ? `
+            <div class="fc-kv">
+              <a href="${escapeAttr(listingUrl)}" target="_blank" rel="noopener"
+                 style="color:var(--gold-ink);font-size:12px;font-weight:500">
+                ${isHUD ? 'View full listing on HUD.gov →' : 'View source listing →'}
+              </a>
+            </div>` : ''}
+          ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">HUD.gov detail page has interior photos, condition notes, disclosures, and the bid submission form.</div>' : ''}
         `)}
 
         ${section(`Closing playbook — ${playbook.title}`, `
@@ -1573,6 +1625,49 @@
   .fc-drawer-body::-webkit-scrollbar { width: 8px; }
   .fc-drawer-body::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 8px; }
   .fc-drawer-body::-webkit-scrollbar-track { background: var(--paper); }
+
+  /* ─── Media (street view + static map) ─── */
+  .fc-drawer-media {
+    position: relative;
+    margin: 0 24px 16px;
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--paper-2);
+  }
+  .fc-streetview {
+    display: block;
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    background: var(--paper-3);
+  }
+  .fc-streetview-fallback {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    height: 140px;
+    padding: 20px;
+    text-align: center;
+    background: var(--paper-2);
+  }
+  .fc-streetview-actions {
+    display: flex; gap: 6px;
+    padding: 10px 12px;
+    background: var(--white);
+    border-top: 1px solid var(--hair);
+  }
+  .fc-drawer-map {
+    margin: 0 24px 16px;
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .fc-staticmap {
+    display: block;
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
 
   .fc-drawer-section {
     padding: 16px 24px;
