@@ -52,7 +52,39 @@
     if (document.getElementById('fc-dash-root')) return;
 
     const mobileFrame = document.querySelector('.mobile-frame');
-    if (mobileFrame) mobileFrame.style.display = 'none';
+    if (mobileFrame) {
+      mobileFrame.style.display = 'none';
+      // The mobile-frame ships with a bunch of chrome (FC wordmark, ALL/HUD/REO
+      // tabs, API status bar, Search/Filters/Clear buttons, metric strip) that
+      // duplicates what our new dashboard has. Hide all of that so the Map
+      // view is JUST the Google Map, maximally visible.
+      const chromeHide = document.createElement('style');
+      chromeHide.id = 'fc-mobile-chrome-hide';
+      chromeHide.textContent = `
+        @media (min-width: 769px) {
+          .mobile-frame header,
+          .mobile-frame .api-bar,
+          .mobile-frame [class*="search-toolbar"],
+          .mobile-frame [class*="nm-strip"],
+          .mobile-frame [class*="header-stats"],
+          .mobile-frame .mobile-bottom-bar,
+          .mobile-frame [class*="mobile-bottom"],
+          .mobile-frame .floating-calendar-btn,
+          .mobile-frame .ptr-indicator {
+            display: none !important;
+          }
+          .mobile-frame #map {
+            height: calc(100vh - 48px) !important;
+            min-height: calc(100vh - 48px) !important;
+            max-height: none !important;
+          }
+          .mobile-frame .app {
+            padding: 0 !important;
+          }
+        }
+      `;
+      document.head.appendChild(chromeHide);
+    }
 
     const root = document.createElement('div');
     root.id = 'fc-dash-root';
@@ -142,9 +174,21 @@
       appInner.style.cssText = [
         'max-height: none',
         'height: 100%',
-        'overflow: auto',
+        'overflow: hidden',
         'position: relative',
       ].join('; ') + ';';
+
+      // Tell Google Maps the container resized and auto-fit markers so the
+      // viewport is centered on the actual properties instead of a default
+      // US-wide bounds. Slight delay for layout to settle, then fit.
+      setTimeout(() => {
+        try {
+          if (window.map && window.google && window.google.maps) {
+            window.google.maps.event.trigger(window.map, 'resize');
+            if (typeof window.fitAll === 'function') window.fitAll();
+          }
+        } catch (e) { /* map not ready yet */ }
+      }, 300);
     }
 
     // Update page title + eyebrow per view
@@ -602,26 +646,32 @@
     // Source-specific closing playbook
     const isHUD = p.source === 'HUD HomeStore';
 
-    // Street View + static map (Google Maps key is exposed client-side
-    // in the main HTML so we can use the same for these static endpoints).
+    // The Google Maps key lives inside a function scope in the main HTML,
+    // so we hardcode the same public key here as well (it's already visible
+    // in page source — not a secret, just an API key).
     const GMAPS_KEY = (typeof GOOGLE_MAPS_API_KEY !== 'undefined')
       ? GOOGLE_MAPS_API_KEY
-      : (window.GOOGLE_MAPS_API_KEY || '');
+      : (window.GOOGLE_MAPS_API_KEY || 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po');
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
     const encAddr = encodeURIComponent(fullAddress);
-    const streetViewUrl = GMAPS_KEY
-      ? `https://maps.googleapis.com/maps/api/streetview?size=520x220&location=${encAddr}&fov=80&key=${GMAPS_KEY}&return_error_codes=true`
-      : '';
-    const staticMapUrl = (GMAPS_KEY && p.lat && p.lng)
-      ? `https://maps.googleapis.com/maps/api/staticmap?center=${p.lat},${p.lng}&zoom=15&size=520x200&maptype=roadmap&markers=color:0xD4A93A%7C${p.lat},${p.lng}&style=feature:poi%7Celement:labels%7Cvisibility:off&key=${GMAPS_KEY}`
-      : (GMAPS_KEY ? `https://maps.googleapis.com/maps/api/staticmap?center=${encAddr}&zoom=15&size=520x200&maptype=roadmap&markers=color:0xD4A93A%7C${encAddr}&style=feature:poi%7Celement:labels%7Cvisibility:off&key=${GMAPS_KEY}` : '');
+    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=520x220&location=${encAddr}&fov=80&source=outdoor&key=${GMAPS_KEY}&return_error_codes=true`;
+    // Interactive Google Maps embed (iframe) — panning, zoom, and satellite
+    // are built in, no JS API bootstrapping needed.
+    const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GMAPS_KEY}&q=${encAddr}&zoom=16&maptype=roadmap`;
 
-    // External listing link — HUD has a deep link via case number, other
-    // sources link to the firm's general listings page.
+    // External listing + photo search links. Zillow/Redfin/Realtor.com all
+    // prohibit direct scraping in their T&Cs but their search URL pattern
+    // is fine for user-driven linking — opening a new tab is exactly how
+    // they expect non-partner traffic to reach them.
     const listingUrl = isHUD && p.firm_file_number
       ? `https://www.hudhomestore.gov/listing/?caseNumber=${encodeURIComponent(p.firm_file_number)}`
       : (p.source_url || '');
     const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
+    const addressSlug = (p.address || '').replace(/\s+/g, '-');
+    const citySlug = (p.city || '').replace(/\s+/g, '-');
+    const zillowUrl  = `https://www.zillow.com/homes/${addressSlug},-${citySlug},-${p.state || 'VA'}-${p.zip || ''}_rb/`;
+    const redfinUrl  = `https://www.redfin.com/stingray/do/query-location?location=${encAddr}&v=2`;
+    const realtorUrl = `https://www.realtor.com/realestateandhomes-search/${addressSlug}_${citySlug}_${p.state || 'VA'}_${p.zip || ''}`;
     const playbook = isHUD ? {
       title: 'HUD REO Purchase',
       icon: 'H',
@@ -666,29 +716,43 @@
       </div>
 
       <div class="fc-drawer-body">
-        ${streetViewUrl ? `
-          <div class="fc-drawer-media">
-            <img src="${streetViewUrl}" alt="Street view of ${escapeHtml(p.address || '')}"
-                 class="fc-streetview"
-                 onerror="this.style.display='none'; const n=this.nextElementSibling; if(n) n.style.display='flex';" />
-            <div class="fc-streetview-fallback">
-              <div class="fc-eyebrow" style="margin-bottom:6px">Street view unavailable</div>
-              <div style="font-size:12px;color:var(--muted)">No Street View coverage for this address.</div>
-            </div>
-            <div class="fc-streetview-actions">
-              ${listingUrl ? `<a href="${escapeAttr(listingUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm fc-btn-gold">
-                ${isHUD ? 'View on HUD.gov →' : 'View source listing →'}
-              </a>` : ''}
-              <a href="${escapeAttr(openOnGMaps)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Open in Google Maps →</a>
-            </div>
+        <div class="fc-drawer-media">
+          <img src="${streetViewUrl}" alt="Street view of ${escapeHtml(p.address || '')}"
+               class="fc-streetview"
+               onerror="this.style.display='none'; const n=this.nextElementSibling; if(n) n.style.display='flex';" />
+          <div class="fc-streetview-fallback">
+            <div class="fc-eyebrow" style="margin-bottom:6px">Street view unavailable</div>
+            <div style="font-size:12px;color:var(--muted)">No Street View coverage for this address — try the map below or search the photo links.</div>
           </div>
-        ` : ''}
+        </div>
 
-        ${staticMapUrl ? `
-          <div class="fc-drawer-map">
-            <img src="${staticMapUrl}" alt="Map of ${escapeHtml(p.address || '')}" class="fc-staticmap" />
+        <div class="fc-drawer-map-wrap">
+          <iframe
+            src="${escapeAttr(mapEmbedUrl)}"
+            class="fc-map-embed"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            allowfullscreen></iframe>
+        </div>
+
+        <div class="fc-drawer-media-actions">
+          <div class="fc-eyebrow" style="margin-bottom:8px">Photos & external listings</div>
+          <div class="fc-media-btnrow">
+            ${listingUrl ? `
+              <a href="${escapeAttr(listingUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm fc-btn-gold">
+                ${isHUD ? 'HUD.gov listing (photos) →' : 'Source listing →'}
+              </a>` : ''}
+            <a href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Zillow →</a>
+            <a href="${escapeAttr(redfinUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Redfin →</a>
+            <a href="${escapeAttr(realtorUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Realtor.com →</a>
+            <a href="${escapeAttr(openOnGMaps)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Google Maps →</a>
           </div>
-        ` : ''}
+          ${!isHUD ? `
+            <div class="fc-media-note">
+              Trustee-sale properties rarely have official photos. Zillow / Redfin / Realtor.com often have prior listing photos if the property sold retail in the last 5-10 years.
+            </div>
+          ` : ''}
+        </div>
 
         ${section('Deal summary', `
           ${kvRow('Purchase Price', '$' + (p.price || 0).toLocaleString())}
@@ -1626,10 +1690,10 @@
   .fc-drawer-body::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 8px; }
   .fc-drawer-body::-webkit-scrollbar-track { background: var(--paper); }
 
-  /* ─── Media (street view + static map) ─── */
+  /* ─── Media (street view + interactive map + external links) ─── */
   .fc-drawer-media {
     position: relative;
-    margin: 0 24px 16px;
+    margin: 16px 24px 12px;
     border: 1px solid var(--hair);
     border-radius: 6px;
     overflow: hidden;
@@ -1645,28 +1709,43 @@
   .fc-streetview-fallback {
     display: none;
     flex-direction: column; align-items: center; justify-content: center;
-    height: 140px;
-    padding: 20px;
+    min-height: 140px;
+    padding: 24px 20px;
     text-align: center;
     background: var(--paper-2);
   }
-  .fc-streetview-actions {
-    display: flex; gap: 6px;
-    padding: 10px 12px;
-    background: var(--white);
-    border-top: 1px solid var(--hair);
-  }
-  .fc-drawer-map {
-    margin: 0 24px 16px;
+
+  .fc-drawer-map-wrap {
+    margin: 0 24px 12px;
     border: 1px solid var(--hair);
     border-radius: 6px;
     overflow: hidden;
+    background: var(--paper-2);
   }
-  .fc-staticmap {
+  .fc-map-embed {
     display: block;
     width: 100%;
-    height: 200px;
-    object-fit: cover;
+    height: 260px;
+    border: 0;
+  }
+
+  .fc-drawer-media-actions {
+    margin: 0 24px 16px;
+    padding: 14px 16px;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+  }
+  .fc-media-btnrow {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .fc-media-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+    padding-top: 10px;
+    border-top: 1px solid var(--hair);
   }
 
   .fc-drawer-section {
