@@ -1166,9 +1166,9 @@ Return ONLY the 2-sentence analysis.`,
     const mapDivId = `fc-drawer-map-${sanitizedId}`;
     const svDivId  = `fc-drawer-sv-${sanitizedId}`;
 
-    const listingUrl = isHUD && p.firm_file_number
-      ? `https://www.hudhomestore.gov/searchresult?searchText=${encodeURIComponent(p.firm_file_number)}`
-      : (p.source_url || '');
+    // HUD.gov deep-link removed — HUD's search page doesn't reliably land
+    // on the right property by case number. Trustee-source URLs still work.
+    const listingUrl = isHUD ? '' : (p.source_url || '');
     const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
     const addressSlug = (p.address || '').replace(/\s+/g, '-');
     const citySlug = (p.city || '').replace(/\s+/g, '-');
@@ -1315,10 +1315,10 @@ Return ONLY the 2-sentence analysis.`,
             <div class="fc-kv">
               <a href="${escapeAttr(listingUrl)}" target="_blank" rel="noopener"
                  style="color:var(--gold-ink);font-size:12px;font-weight:500">
-                ${isHUD ? 'View full listing on HUD.gov →' : 'View source listing →'}
+                View source listing →
               </a>
             </div>` : ''}
-          ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">HUD.gov detail page has interior photos, condition notes, disclosures, and the bid submission form.</div>' : ''}
+          ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">Search this case number directly at hudhomestore.gov to see photos, disclosures, and submit a bid.</div>' : ''}
         `)}
 
         ${section('Mortgage calculator', `
