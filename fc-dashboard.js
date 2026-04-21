@@ -890,6 +890,8 @@
           ${kvRow('Investment Score', (p.score || 0) + ' / 100')}
         `)}
 
+        ${marketComparisonSection(p)}
+
         ${section('Property details', `
           ${kvRow('Beds / Baths', `${p.beds || 0}bd / ${p.baths || 0}ba`)}
           ${kvRow('Square Footage', (p.sqft || 0).toLocaleString() + ' sf')}
@@ -950,6 +952,78 @@
         <div class="fc-drawer-section-body">${bodyHtml}</div>
       </div>
     `;
+  }
+
+  function marketComparisonSection(p) {
+    const comps = Array.isArray(p.sale_comps) ? p.sale_comps : [];
+    if (!comps.length) {
+      return section('Market comparison', `
+        <div class="fc-kv-caption" style="color:var(--muted);font-size:11px">
+          No recent comparable sales available for this address.
+        </div>
+      `);
+    }
+
+    const priced  = comps.filter(c => c.price);
+    const avgComp = priced.length
+      ? Math.round(priced.reduce((s, c) => s + c.price, 0) / priced.length)
+      : 0;
+    const sqftCs  = comps.filter(c => c.price_per_sqft);
+    const avgPPS  = sqftCs.length
+      ? Math.round(sqftCs.reduce((s, c) => s + c.price_per_sqft, 0) / sqftCs.length)
+      : 0;
+    const domCs   = comps.filter(c => c.days_on_market != null);
+    const avgDOM  = domCs.length
+      ? Math.round(domCs.reduce((s, c) => s + c.days_on_market, 0) / domCs.length)
+      : null;
+
+    const marketValue  = p.avm_value || avgComp;
+    const yourPPS      = p.sqft ? Math.round((p.price || 0) / p.sqft) : 0;
+    const gap          = marketValue - (p.price || 0);
+    const gapPct       = marketValue > 0 ? Math.round((gap / marketValue) * 100) : 0;
+    const rangeCaption = (p.avm_range_low && p.avm_range_high)
+      ? `Range $${p.avm_range_low.toLocaleString()}–$${p.avm_range_high.toLocaleString()}`
+      : (p.avm_value ? 'RentCast AVM' : `Average of ${priced.length} comps`);
+
+    const compsRows = priced.slice().sort((a, b) => a.price - b.price).slice(0, 8).map(c => {
+      const diff     = c.price - (p.price || 0);
+      const diffPct  = c.price > 0 ? Math.round((diff / c.price) * 100) : 0;
+      const dist     = c.distance != null ? `${c.distance.toFixed(2)}mi` : 'nearby';
+      const dom      = c.days_on_market != null ? ` · ${c.days_on_market}d DOM` : '';
+      const beds     = c.beds  ?? '—';
+      const baths    = c.baths ?? '—';
+      const sqft     = c.sqft ? c.sqft.toLocaleString() + 'sf' : '—';
+      return `
+        <div class="fc-kv" style="align-items:flex-start">
+          <div class="fc-kv-label" style="flex:1">
+            <div>${escapeHtml(c.address || 'Nearby sale')}</div>
+            <div class="fc-kv-caption" style="color:var(--muted);font-size:11px">
+              ${beds}bd · ${baths}ba · ${sqft} · ${dist}${dom}
+            </div>
+          </div>
+          <div class="fc-kv-value" style="text-align:right;min-width:110px">
+            <div>$${c.price.toLocaleString()}</div>
+            <span class="fc-kv-caption" style="color:${diff >= 0 ? 'var(--muted)' : 'var(--sage)'}">
+              ${diff >= 0 ? '+' : '−'}$${Math.abs(diff).toLocaleString()} (${diffPct >= 0 ? '+' : ''}${diffPct}%)
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return section('Market comparison', `
+      ${kvRow(p.avm_value ? 'RentCast AVM' : 'Avg comp price', '$' + marketValue.toLocaleString(), 'ink', rangeCaption)}
+      ${kvRow(gap >= 0 ? 'Below market' : 'Above market',
+              (gap >= 0 ? '−' : '+') + '$' + Math.abs(gap).toLocaleString(),
+              gap >= 0 ? 'sage' : 'coral',
+              `${Math.abs(gapPct)}% vs list price`)}
+      ${kvRow('Market $/sf', '$' + avgPPS + '/sf', 'ink', yourPPS ? `Your $/sf: $${yourPPS}/sf` : '')}
+      ${avgDOM != null ? kvRow('Avg days on market', avgDOM + 'd') : ''}
+      <div class="fc-eyebrow" style="margin:14px 0 6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">
+        Comparable recent sales
+      </div>
+      ${compsRows}
+    `);
   }
 
   function kvRow(label, value, valueClass, caption) {
