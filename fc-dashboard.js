@@ -64,15 +64,84 @@
     wireNav(root);
   }
 
-  // ─── Nav click handling — simple placeholder for now ────────────────────
+  // ─── View routing ───────────────────────────────────────────────────────
+  // Each sidebar item has data-view. Switching views shows/hides sections
+  // in the main area. URL hash keeps state across refreshes.
   function wireNav(root) {
     const items = root.querySelectorAll('.fc-side-item');
     items.forEach((el) => {
       el.addEventListener('click', () => {
-        items.forEach((x) => x.classList.remove('active'));
-        el.classList.add('active');
+        const view = el.getAttribute('data-view');
+        if (!view) return;
+        setView(view);
       });
     });
+    // Restore view from URL hash
+    const initial = (location.hash || '#dashboard').replace('#', '');
+    setView(initial);
+    window.addEventListener('hashchange', () => {
+      const v = (location.hash || '#dashboard').replace('#', '');
+      setView(v);
+    });
+  }
+
+  function setView(view) {
+    const valid = ['dashboard', 'listings', 'map', 'alerts', 'rehab', 'market', 'brrrr', 'settings'];
+    if (!valid.includes(view)) view = 'dashboard';
+    if (location.hash !== '#' + view) {
+      history.replaceState(null, '', '#' + view);
+    }
+    // Nav active state
+    document.querySelectorAll('#fc-dash-root .fc-side-item').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === view);
+    });
+    // Toggle visibility of the existing mobile-frame (hosts Google Map) when
+    // user picks Map — it becomes a full-width canvas.
+    const mobileFrame = document.querySelector('.mobile-frame');
+    const dashMain = document.querySelector('#fc-dash-root .fc-main');
+    if (view === 'map') {
+      if (mobileFrame) {
+        mobileFrame.style.display = 'block';
+        mobileFrame.style.position = 'fixed';
+        mobileFrame.style.top = '48px';
+        mobileFrame.style.left = '220px';
+        mobileFrame.style.right = '0';
+        mobileFrame.style.bottom = '0';
+        mobileFrame.style.maxWidth = 'none';
+        mobileFrame.style.width = 'auto';
+        mobileFrame.style.height = 'auto';
+        mobileFrame.style.borderRadius = '0';
+        mobileFrame.style.boxShadow = 'none';
+        mobileFrame.style.zIndex = '10';
+      }
+      if (dashMain) dashMain.style.display = 'none';
+    } else {
+      if (mobileFrame) mobileFrame.style.display = 'none';
+      if (dashMain) dashMain.style.display = '';
+    }
+
+    // Show / hide view sections within fc-main
+    ['dashboard', 'listings', 'alerts', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+      const el = document.getElementById(`fc-view-${v}`);
+      if (el) el.style.display = (v === view) ? '' : 'none';
+    });
+
+    // Update page title + eyebrow per view
+    const titles = {
+      dashboard: 'Foreclosure Command Center',
+      listings:  'All Listings',
+      map:       'Property Map',
+      alerts:    'Alerts',
+      rehab:     'Rehab Calculator',
+      market:    'Market Analysis',
+      brrrr:     'BRRRR Calculator',
+      settings:  'Settings',
+    };
+    const titleEl = document.querySelector('#fc-dash-root .fc-page-title');
+    if (titleEl && titles[view]) titleEl.textContent = titles[view];
+
+    // Lazily render listings when shown
+    if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
   }
 
   // ─── Fetch foreclosure data + populate dashboard ────────────────────────
@@ -88,9 +157,89 @@
       renderHotCounties(d);
       renderAICoach(d);
       updateSubline(d);
+      updateSidebarCounts(d);
+      // Re-render listings if that's the active view
+      if ((location.hash || '').replace('#', '') === 'listings') renderListings(d);
     } catch (e) {
       console.warn('[FC Dash] data load failed:', e);
     }
+  }
+
+  function updateSidebarCounts(d) {
+    const count = (d.foreclosures || []).length;
+    const el = document.getElementById('fc-sc-listings');
+    if (el) el.textContent = count;
+  }
+
+  // ─── Listings view — full sortable table ────────────────────────────────
+  let __listingsSortKey = 'score';
+  function renderListings(d) {
+    const body = document.getElementById('fc-listings-body');
+    const countPill = document.getElementById('fc-listings-count');
+    if (!body) return;
+
+    // Wire up sort buttons (idempotent)
+    document.querySelectorAll('.fc-list-sort').forEach(btn => {
+      if (!btn.__wired) {
+        btn.__wired = true;
+        btn.onclick = () => {
+          document.querySelectorAll('.fc-list-sort').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          __listingsSortKey = btn.getAttribute('data-sort');
+          renderListings(window.__fcData);
+        };
+      }
+    });
+
+    let props = (d.foreclosures || []).slice();
+    const sortFns = {
+      score:    (a, b) => (b.score || 0) - (a.score || 0),
+      days:     (a, b) => (a.days_to_sale == null ? 9999 : a.days_to_sale) - (b.days_to_sale == null ? 9999 : b.days_to_sale),
+      price:    (a, b) => (b.price || 0) - (a.price || 0),
+      discount: (a, b) => {
+        const da = a.arv && a.price ? (1 - a.price/a.arv) : 0;
+        const db = b.arv && b.price ? (1 - b.price/b.arv) : 0;
+        return db - da;
+      },
+    };
+    props.sort(sortFns[__listingsSortKey] || sortFns.score);
+
+    if (countPill) countPill.textContent = `${props.length} properties`;
+
+    if (props.length === 0) {
+      body.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">No properties.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = props.map(p => {
+      const initials = (p.city || p.address || '??').slice(0, 2).toUpperCase();
+      const sourceTag = p.source === 'HUD HomeStore' ? 'HUD' : (p.source || '').split(' ')[0] || 'VA';
+      const days = p.days_to_sale;
+      const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
+      const saleUrgent = days != null && days >= 0 && days <= 3;
+      const discount = (p.arv && p.price && p.arv > p.price) ? Math.round((1 - p.price / p.arv) * 100) : null;
+      const scoreColor = (p.score || 0) >= 75 ? 'var(--sage)' : (p.score || 0) >= 60 ? 'var(--gold-ink)' : 'var(--muted)';
+      return `
+        <tr>
+          <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
+          <td>
+            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
+            <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')}</div>
+          </td>
+          <td style="font-size:12px;color:var(--ink-3)">${escapeHtml(p.county || '—')}</td>
+          <td><span class="fc-pill">${escapeHtml(sourceTag)}</span></td>
+          <td class="fc-mono" style="font-size:12px">${p.beds || 0}bd/${p.baths || 0}ba</td>
+          <td style="text-align:right" class="fc-mono">${(p.sqft || 0).toLocaleString()}</td>
+          <td style="text-align:right" class="fc-mono" style="font-weight:500">$${Math.round((p.price || 0)/1000)}K</td>
+          <td style="text-align:right" class="fc-mono">$${Math.round((p.arv || 0)/1000)}K</td>
+          <td style="text-align:right" class="fc-mono" style="color:${discount >= 25 ? 'var(--sage)' : 'var(--muted)'}">${discount == null ? '—' : discount + '%'}</td>
+          <td style="text-align:right"><span class="fc-mono" style="color:${scoreColor};font-weight:600">${p.score || 0}</span></td>
+          <td style="text-align:right">
+            <div class="fc-mono" style="color:${saleUrgent ? 'var(--coral)' : 'var(--ink)'}">${saleLabel}</div>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   // ─── Hot counties — ranked by volume with score signal + ring ──────────
@@ -567,20 +716,20 @@
       <div class="fc-sidebar">
         <div class="fc-side-section">
           <div class="fc-side-label">Properties</div>
-          <div class="fc-side-item active">${ICO.home}<span>Dashboard</span></div>
-          <div class="fc-side-item">${ICO.building}<span>Listings</span><span class="fc-side-count">—</span></div>
-          <div class="fc-side-item">${ICO.map}<span>Map</span></div>
-          <div class="fc-side-item">${ICO.bell}<span>Alerts</span><span class="fc-side-count">0</span></div>
+          <div class="fc-side-item active" data-view="dashboard">${ICO.home}<span>Dashboard</span></div>
+          <div class="fc-side-item" data-view="listings">${ICO.building}<span>Listings</span><span class="fc-side-count" id="fc-sc-listings">—</span></div>
+          <div class="fc-side-item" data-view="map">${ICO.map}<span>Map</span></div>
+          <div class="fc-side-item" data-view="alerts">${ICO.bell}<span>Alerts</span><span class="fc-side-count">0</span></div>
         </div>
         <div class="fc-side-section">
           <div class="fc-side-label">Tools</div>
-          <div class="fc-side-item">${ICO.calc}<span>Rehab Calculator</span></div>
-          <div class="fc-side-item">${ICO.chart}<span>Market Analysis</span></div>
-          <div class="fc-side-item">${ICO.book}<span>BRRRR Calculator</span></div>
+          <div class="fc-side-item" data-view="rehab">${ICO.calc}<span>Rehab Calculator</span></div>
+          <div class="fc-side-item" data-view="market">${ICO.chart}<span>Market Analysis</span></div>
+          <div class="fc-side-item" data-view="brrrr">${ICO.book}<span>BRRRR Calculator</span></div>
         </div>
         <div class="fc-side-section">
           <div class="fc-side-label">Workspace</div>
-          <div class="fc-side-item">${ICO.gear}<span>Settings</span></div>
+          <div class="fc-side-item" data-view="settings">${ICO.gear}<span>Settings</span></div>
         </div>
         <div class="fc-side-footer">
           <div class="fc-eyebrow" style="margin-bottom:6px">Coverage</div>
@@ -605,6 +754,7 @@
             </div>
           </div>
 
+          <div id="fc-view-dashboard">
           <div class="fc-kpi-grid" id="fc-kpi-grid">
             <div class="fc-kpi">
               <div class="fc-kpi-label"><span class="fc-eyebrow">Loading…</span></div>
@@ -674,6 +824,52 @@
               </div>
             </div>
           </div>
+          </div><!-- /fc-view-dashboard -->
+
+          <!-- Listings view -->
+          <div id="fc-view-listings" style="display:none">
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">All listings</div>
+                <span class="fc-pill" id="fc-listings-count">—</span>
+                <div style="margin-left:auto;display:flex;gap:4px">
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort active" data-sort="score">Score</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort" data-sort="days">Sale date</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort" data-sort="price">Price</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort" data-sort="discount">Discount</button>
+                </div>
+              </div>
+              <table class="fc-table" id="fc-listings-table">
+                <thead>
+                  <tr>
+                    <th style="width:28px"></th>
+                    <th>Address</th>
+                    <th>County</th>
+                    <th>Source</th>
+                    <th>Beds/Baths</th>
+                    <th style="text-align:right">Sqft</th>
+                    <th style="text-align:right">Price</th>
+                    <th style="text-align:right">ARV</th>
+                    <th style="text-align:right">Disc</th>
+                    <th style="text-align:right">Score</th>
+                    <th style="text-align:right">Sale</th>
+                  </tr>
+                </thead>
+                <tbody id="fc-listings-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Placeholder views -->
+          ${['alerts', 'rehab', 'market', 'brrrr', 'settings'].map(v => `
+            <div id="fc-view-${v}" style="display:none">
+              <div class="fc-stage-placeholder">
+                <div class="fc-eyebrow">${v.toUpperCase()}</div>
+                <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;margin-top:6px;margin-bottom:4px">Coming soon.</div>
+                <div style="font-size:13px;color:var(--muted)">This view is on the roadmap. In the meantime, Dashboard and Listings have the core functionality.</div>
+              </div>
+            </div>
+          `).join('')}
         </div>
       </div>
     </div>
