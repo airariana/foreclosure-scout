@@ -278,7 +278,7 @@
     if (countPill) countPill.textContent = `${props.length} properties`;
 
     if (props.length === 0) {
-      body.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">No properties.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--muted)">No properties.</td></tr>`;
       return;
     }
 
@@ -296,6 +296,7 @@
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')}</div>
           </td>
           <td style="font-size:12px;color:var(--ink-3)">${escapeHtml(p.county || '—')}</td>
+          <td>${typePill(p.listingType)}</td>
           <td><span class="fc-pill">${escapeHtml(sourceTag)}</span></td>
           <td class="fc-mono" style="font-size:12px">${p.beds || 0}/${p.baths || 0}</td>
           <td style="text-align:right" class="fc-mono">${(p.sqft || 0).toLocaleString()}</td>
@@ -1184,6 +1185,23 @@ Return ONLY the 2-sentence analysis.`,
     return `<span class="fc-pill coral" title="Over MAO of $${(p.mao70/1000).toFixed(0)}K">$${Math.round(gap/1000)}K over</span>`;
   }
 
+  // Colored pill matching the map legend. Colors mirror markerColor() in
+  // foreclosure-scout.html so the list and map stay visually consistent.
+  function typePill(listingType) {
+    const colors = {
+      'REO/Bank-Owned':  { bg: '#c84b2f', label: 'REO'     },
+      'Auction':         { bg: '#b8860b', label: 'Auction' },
+      'Pre-Foreclosure': { bg: '#2d6a4f', label: 'Pre-FC'  },
+      'HUD Home':        { bg: '#2a6496', label: 'HUD'     },
+      'HomePath':        { bg: '#2a6496', label: 'HomePath'},
+      'Short Sale':      { bg: '#6644aa', label: 'Short'   },
+    };
+    const t = colors[listingType];
+    if (!t) return `<span class="fc-pill" title="${escapeAttr(listingType || 'Unknown')}">${escapeHtml(listingType || '—')}</span>`;
+    return `<span class="fc-pill" title="${escapeAttr(listingType)}"
+      style="background:${t.bg};color:#fff;border-color:${t.bg};font-weight:500">${t.label}</span>`;
+  }
+
   function updateSubline(d) {
     const m = d.metadata || {};
     const hi = (m.pricing_confidence || {}).high || 0;
@@ -1509,6 +1527,7 @@ Return ONLY the 2-sentence analysis.`,
                     <th style="width:28px"></th>
                     <th>Address</th>
                     <th>County</th>
+                    <th>Type</th>
                     <th>Source</th>
                     <th>Bd/Ba</th>
                     <th style="text-align:right">Sqft</th>
