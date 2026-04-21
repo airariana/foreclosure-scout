@@ -1,4 +1,14 @@
 {
+  "10006 moultrie road::glen allen::va::23060": {
+    "baths": 2.5,
+    "beds": 4,
+    "enriched_at": "2026-04-21T15:42:05.852533Z",
+    "lot_size": 20013,
+    "property_type": "Single Family",
+    "rent_estimate": 2730,
+    "sqft": 2233,
+    "year_built": 2003
+  },
   "1019 22nd st::newport news::va::23607": {
     "baths": 1.0,
     "beds": 2,
@@ -128,6 +138,16 @@
     "rent_estimate": 2670,
     "sqft": 1885,
     "year_built": 1972
+  },
+  "111 dana drive::suffolk::va::23434": {
+    "baths": 2.0,
+    "beds": 4,
+    "enriched_at": "2026-04-21T15:42:05.852533Z",
+    "lot_size": 10454,
+    "property_type": "Single Family",
+    "rent_estimate": 2300,
+    "sqft": 1379,
+    "year_built": 2000
   },
   "111 pembroke street::pembroke::va::24136": {
     "baths": 1.0,
@@ -468,6 +488,16 @@
     "rent_estimate": 8850,
     "sqft": 5324,
     "year_built": 2024
+  },
+  "1604 darren circle::portsmouth::va::23701": {
+    "baths": 1.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T15:42:05.852533Z",
+    "lot_size": 43560,
+    "property_type": "Condo",
+    "rent_estimate": 1970,
+    "sqft": 1188,
+    "year_built": 1977
   },
   "1614 and 1616 berkley avenue extension::norfolk::va::23523": {
     "baths": 2.0,
@@ -918,6 +948,16 @@
     "rent_estimate": 1700,
     "sqft": 2176,
     "year_built": 1927
+  },
+  "305 westwood drive::suffolk::va::23434": {
+    "baths": 2.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T15:42:05.852533Z",
+    "lot_size": 38768,
+    "property_type": "Single Family",
+    "rent_estimate": 2450,
+    "sqft": 1915,
+    "year_built": 1965
   },
   "3065 glastonbury drive::virginia beach::va::23453": {
     "baths": 2.5,
