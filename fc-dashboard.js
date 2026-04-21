@@ -1482,16 +1482,34 @@
     box-sizing: border-box;
   }
 
-  /* Every view container and grid/card inside must also claim full width */
+  /* Every view container and every widget inside must claim full width so
+     no component shrink-wraps to its content. Applied defensively to every
+     known layout class used across the dashboard, listings, and placeholder
+     views. */
   #fc-view-dashboard,
   #fc-view-listings,
+  #fc-view-map,
   #fc-view-alerts,
   #fc-view-rehab,
   #fc-view-market,
   #fc-view-brrrr,
-  #fc-view-settings {
-    width: 100%;
+  #fc-view-settings,
+  .fc-page-head,
+  .fc-kpi-grid,
+  .fc-two-col,
+  .fc-card,
+  .fc-stage-placeholder,
+  .fc-table {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box;
   }
+
+  /* Grid layouts should use available space for their tracks instead of
+     collapsing to content. Re-declare grid-template-columns with fr units
+     so they fill the container regardless of content width. */
+  .fc-kpi-grid { grid-template-columns: repeat(4, 1fr) !important; }
+  .fc-two-col { grid-template-columns: 1.5fr 1fr !important; }
 
   /* ─── Page head ─── */
   .fc-page-head {
