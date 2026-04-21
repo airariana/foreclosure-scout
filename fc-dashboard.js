@@ -1467,13 +1467,13 @@
   .fc-main::-webkit-scrollbar { width: 10px; height: 10px; }
   .fc-main::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 10px; border: 2px solid var(--paper); }
   .fc-main::-webkit-scrollbar-track { background: var(--paper); }
-  /* Content width constrained to a comfortable reading ratio (~1280px)
-     and centered. Prevents the dashboard from stretching across ultrawide
-     monitors where KPI tiles and tables look sparse. */
+  /* Fully fluid — content fills whatever viewport width we have. On
+     ultrawide (2000px+) monitors the KPI grid and tables get extra room
+     rather than leaving empty side whitespace. This matches the Map
+     view's full-viewport behavior so every page feels consistent. */
   .fc-main-inner {
     padding: 24px 32px;
-    max-width: 1280px;
-    margin: 0 auto;
+    width: 100%;
   }
 
   /* ─── Page head ─── */
