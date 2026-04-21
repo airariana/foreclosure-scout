@@ -54,7 +54,7 @@ HEADERS = {
 
 # ── Auction Pricing Matrix ────────────────────────────────────────────────────
 
-ALLOWED_STATES = {"VA", "MD"}
+ALLOWED_STATES = {"VA", "MD", "DC"}
 
 COUNTY_BASE_VALUES = {
     # Northern Virginia
@@ -116,6 +116,9 @@ COUNTY_BASE_VALUES = {
     "Wicomico County":        210_000,
     "Somerset County":        170_000,
     "Worcester County":       320_000,
+    # District of Columbia (one jurisdiction — quadrants treated as same base)
+    "District Of Columbia":   725_000,
+    "District of Columbia":   725_000,
     # Default
     "DEFAULT":               275_000,
 }
@@ -1201,6 +1204,11 @@ def normalize_county(raw: str, state: str = "VA") -> str:
         # Baltimore City is the only MD independent city.
         if "Baltimore" in titled and "County" not in titled:
             return "Baltimore City"
+    elif state == "DC":
+        # DC has no counties — the District itself is the jurisdiction.
+        # Normalize any permutation ("District Of Columbia", "Washington", etc.)
+        # to a single canonical form used in COUNTY_BASE_VALUES.
+        return "District of Columbia"
 
     if "County" not in titled and "City" not in titled:
         return f"{titled} County"

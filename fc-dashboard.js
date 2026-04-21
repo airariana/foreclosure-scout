@@ -232,12 +232,12 @@
 
   function updateStateChipCounts(d) {
     const props = (d && d.foreclosures) || [];
-    const counts = { ALL: props.length, VA: 0, MD: 0 };
+    const counts = { ALL: props.length, VA: 0, MD: 0, DC: 0 };
     for (const p of props) {
       const s = (p.state || 'VA').toUpperCase();
       if (counts[s] != null) counts[s] += 1;
     }
-    for (const s of ['ALL', 'VA', 'MD']) {
+    for (const s of ['ALL', 'VA', 'MD', 'DC']) {
       const el = document.getElementById(`fc-state-count-${s}`);
       if (el) el.textContent = counts[s];
     }
@@ -1516,6 +1516,7 @@ Return ONLY the 2-sentence analysis.`,
                 <button class="fc-btn fc-btn-sm fc-state-chip active" data-state="ALL">All <span class="fc-state-count" id="fc-state-count-ALL">—</span></button>
                 <button class="fc-btn fc-btn-sm fc-state-chip" data-state="VA">VA <span class="fc-state-count" id="fc-state-count-VA">—</span></button>
                 <button class="fc-btn fc-btn-sm fc-state-chip" data-state="MD">MD <span class="fc-state-count" id="fc-state-count-MD">—</span></button>
+                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="DC">DC <span class="fc-state-count" id="fc-state-count-DC">—</span></button>
               </div>
               <button class="fc-btn">${ICO.plus} Add watchlist</button>
               <button class="fc-btn fc-btn-dark">${ICO.search} Search listings</button>

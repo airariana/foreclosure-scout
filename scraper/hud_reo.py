@@ -3,8 +3,9 @@ HUD REO (Real Estate Owned) source for Foreclosure Scout.
 
 HUD HomeStore's Excel export flow is the data source. Because the export
 button requires a logged-in HUD account session, we can't automate the
-download — instead the user manually exports and commits the file at
-`data/hud_va.xlsx`. This module reads whatever's there on each scheduled run.
+download — instead the user manually exports per state and commits the
+files at `data/hud_{state}.xlsx`. This module reads whatever's there on
+each scheduled run, one file per state.
 
 HUD data quality is significantly better than trustee-firm scrapes:
   - Actual list price (not estimated) → HIGH-confidence pricing
@@ -28,17 +29,21 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-HUD_XLSX_PATH = Path("data/hud_va.xlsx")
+# Per-state xlsx exports. Add a new state by dropping a matching file here
+# and appending to this list — the loader reads each one independently.
+HUD_XLSX_FILES = [
+    (Path("data/hud_va.xlsx"), "VA"),
+    (Path("data/hud_md.xlsx"), "MD"),
+    (Path("data/hud_dc.xlsx"), "DC"),
+]
+
+ALLOWED_HUD_STATES = {"VA", "MD", "DC"}
 
 
 def scrape_hud_reo() -> list[dict]:
-    """Parse the user-committed HUD REO xlsx into v2.1-schema property dicts."""
+    """Parse all per-state HUD REO xlsx exports into v2.1-schema property dicts."""
     log.info("Reading HUD REO from xlsx ...")
     properties: list[dict] = []
-
-    if not HUD_XLSX_PATH.exists():
-        log.info(f"HUD REO: no file at {HUD_XLSX_PATH} — skipping")
-        return properties
 
     try:
         from openpyxl import load_workbook
@@ -46,42 +51,49 @@ def scrape_hud_reo() -> list[dict]:
         log.warning("HUD REO: openpyxl not installed — skipping")
         return properties
 
-    try:
-        wb = load_workbook(HUD_XLSX_PATH, read_only=True, data_only=True)
-        ws = wb[wb.sheetnames[0]]
-        rows = list(ws.iter_rows(values_only=True))
+    for path, state_hint in HUD_XLSX_FILES:
+        if not path.exists():
+            log.info(f"HUD REO: no file at {path} — skipping {state_hint}")
+            continue
 
-        if not rows:
-            log.warning("HUD REO: xlsx is empty")
-            return properties
+        try:
+            added_before = len(properties)
+            wb = load_workbook(path, read_only=True, data_only=True)
+            ws = wb[wb.sheetnames[0]]
+            rows = list(ws.iter_rows(values_only=True))
 
-        # Build header → column-index map so reordering doesn't break us.
-        header = [str(h or "").strip() for h in rows[0]]
-        idx = {name: i for i, name in enumerate(header)}
-
-        required = {"Address", "City", "State", "Zip Code", "Price"}
-        missing = required - set(idx.keys())
-        if missing:
-            log.error(f"HUD REO: missing expected columns: {missing}")
-            return properties
-
-        for raw_row in rows[1:]:
-            if not raw_row or not raw_row[idx["Address"]]:
-                continue
-            # Accept VA + MD; skip anything outside our coverage.
-            state = str(raw_row[idx.get("State", -1)] or "").strip().upper()
-            if state not in {"VA", "MD"}:
+            if not rows:
+                log.warning(f"HUD REO {state_hint}: xlsx is empty")
                 continue
 
-            prop = _build_property(raw_row, idx)
-            if prop:
-                properties.append(prop)
+            # Build header → column-index map so reordering doesn't break us.
+            header = [str(h or "").strip() for h in rows[0]]
+            idx = {name: i for i, name in enumerate(header)}
 
-    except Exception as e:
-        log.error(f"HUD REO parse failed: {e}")
-        return properties
+            required = {"Address", "City", "State", "Zip Code", "Price"}
+            missing = required - set(idx.keys())
+            if missing:
+                log.error(f"HUD REO {state_hint}: missing expected columns: {missing}")
+                continue
 
-    log.info(f"HUD REO: {len(properties)} VA/MD properties")
+            for raw_row in rows[1:]:
+                if not raw_row or not raw_row[idx["Address"]]:
+                    continue
+                state = str(raw_row[idx.get("State", -1)] or "").strip().upper()
+                if state not in ALLOWED_HUD_STATES:
+                    continue
+
+                prop = _build_property(raw_row, idx)
+                if prop:
+                    properties.append(prop)
+
+            log.info(f"HUD REO {state_hint}: {len(properties) - added_before} properties from {path.name}")
+
+        except Exception as e:
+            log.error(f"HUD REO {state_hint} parse failed: {e}")
+            continue
+
+    log.info(f"HUD REO: {len(properties)} total properties across VA/MD/DC")
     return properties
 
 
