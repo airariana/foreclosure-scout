@@ -1333,6 +1333,16 @@
     margin: 0 !important;
     padding: 0 !important;
     background: var(--paper) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    /* CRITICAL: original body CSS has display:flex + center alignment
+       which causes fc-dash-root to shrink-wrap to content instead of
+       filling the viewport. Force block layout so the dashboard spans
+       the full window width. */
+    display: block !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    overflow-x: hidden !important;
   }
 
   /* ─── Root layout ─── */
@@ -1349,6 +1359,11 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* Explicit width claim, independent of body's residual flex behavior */
+    width: 100vw !important;
+    max-width: 100vw !important;
+    position: relative !important;
+    left: 0 !important;
   }
   #fc-dash-root.fc-dash * { box-sizing: border-box; }
   #fc-dash-root.fc-dash svg { flex-shrink: 0; }
