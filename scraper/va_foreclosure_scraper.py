@@ -1166,6 +1166,16 @@ def run(gmaps_key: str = "") -> dict:
     all_props.extend(scrape_bww())
     time.sleep(2)
     all_props.extend(scrape_mwc())
+    time.sleep(1)
+
+    # HUD REO from user-committed xlsx (data/hud_va.xlsx).
+    # User manually exports from hudhomestore.gov weekly; committing the
+    # file triggers inclusion in the next scrape run.
+    try:
+        from hud_reo import scrape_hud_reo
+        all_props.extend(scrape_hud_reo())
+    except Exception as e:
+        log.warning(f"HUD REO: loader failed: {e}")
 
     # Deduplicate
     all_props = deduplicate(all_props)
