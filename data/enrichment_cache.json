@@ -1,4 +1,14 @@
 {
+  "1019 22nd st::newport news::va::23607": {
+    "baths": 1.0,
+    "beds": 2,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 4356,
+    "property_type": "Single Family",
+    "rent_estimate": 1380,
+    "sqft": 1038,
+    "year_built": 1925
+  },
   "1022 jefferson circle::martinsville::va::24112": {
     "baths": 1.0,
     "beds": 2,
@@ -179,6 +189,26 @@
     "sqft": 1728,
     "year_built": 1950
   },
+  "113 w main street::wakefield::va::23888": {
+    "baths": 3.5,
+    "beds": 5,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 16779,
+    "property_type": "Single Family",
+    "rent_estimate": 1680,
+    "sqft": 2724,
+    "year_built": 1900
+  },
+  "114 dudley drive::martinsville::va::24112": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 10890,
+    "property_type": "Single Family",
+    "rent_estimate": 1110,
+    "sqft": 992,
+    "year_built": 1960
+  },
   "1149 hayes mill road::boydton::va::": {
     "baths": 2.0,
     "beds": 3,
@@ -188,6 +218,26 @@
     "rent_estimate": 1830,
     "sqft": 1409,
     "year_built": 1991
+  },
+  "1169 valley dr::bristol::va::24201": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 14810,
+    "property_type": "Single Family",
+    "rent_estimate": 1320,
+    "sqft": 286,
+    "year_built": 1966
+  },
+  "117 pleasant spring ave::waverly::va::23890": {
+    "baths": 2.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 9932,
+    "property_type": "Single Family",
+    "rent_estimate": 1540,
+    "sqft": 1260,
+    "year_built": 2005
   },
   "119 sylvan rd::wakefield::va::23888": {
     "baths": 1.0,
@@ -208,6 +258,26 @@
     "rent_estimate": 2770,
     "sqft": 1536,
     "year_built": 1901
+  },
+  "123 elmwood ln::rustburg::va::24588": {
+    "baths": 1.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 28750,
+    "property_type": "Single Family",
+    "rent_estimate": 1820,
+    "sqft": 1515,
+    "year_built": 1970
+  },
+  "128 oak dr::stafford::va::22554": {
+    "baths": 2.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 2774,
+    "property_type": "Townhouse",
+    "rent_estimate": 2220,
+    "sqft": 1414,
+    "year_built": 1976
   },
   "130 devon road::williamsburg::va::": {
     "baths": 2.5,
@@ -308,6 +378,16 @@
     "rent_estimate": 1720,
     "sqft": null,
     "year_built": null
+  },
+  "14035 foursquare rd::smithfield::va::23430": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 13504,
+    "property_type": "Single Family",
+    "rent_estimate": 2060,
+    "sqft": 1232,
+    "year_built": 1965
   },
   "1422 bull run dr::richmond::va::23231": {
     "baths": 1.5,
@@ -499,6 +579,36 @@
     "sqft": 1438,
     "year_built": 1986
   },
+  "20132 king william rd::king william::va::23086": {
+    "baths": 2.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 87991,
+    "property_type": "Single Family",
+    "rent_estimate": 2120,
+    "sqft": 1827,
+    "year_built": 2022
+  },
+  "202 n juniper ave::henrico::va::23075": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 5842,
+    "property_type": "Single Family",
+    "rent_estimate": 1560,
+    "sqft": 1088,
+    "year_built": 1934
+  },
+  "2025 moorefield bridge rd::danville::va::24541": {
+    "baths": 3.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 416869,
+    "property_type": "Single Family",
+    "rent_estimate": 1600,
+    "sqft": 2477,
+    "year_built": 1986
+  },
   "205 wellons street::suffolk::va::": {
     "baths": 2.0,
     "beds": 4,
@@ -518,6 +628,16 @@
     "rent_estimate": 1830,
     "sqft": 1581,
     "year_built": 1976
+  },
+  "207 north 14th ave::hopewell::va::23860": {
+    "baths": 2.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 4600,
+    "property_type": "Single Family",
+    "rent_estimate": 1850,
+    "sqft": 1527,
+    "year_built": 1946
   },
   "210 sandpiper dr::portsmouth::va::23704": {
     "baths": 1.0,
@@ -559,6 +679,16 @@
     "sqft": 1266,
     "year_built": 1955
   },
+  "2216 deep creek blv::portsmouth::va::23704": {
+    "baths": 3.0,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 6098,
+    "property_type": "Single Family",
+    "rent_estimate": 2590,
+    "sqft": 2240,
+    "year_built": 1961
+  },
   "2269 white house cove::newport news::va::": {
     "baths": 2.5,
     "beds": 3,
@@ -578,6 +708,16 @@
     "rent_estimate": 2770,
     "sqft": 2820,
     "year_built": 1983
+  },
+  "235 oak point dr::lancaster::va::22503": {
+    "baths": 3.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 331056,
+    "property_type": "Single Family",
+    "rent_estimate": 2310,
+    "sqft": 2120,
+    "year_built": 1992
   },
   "2403 lafayette boulevard::norfolk::va::": {
     "baths": 2.0,
@@ -669,6 +809,16 @@
     "sqft": 1512,
     "year_built": 2022
   },
+  "26445 rapidan rd::rapidan::va::22733": {
+    "baths": 1.0,
+    "beds": 2,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 43560,
+    "property_type": "Single Family",
+    "rent_estimate": 1750,
+    "sqft": 1534,
+    "year_built": 1954
+  },
   "2709 maurice walk ct glen::allen::va::23060": {
     "baths": 2.5,
     "beds": 4,
@@ -688,6 +838,16 @@
     "rent_estimate": 1260,
     "sqft": 1289,
     "year_built": 1972
+  },
+  "2849 oak point lane::richmond::va::23233": {
+    "baths": 3.5,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 53867,
+    "property_type": "Single Family",
+    "rent_estimate": 3450,
+    "sqft": 3943,
+    "year_built": 1999
   },
   "2907 leta court::hampton::va::23666": {
     "baths": 2.0,
@@ -738,6 +898,16 @@
     "rent_estimate": 2510,
     "sqft": 2561,
     "year_built": 2007
+  },
+  "304 n college drive::franklin::va::23851": {
+    "baths": 2.5,
+    "beds": 2,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 4095,
+    "property_type": "Townhouse",
+    "rent_estimate": 1580,
+    "sqft": 1416,
+    "year_built": 1990
   },
   "3046 linwood road nw::roanoke::va::": {
     "baths": 1.5,
@@ -809,6 +979,16 @@
     "sqft": 1126,
     "year_built": 1941
   },
+  "331 pettus st::south hill::va::23970": {
+    "baths": null,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 55000,
+    "property_type": "Single Family",
+    "rent_estimate": 1610,
+    "sqft": 1152,
+    "year_built": 1995
+  },
   "3330 verdun avenue::norfolk::va::": {
     "baths": 2.5,
     "beds": 4,
@@ -828,6 +1008,16 @@
     "rent_estimate": 3510,
     "sqft": 3622,
     "year_built": 2009
+  },
+  "3415 willis wharf rd::exmore::va::23350": {
+    "baths": 2.0,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 21344,
+    "property_type": "Single Family",
+    "rent_estimate": 1940,
+    "sqft": 2818,
+    "year_built": 1930
   },
   "3424 nansemond parkway::suffolk::va::23435": {
     "baths": 3.0,
@@ -949,6 +1139,16 @@
     "sqft": 1513,
     "year_built": 1972
   },
+  "4216 rosewood ct::williamsburg::va::23188": {
+    "baths": 2.5,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 6534,
+    "property_type": "Single Family",
+    "rent_estimate": 2540,
+    "sqft": 1871,
+    "year_built": 1996
+  },
   "425 willowshade ln elk::creek::va::24326": {
     "baths": 4.5,
     "beds": 6,
@@ -958,6 +1158,16 @@
     "rent_estimate": null,
     "sqft": 5044,
     "year_built": 1861
+  },
+  "4301 oneford pl::chesapeake::va::23321": {
+    "baths": 2.0,
+    "beds": 2,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 871,
+    "property_type": "Townhouse",
+    "rent_estimate": 1710,
+    "sqft": 1274,
+    "year_built": 2005
   },
   "4419 kendal way::suffolk::va::": {
     "baths": 3.0,
@@ -1009,6 +1219,16 @@
     "sqft": 2175,
     "year_built": 1958
   },
+  "4722 warwick st::north dinwiddie::va::23803": {
+    "baths": 1.0,
+    "beds": 2,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 38419920,
+    "property_type": "Single Family",
+    "rent_estimate": 1120,
+    "sqft": 720,
+    "year_built": null
+  },
   "47451 sharpskin island square::sterling::va::20165": {
     "baths": 3.0,
     "beds": 3,
@@ -1029,6 +1249,16 @@
     "sqft": 1376,
     "year_built": 1995
   },
+  "50 robin rd::martinsville::va::24112": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 20909,
+    "property_type": "Single Family",
+    "rent_estimate": 1140,
+    "sqft": 1022,
+    "year_built": 1972
+  },
   "501 carters grove court::hampton::va::23663": {
     "baths": 2.0,
     "beds": 4,
@@ -1038,6 +1268,36 @@
     "rent_estimate": 2240,
     "sqft": 1833,
     "year_built": 1964
+  },
+  "5106 hazelwood rd::hampton::va::23605": {
+    "baths": 2.0,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 3999,
+    "property_type": "Single Family",
+    "rent_estimate": 2060,
+    "sqft": 1653,
+    "year_built": 1970
+  },
+  "513 water lilly rd::portsmouth::va::23701": {
+    "baths": 2.5,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 43560,
+    "property_type": "Single Family",
+    "rent_estimate": 2570,
+    "sqft": 2262,
+    "year_built": 2006
+  },
+  "514 german school rd::richmond::va::23225": {
+    "baths": 1.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 13499,
+    "property_type": "Single Family",
+    "rent_estimate": 1760,
+    "sqft": 960,
+    "year_built": 1978
   },
   "515 big bethel road::hampton::va::": {
     "baths": 1.0,
@@ -1059,6 +1319,16 @@
     "sqft": 840,
     "year_built": 1965
   },
+  "54 burtis street::portsmouth::va::23702": {
+    "baths": 2.5,
+    "beds": 4,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 8712,
+    "property_type": "Single Family",
+    "rent_estimate": 2350,
+    "sqft": 1626,
+    "year_built": 1929
+  },
   "5427 8th road south::arlington::va::22204": {
     "baths": 1.5,
     "beds": 2,
@@ -1078,6 +1348,16 @@
     "rent_estimate": 2020,
     "sqft": 960,
     "year_built": 1981
+  },
+  "5630 spring meadow dr::roanoke::va::24018": {
+    "baths": 2.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 19602,
+    "property_type": "Single Family",
+    "rent_estimate": 2100,
+    "sqft": 1630,
+    "year_built": 1996
   },
   "5914 potomac ave::hampton::va::23605": {
     "baths": 1.0,
@@ -1209,6 +1489,16 @@
     "sqft": 1615,
     "year_built": 1959
   },
+  "733 fairland ave::hampton::va::23661": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 5001,
+    "property_type": "Single Family",
+    "rent_estimate": 1590,
+    "sqft": 1025,
+    "year_built": 1964
+  },
   "7385 jiri woods court::springfield::va::22153": {
     "baths": 3.0,
     "beds": 3,
@@ -1318,6 +1608,16 @@
     "rent_estimate": 2170,
     "sqft": 1534,
     "year_built": 2005
+  },
+  "9865 high water ct::burke::va::22015": {
+    "baths": 2.5,
+    "beds": 3,
+    "enriched_at": "2026-04-21T03:55:45.069270Z",
+    "lot_size": 2356,
+    "property_type": "Townhouse",
+    "rent_estimate": 2910,
+    "sqft": 1399,
+    "year_built": 1979
   },
   "9905 shadowridge ct::fredericksburg::va::22407": {
     "baths": 2.5,
