@@ -989,6 +989,16 @@
     "sqft": 1152,
     "year_built": 1995
   },
+  "3324 bandy road::roanoke::va::24014": {
+    "baths": 1.0,
+    "beds": 3,
+    "enriched_at": "2026-04-21T15:10:16.994004Z",
+    "lot_size": 38333,
+    "property_type": "Single Family",
+    "rent_estimate": 1420,
+    "sqft": 992,
+    "year_built": 1940
+  },
   "3330 verdun avenue::norfolk::va::": {
     "baths": 2.5,
     "beds": 4,
