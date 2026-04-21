@@ -17,9 +17,14 @@
   <meta name="apple-mobile-web-app-title" content="FC Scout">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="Foreclosure Scout">
-  <link rel="manifest" href="manifest.json?v=2">
-  <link rel="apple-touch-icon" href="fc-icon.svg">
-  <link rel="icon" type="image/svg+xml" href="fc-icon.svg">
+  <link rel="manifest" href="manifest.json?v=3">
+  <!-- Favicon: SVG for modern browsers (scales perfectly), PNG for Apple,
+       ICO for legacy. Cache-busted after v2.1 redesign. -->
+  <link rel="icon" type="image/svg+xml" href="fc-icon.svg?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png?v=2">
+  <link rel="shortcut icon" href="favicon.ico?v=2">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -144,7 +149,8 @@ body{
 
 /* Header */
 header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-items:stretch;justify-content:space-between;border-bottom:3px solid var(--accent);position:sticky;top:0;z-index:200;}
-.logo-block{display:flex;align-items:center;gap:16px;padding:14px 24px 14px 0;border-right:1px solid rgba(244,241,235,0.1);margin-right:24px;}
+.logo-block{display:flex;align-items:center;gap:14px;padding:14px 24px 14px 0;border-right:1px solid rgba(244,241,235,0.1);margin-right:24px;}
+.logo-img{flex-shrink:0;display:block;border-radius:8px;}
 .logo-mark{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:var(--accent);line-height:1;}
 .logo-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(244,241,235,0.45);letter-spacing:2px;text-transform:uppercase;line-height:1.4;}
 .header-nav{display:flex;align-items:center;flex:1;}
@@ -1156,6 +1162,7 @@ header,
 
 <header>
   <div class="logo-block">
+    <img src="fc-icon.svg?v=2" alt="Foreclosure Scout" class="logo-img" width="36" height="36" />
     <div><div class="logo-mark">FORECLOSURE SCOUT</div><div class="logo-sub">DC · MD · VA · v2.1</div></div>
   </div>
   <nav class="header-nav">

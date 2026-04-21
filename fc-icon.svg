@@ -1,15 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <rect width="192" height="192" rx="24" fill="#1a1a18"/>
-  <rect width="192" height="4" y="188" rx="0" fill="#c84b2f"/>
-  <!-- House shape -->
-  <polygon points="96,30 152,80 152,160 40,160 40,80" fill="#2a2a26"/>
-  <polygon points="96,24 160,80 152,80 96,32 40,80 32,80" fill="#c84b2f"/>
-  <!-- Door -->
-  <rect x="80" y="110" width="32" height="50" rx="4" fill="#c84b2f"/>
-  <!-- Window left -->
-  <rect x="50" y="95" width="24" height="22" rx="3" fill="#2a6496"/>
-  <!-- Window right -->
-  <rect x="118" y="95" width="24" height="22" rx="3" fill="#2a6496"/>
-  <!-- Text FC -->
-  <text x="96" y="178" font-family="sans-serif" font-size="14" font-weight="bold" fill="#c84b2f" text-anchor="middle" letter-spacing="4">SCOUT</text>
+  <!-- Rounded square dark tile -->
+  <rect width="192" height="192" rx="28" fill="#0E1728"/>
+
+  <!-- Magnifying glass: lens circle + handle -->
+  <!-- Gold-accent ring outside -->
+  <circle cx="82" cy="82" r="58" fill="none" stroke="#D4A93A" stroke-width="6"/>
+
+  <!-- Lens interior: warm paper tone so house reads cleanly -->
+  <circle cx="82" cy="82" r="52" fill="#FAF8F3"/>
+
+  <!-- Inside the lens: minimalist house -->
+  <g transform="translate(82, 82)">
+    <!-- Roof (triangle) -->
+    <polygon points="-28,-2 0,-28 28,-2" fill="#0E1728"/>
+    <!-- House body -->
+    <rect x="-24" y="-2" width="48" height="32" fill="#0E1728"/>
+    <!-- Door (gold accent, echoes the ring) -->
+    <rect x="-6" y="10" width="12" height="20" fill="#D4A93A"/>
+    <!-- Windows -->
+    <rect x="-19" y="4" width="9" height="9" fill="#FAF8F3"/>
+    <rect x="10" y="4" width="9" height="9" fill="#FAF8F3"/>
+  </g>
+
+  <!-- Magnifying glass handle -->
+  <rect x="128" y="128" width="14" height="48" rx="6" fill="#D4A93A"
+        transform="rotate(45, 135, 152)"/>
 </svg>

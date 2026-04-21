@@ -4,29 +4,27 @@
   "description": "DC/MD/VA Foreclosure Intelligence Platform",
   "start_url": "./foreclosure-scout.html",
   "display": "standalone",
-  "background_color": "#0a0b0f",
-  "theme_color": "#c84b2f",
+  "background_color": "#0E1728",
+  "theme_color": "#D4A93A",
   "orientation": "any",
   "icons": [
     {
-      "src": "icons/fc-icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icons/fc-icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
+      "purpose": "any"
+    },
     {
-      "src": "icons/fc-screenshot.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
+      "src": "fc-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "categories": ["finance", "business"],
@@ -36,14 +34,7 @@
       "short_name": "Search",
       "description": "Search DC/MD/VA foreclosure listings",
       "url": "./foreclosure-scout.html",
-      "icons": [{ "src": "icons/fc-icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Court Filings",
-      "short_name": "Court",
-      "description": "Browse CourtListener bankruptcy filings",
-      "url": "./foreclosure-scout.html#court",
-      "icons": [{ "src": "icons/fc-icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
