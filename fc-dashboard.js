@@ -631,19 +631,20 @@
       drawer.classList.add('open');
     });
 
-    // Initialize the embedded Google Map using the already-loaded JS API
-    // (avoids needing Maps Embed API as a separate activation).
-    initDrawerMap(p);
+    // Initialize the embedded Street View + Map using the already-loaded
+    // JS API (avoids needing Street View Static API or Maps Embed API as
+    // separate activations).
+    initDrawerMedia(p);
   }
 
-  function initDrawerMap(p) {
+  function initDrawerMedia(p) {
     if (!window.google || !window.google.maps) {
       // JS Maps API not ready yet — retry briefly, then give up silently.
       let retries = 10;
       const waitForMaps = setInterval(() => {
         if (window.google && window.google.maps) {
           clearInterval(waitForMaps);
-          initDrawerMap(p);
+          initDrawerMedia(p);
         } else if (--retries <= 0) {
           clearInterval(waitForMaps);
           console.warn('[FC Drawer] Google Maps JS API never loaded');
@@ -651,57 +652,106 @@
       }, 200);
       return;
     }
-    const mapDivId = `fc-drawer-map-${(p.id || 'x').replace(/[^a-z0-9]/gi, '')}`;
-    const el = document.getElementById(mapDivId);
-    if (!el) return;
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const mapEl = document.getElementById(`fc-drawer-map-${sanitizedId}`);
+    const svEl  = document.getElementById(`fc-drawer-sv-${sanitizedId}`);
 
-    // Prefer lat/lng from the scraper; fall back to geocoding the address
-    // via the existing Geocoder if coordinates are missing.
     const hasCoords = p.lat && p.lng && (typeof p.lat === 'number') && (typeof p.lng === 'number');
-    const gold = 'oklch(0.72 0.13 85)';
-
-    const render = (lat, lng) => {
-      const map = new google.maps.Map(el, {
-        center: { lat, lng },
-        zoom: 16,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-        styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
-      });
-      new google.maps.Marker({
-        position: { lat, lng },
-        map,
-        title: p.address,
-        icon: {
-          path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-          fillColor: '#D4A93A',
-          fillOpacity: 1,
-          strokeColor: '#0E1728',
-          strokeWeight: 1.5,
-          scale: 1.6,
-          anchor: new google.maps.Point(12, 22),
-        },
-      });
-    };
-
-    if (hasCoords) {
-      render(p.lat, p.lng);
-    } else {
+    const locate = (cb) => {
+      if (hasCoords) { cb({ lat: p.lat, lng: p.lng }); return; }
       const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
       try {
         const geocoder = new google.maps.Geocoder();
         geocoder.geocode({ address: fullAddress }, (results, status) => {
           if (status === 'OK' && results[0]) {
             const loc = results[0].geometry.location;
-            render(loc.lat(), loc.lng());
+            cb({ lat: loc.lat(), lng: loc.lng() });
           } else {
-            el.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">Map unavailable for this address.</div>`;
+            cb(null);
           }
         });
-      } catch (e) {
-        el.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">Map unavailable.</div>`;
+      } catch (e) { cb(null); }
+    };
+
+    locate((coords) => {
+      if (!coords) {
+        if (mapEl) mapEl.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">Map unavailable for this address.</div>`;
+        showSvFallback(svEl);
+        return;
       }
+      renderDrawerMap(mapEl, coords, p);
+      renderDrawerStreetView(svEl, coords);
+    });
+  }
+
+  function renderDrawerMap(el, coords, p) {
+    if (!el) return;
+    const map = new google.maps.Map(el, {
+      center: coords,
+      zoom: 16,
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
+      styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
+    });
+    new google.maps.Marker({
+      position: coords,
+      map,
+      title: p.address,
+      icon: {
+        path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+        fillColor: '#D4A93A',
+        fillOpacity: 1,
+        strokeColor: '#0E1728',
+        strokeWeight: 1.5,
+        scale: 1.6,
+        anchor: new google.maps.Point(12, 22),
+      },
+    });
+  }
+
+  function renderDrawerStreetView(el, coords) {
+    if (!el) return;
+    const svService = new google.maps.StreetViewService();
+    // Check if Street View coverage exists near the address (within 50m).
+    svService.getPanorama({ location: coords, radius: 50, source: 'outdoor' }, (data, status) => {
+      if (status !== 'OK' || !data || !data.location) {
+        showSvFallback(el);
+        return;
+      }
+      new google.maps.StreetViewPanorama(el, {
+        pano: data.location.pano,
+        pov: { heading: computeHeadingToward(data.location.latLng, coords), pitch: 5 },
+        zoom: 0.6,
+        addressControl: false,
+        linksControl: false,
+        panControl: true,
+        enableCloseButton: false,
+        fullscreenControl: true,
+        zoomControl: true,
+        motionTracking: false,
+        motionTrackingControl: false,
+      });
+    });
+  }
+
+  function computeHeadingToward(fromLatLng, toCoords) {
+    // Aim Street View camera toward the target address from the nearest
+    // pano location — otherwise it can point backward or sideways.
+    try {
+      const to = new google.maps.LatLng(toCoords.lat, toCoords.lng);
+      return google.maps.geometry && google.maps.geometry.spherical
+        ? google.maps.geometry.spherical.computeHeading(fromLatLng, to)
+        : 0;
+    } catch (e) { return 0; }
+  }
+
+  function showSvFallback(el) {
+    if (!el) return;
+    el.style.display = 'none';
+    const fb = el.nextElementSibling;
+    if (fb && fb.classList.contains('fc-streetview-fallback')) {
+      fb.style.display = 'flex';
     }
   }
 
@@ -733,12 +783,12 @@
       : (window.GOOGLE_MAPS_API_KEY || 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po');
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
     const encAddr = encodeURIComponent(fullAddress);
-    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=520x220&location=${encAddr}&fov=80&source=outdoor&key=${GMAPS_KEY}&return_error_codes=true`;
-    // Interactive Google Maps — rendered via the JS API that's already
-    // loaded and working in the main app (avoids needing a separate Maps
-    // Embed API activation). Unique container ID per render so multiple
-    // drawer opens don't collide.
-    const mapDivId = `fc-drawer-map-${(p.id || 'x').replace(/[^a-z0-9]/gi, '')}`;
+    // Interactive Street View + Map — both rendered via the JS API that's
+    // already enabled for the main app. Avoids needing Street View Static
+    // API or Maps Embed API as separate activations.
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const mapDivId = `fc-drawer-map-${sanitizedId}`;
+    const svDivId  = `fc-drawer-sv-${sanitizedId}`;
 
     // External listing + photo search links. Zillow/Redfin/Realtor.com all
     // prohibit direct scraping in their T&Cs but their search URL pattern
@@ -750,9 +800,31 @@
     const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
     const addressSlug = (p.address || '').replace(/\s+/g, '-');
     const citySlug = (p.city || '').replace(/\s+/g, '-');
+    // Shortened street-suffix version for Redfin's URL slugs (Street → St, etc.)
+    const redfinSlug = addressSlug
+      .replace(/-Street\b/i, '-St')
+      .replace(/-Avenue\b/i, '-Ave')
+      .replace(/-Road\b/i, '-Rd')
+      .replace(/-Drive\b/i, '-Dr')
+      .replace(/-Lane\b/i, '-Ln')
+      .replace(/-Court\b/i, '-Ct')
+      .replace(/-Boulevard\b/i, '-Blvd')
+      .replace(/-Circle\b/i, '-Cir')
+      .replace(/-Place\b/i, '-Pl')
+      .replace(/-Terrace\b/i, '-Ter');
     const zillowUrl  = `https://www.zillow.com/homes/${addressSlug},-${citySlug},-${p.state || 'VA'}-${p.zip || ''}_rb/`;
-    const redfinUrl  = `https://www.redfin.com/stingray/do/query-location?location=${encAddr}&v=2`;
-    const realtorUrl = `https://www.realtor.com/realestateandhomes-search/${addressSlug}_${citySlug}_${p.state || 'VA'}_${p.zip || ''}`;
+    // Redfin's /stingray/ endpoint gets CloudFront-403'd as a bot URL.
+    // Use the user-facing address pattern — falls back to zip search if
+    // Redfin doesn't have the specific property indexed.
+    const redfinUrl  = p.zip
+      ? `https://www.redfin.com/${p.state || 'VA'}/${citySlug}/${redfinSlug}-${p.zip}`
+      : `https://www.redfin.com/${p.state || 'VA'}/${citySlug}`;
+    // Realtor.com: their /realestateandhomes-detail/ URLs need a listing
+    // ID we don't have. Fall back to zip-code search which always resolves
+    // to real results (user can filter from there).
+    const realtorUrl = p.zip
+      ? `https://www.realtor.com/realestateandhomes-search/${p.zip}`
+      : `https://www.realtor.com/realestateandhomes-search/${citySlug}_${p.state || 'VA'}`;
     const playbook = isHUD ? {
       title: 'HUD REO Purchase',
       icon: 'H',
@@ -798,9 +870,7 @@
 
       <div class="fc-drawer-body">
         <div class="fc-drawer-media">
-          <img src="${streetViewUrl}" alt="Street view of ${escapeHtml(p.address || '')}"
-               class="fc-streetview"
-               onerror="this.style.display='none'; const n=this.nextElementSibling; if(n) n.style.display='flex';" />
+          <div id="${escapeAttr(svDivId)}" class="fc-streetview"></div>
           <div class="fc-streetview-fallback">
             <div class="fc-eyebrow" style="margin-bottom:6px">Street view unavailable</div>
             <div style="font-size:12px;color:var(--muted)">No Street View coverage for this address — try the map below or search the photo links.</div>
