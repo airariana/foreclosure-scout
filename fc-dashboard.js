@@ -1167,7 +1167,7 @@ Return ONLY the 2-sentence analysis.`,
     const svDivId  = `fc-drawer-sv-${sanitizedId}`;
 
     const listingUrl = isHUD && p.firm_file_number
-      ? `https://www.hudhomestore.gov/listing/?caseNumber=${encodeURIComponent(p.firm_file_number)}`
+      ? `https://www.hudhomestore.gov/searchresult?searchText=${encodeURIComponent(p.firm_file_number)}`
       : (p.source_url || '');
     const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
     const addressSlug = (p.address || '').replace(/\s+/g, '-');
