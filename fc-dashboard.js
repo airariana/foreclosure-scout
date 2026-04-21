@@ -99,20 +99,39 @@
     // user picks Map — it becomes a full-width canvas.
     const mobileFrame = document.querySelector('.mobile-frame');
     const dashMain = document.querySelector('#fc-dash-root .fc-main');
+    const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
     if (view === 'map') {
       if (mobileFrame) {
-        mobileFrame.style.display = 'block';
-        mobileFrame.style.position = 'fixed';
-        mobileFrame.style.top = '48px';
-        mobileFrame.style.left = '220px';
-        mobileFrame.style.right = '0';
-        mobileFrame.style.bottom = '0';
-        mobileFrame.style.maxWidth = 'none';
-        mobileFrame.style.width = 'auto';
-        mobileFrame.style.height = 'auto';
-        mobileFrame.style.borderRadius = '0';
-        mobileFrame.style.boxShadow = 'none';
-        mobileFrame.style.zIndex = '10';
+        // Override all the mobile-frame's default chrome so it behaves as a
+        // full-pane canvas inside our 220px-sidebar + 48px-topbar layout.
+        // z-index stays BELOW the sidebar (25) and topbar (30) so they
+        // visually sit on top of the map edges if there's any overlap.
+        mobileFrame.style.cssText = [
+          'display: block',
+          'position: fixed',
+          'top: 48px',
+          'left: 220px',
+          'right: 0',
+          'bottom: 0',
+          'max-width: none',
+          'width: auto',
+          'height: auto',
+          'min-height: 0',
+          'border-radius: 0',
+          'box-shadow: none',
+          'margin: 0',
+          'padding: 0',
+          'background: #FAF8F3',
+          'z-index: 5',
+          'overflow: hidden',
+        ].join('; ') + ';';
+      }
+      if (appInner) {
+        appInner.style.cssText = [
+          'max-height: none',
+          'height: 100%',
+          'overflow: auto',
+        ].join('; ') + ';';
       }
       if (dashMain) dashMain.style.display = 'none';
     } else {
@@ -877,7 +896,34 @@
 
   // ─── CSS ────────────────────────────────────────────────────────────────
   const CSS_CONTENT = `
-/* Design tokens (scoped to fc-dash) */
+/* Design tokens — promoted to :root so body background can resolve the var */
+:root {
+  --paper:   #FAF8F3;
+  --paper-2: #F2EEE3;
+  --paper-3: #EAE4D5;
+  --white:   #FFFFFF;
+  --ink:     #0E1728;
+  --ink-2:   #1B2640;
+  --ink-3:   #2A3655;
+  --muted:   #6B6658;
+  --muted-2: #8F897A;
+  --hair:    #E6E1D6;
+  --hair-2:  #D6CFBF;
+  --gold:       oklch(0.72 0.13 85);
+  --gold-deep:  oklch(0.56 0.12 78);
+  --gold-soft:  oklch(0.94 0.04 85);
+  --gold-ink:   oklch(0.38 0.1 75);
+  --sage:       oklch(0.58 0.11 150);
+  --sage-soft:  oklch(0.94 0.04 150);
+  --coral:      oklch(0.58 0.17 30);
+  --coral-soft: oklch(0.94 0.04 30);
+  --sky:        oklch(0.58 0.11 235);
+  --sky-soft:   oklch(0.94 0.03 235);
+  --f-ui:    "Inter Tight", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --f-mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --f-serif: "Source Serif 4", Georgia, serif;
+}
+
 .fc-dash {
   --paper:   #FAF8F3;
   --paper-2: #F2EEE3;
@@ -923,7 +969,7 @@
     font-size: 13px;
     line-height: 1.5;
     color: var(--ink);
-    background: var(--paper);
+    background: #FAF8F3;
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "ss01", "cv11";
     font-variant-numeric: tabular-nums;
@@ -931,6 +977,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 1;
   }
   #fc-dash-root.fc-dash * { box-sizing: border-box; }
   #fc-dash-root.fc-dash svg { flex-shrink: 0; }
@@ -942,6 +990,8 @@
     border-bottom: 1px solid var(--hair);
     background: var(--paper);
     flex-shrink: 0;
+    position: relative;
+    z-index: 30;
   }
   .fc-brand {
     display: flex; align-items: center; gap: 10px;
@@ -1014,6 +1064,8 @@
     background: var(--paper);
     display: flex; flex-direction: column;
     padding: 12px 0;
+    position: relative;
+    z-index: 25;
   }
   .fc-side-section { padding: 8px 10px; }
   .fc-side-label {
