@@ -3322,14 +3322,10 @@ async function loadPropertyIntelligence(p, containerId){
   const el = document.getElementById(containerId);
   if(!el) return;
 
-  // Show loading state
+  // Show loading state. Street View is intentionally omitted here —
+  // the drawer already has an interactive StreetViewPanorama at the
+  // top with progressive-radius fallback (see fc-dashboard.js).
   el.innerHTML = `
-    <div class="street-view-wrap" id="sv-${p.id}">
-      <img src="${getStreetViewUrl(p.address, p.city, p.state)}"
-        onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--muted)\'>Street view unavailable</div>'"
-        alt="Street View">
-      <div class="sv-label">📷 Google Street View · ${p.address}</div>
-    </div>
     <div class="intel-grid" id="ig-${p.id}">
       ${['FLOOD ZONE','MED. INCOME','RENTER %','UNEMPLOYMENT','WALK SCORE'].map(k=>`
         <div class="intel-cell loading">
