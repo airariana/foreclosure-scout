@@ -62,15 +62,19 @@
       chromeHide.id = 'fc-mobile-chrome-hide';
       chromeHide.textContent = `
         @media (min-width: 769px) {
+          /* Everything inside the mobile-frame's .app except #map should be
+             hidden — they duplicate the dashboard's own chrome. Listed
+             individually (not catch-all) to avoid hiding map overlays. */
+          .mobile-frame .ptr-progress,
+          .mobile-frame .ptr-indicator,
           .mobile-frame header,
           .mobile-frame .api-bar,
-          .mobile-frame [class*="search-toolbar"],
-          .mobile-frame [class*="nm-strip"],
-          .mobile-frame [class*="header-stats"],
+          .mobile-frame .filter-bar,
+          .mobile-frame .stats-banner,
+          .mobile-frame .filter-sidebar,
           .mobile-frame .mobile-bottom-bar,
           .mobile-frame [class*="mobile-bottom"],
-          .mobile-frame .floating-calendar-btn,
-          .mobile-frame .ptr-indicator {
+          .mobile-frame .floating-calendar-btn {
             display: none !important;
           }
           .mobile-frame #map {
@@ -78,8 +82,10 @@
             min-height: calc(100vh - 48px) !important;
             max-height: none !important;
           }
-          .mobile-frame .app {
+          .mobile-frame .app,
+          .mobile-frame .app::before {
             padding: 0 !important;
+            background-image: none !important;
           }
         }
       `;
@@ -1461,7 +1467,14 @@
   .fc-main::-webkit-scrollbar { width: 10px; height: 10px; }
   .fc-main::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 10px; border: 2px solid var(--paper); }
   .fc-main::-webkit-scrollbar-track { background: var(--paper); }
-  .fc-main-inner { padding: 24px 32px; max-width: 1600px; }
+  /* Content width constrained to a comfortable reading ratio (~1280px)
+     and centered. Prevents the dashboard from stretching across ultrawide
+     monitors where KPI tiles and tables look sparse. */
+  .fc-main-inner {
+    padding: 24px 32px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
 
   /* ─── Page head ─── */
   .fc-page-head {
