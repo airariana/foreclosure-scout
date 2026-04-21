@@ -259,6 +259,114 @@
     }
   }
 
+  // ─── Zillow manual-lookup overrides ─────────────────────────────────────
+  // Users open Zillow, copy the Zestimate + Rent Zestimate for a property,
+  // and paste them into the drawer. Saved to localStorage per property ID.
+  // Drawer + listings re-render with overridden ARV and monthlyRent so
+  // Cash Flow / Cap Rate / 70% rule reflect Zillow values instead of the
+  // county-heuristic defaults.
+  const ZILLOW_LS_PREFIX = 'fs_zillow_';
+
+  function getZillowValues(propId) {
+    if (!propId) return null;
+    try {
+      const raw = localStorage.getItem(ZILLOW_LS_PREFIX + propId);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function setZillowValues(propId, values) {
+    if (!propId) return;
+    if (values && (values.zestimate || values.rent || values.notes)) {
+      localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify({
+        zestimate: values.zestimate ? Number(values.zestimate) : null,
+        rent:      values.rent      ? Number(values.rent)      : null,
+        notes:     values.notes || '',
+        updatedAt: new Date().toISOString(),
+      }));
+    } else {
+      localStorage.removeItem(ZILLOW_LS_PREFIX + propId);
+    }
+  }
+
+  function applyZillowOverrides(p) {
+    if (!p || !p.id) return;
+    const z = getZillowValues(p.id);
+    if (!z) { p._zillowValidated = false; return; }
+
+    if (z.zestimate) p.arv = z.zestimate;
+    if (z.rent)      p.monthlyRent = z.rent;
+
+    // Downstream recompute — matches Python build_pricing's math except for
+    // the score/grade pipeline, which is left at the scraper's original value.
+    if (p.arv > 0 && p.price > 0) {
+      p.discount = Math.round((1 - p.price / p.arv) * 100);
+    }
+    p.rehabEstimate = Math.round((p.arv || 0) * 0.08);
+    p.mao70 = Math.round((p.arv || 0) * 0.70 - p.rehabEstimate);
+    p.passes70 = p.price > 0 && p.price <= p.mao70;
+
+    if (p.price > 0 && p.monthlyRent > 0) {
+      const loan = p.price * 0.75;
+      const monthlyRate = 0.07 / 12;
+      const pi = loan * monthlyRate / (1 - Math.pow(1 + monthlyRate, -360));
+      const tax = (p.arv || 0) * 0.01 / 12;
+      const ins = (p.arv || 0) * 0.005 / 12;
+      const vacancy = p.monthlyRent * 0.08;
+      p.cashFlow = Math.round(p.monthlyRent - pi - tax - ins - vacancy);
+      const noi = p.monthlyRent * 12 - ((p.arv || 0) * 0.015 + vacancy * 12);
+      p.capRate = p.price > 0 ? Number(((noi / p.price) * 100).toFixed(1)) : 0;
+      p.dscr = pi > 0 ? Number((p.monthlyRent / pi).toFixed(2)) : 0;
+    }
+
+    p._zillowValidated = true;
+    p._zillowNotes = z.notes;
+    p._zillowUpdatedAt = z.updatedAt;
+  }
+
+  function applyAllZillowOverrides(data) {
+    if (!data || !data.foreclosures) return;
+    for (const p of data.foreclosures) applyZillowOverrides(p);
+  }
+
+  // Called from the drawer Save button's onclick attribute. Global for
+  // inline-onclick reachability. Saves values, re-applies overrides,
+  // re-renders every affected view.
+  window.fcSaveZillowValues = function (propId, sanitizedId) {
+    const zEl = document.getElementById(`fc-z-arv-${sanitizedId}`);
+    const rEl = document.getElementById(`fc-z-rent-${sanitizedId}`);
+    const nEl = document.getElementById(`fc-z-notes-${sanitizedId}`);
+    setZillowValues(propId, {
+      zestimate: zEl ? zEl.value : '',
+      rent:      rEl ? rEl.value : '',
+      notes:     nEl ? nEl.value : '',
+    });
+    const d = window.__fcData;
+    if (d) {
+      applyAllZillowOverrides(d);
+      renderKPIs(d);
+      renderPriorityQueue(d);
+      renderHotCounties(d);
+      renderAICoach(d);
+      renderListings(d);
+      openPropertyDrawer(propId); // re-render drawer with new values
+    }
+  };
+
+  window.fcClearZillowValues = function (propId) {
+    setZillowValues(propId, null);
+    const d = window.__fcData;
+    if (d) {
+      applyAllZillowOverrides(d);
+      renderKPIs(d);
+      renderPriorityQueue(d);
+      renderHotCounties(d);
+      renderAICoach(d);
+      renderListings(d);
+      openPropertyDrawer(propId);
+    }
+  };
+
   // ─── View routing ───────────────────────────────────────────────────────
   // Each sidebar item has data-view. Switching views shows/hides sections
   // in the main area. URL hash keeps state across refreshes.
@@ -418,6 +526,7 @@
       if (!r.ok) throw new Error('fetch failed: ' + r.status);
       const d = await r.json();
       window.__fcData = d;
+      applyAllZillowOverrides(d);
       wireStateChips();
       updateStateChipCounts(d);
       renderKPIs(d);
@@ -492,7 +601,7 @@
         <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
           <td>
-            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
+            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}${p._zillowValidated ? ' <span class="fc-z-badge" title="Zillow-validated">Z ✓</span>' : ''}</div>
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')}</div>
           </td>
           <td style="font-size:12px;color:var(--ink-3)">${escapeHtml(p.county || '—')}</td>
@@ -684,7 +793,7 @@
         <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
           <td>
-            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
+            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}${p._zillowValidated ? ' <span class="fc-z-badge" title="Zillow-validated">Z ✓</span>' : ''}</div>
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(sourceTag)}</div>
           </td>
           <td>${typePill(p.listingType)}</td>
@@ -827,6 +936,9 @@
       });
     }
 
+    // Re-apply Zillow overrides fresh on each drawer open, in case the
+    // user saved values in a previous session.
+    applyZillowOverrides(p);
     drawer.innerHTML = renderDrawerContent(p);
     // Wire close button
     const closeBtn = drawer.querySelector('#fc-drawer-close');
@@ -1134,14 +1246,16 @@ Return ONLY the 2-sentence analysis.`,
         `)}
 
         ${section('Rental financials', `
-          ${kvRow('Monthly Rent', '$' + (p.monthlyRent || 0).toLocaleString(), 'ink', 'Heuristic (0.7% of ARV)')}
+          ${kvRow('Monthly Rent', '$' + (p.monthlyRent || 0).toLocaleString(), 'ink', p._zillowValidated ? 'Zillow Rent Zestimate ✓' : 'Heuristic (0.7% of ARV)')}
           ${kvRow('Cash Flow', '$' + (p.cashFlow || 0).toLocaleString() + '/mo', (p.cashFlow || 0) > 0 ? 'sage' : 'coral')}
           ${kvRow('Cap Rate', (p.capRate || 0) + '%')}
-          ${kvRow('DSCR', (pr.dscr || 0).toFixed(2),
-                  (pr.dscr || 0) >= 1.25 ? 'sage' : (pr.dscr || 0) >= 1.0 ? 'muted' : 'coral',
-                  (pr.dscr || 0) >= 1.25 ? 'BRRRR-ready' : (pr.dscr || 0) >= 1.0 ? 'Covers mortgage' : 'Negative leverage')}
+          ${kvRow('DSCR', ((p._zillowValidated ? p.dscr : pr.dscr) || 0).toFixed(2),
+                  ((p._zillowValidated ? p.dscr : pr.dscr) || 0) >= 1.25 ? 'sage' : ((p._zillowValidated ? p.dscr : pr.dscr) || 0) >= 1.0 ? 'muted' : 'coral',
+                  ((p._zillowValidated ? p.dscr : pr.dscr) || 0) >= 1.25 ? 'BRRRR-ready' : ((p._zillowValidated ? p.dscr : pr.dscr) || 0) >= 1.0 ? 'Covers mortgage' : 'Negative leverage')}
           ${kvRow('Investment Score', (p.score || 0) + ' / 100')}
         `)}
+
+        ${zillowLookupSection(p, zillowUrl, sanitizedId)}
 
         ${section('AI analysis', `
           <div class="ai-box loading" id="fc-drawer-ai-${sanitizedId}">
@@ -1245,6 +1359,72 @@ Return ONLY the 2-sentence analysis.`,
       <div class="fc-drawer-section">
         <div class="fc-drawer-section-hd">${escapeHtml(title)}</div>
         <div class="fc-drawer-section-body">${bodyHtml}</div>
+      </div>
+    `;
+  }
+
+  function zillowLookupSection(p, zillowUrl, sanitizedId) {
+    const z = getZillowValues(p.id) || {};
+    const zestimate = z.zestimate || '';
+    const rent      = z.rent || '';
+    const notes     = z.notes || '';
+    const updated   = z.updatedAt
+      ? new Date(z.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+    const savedBadge = p._zillowValidated
+      ? `<span class="fc-pill sage" style="margin-left:8px">Zillow ✓</span>`
+      : '';
+
+    return `
+      <div class="fc-drawer-section">
+        <div class="fc-drawer-section-hd">Zillow lookup${savedBadge}</div>
+        <div class="fc-drawer-section-body">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+            Open the address on Zillow, then paste the Zestimate and Rent
+            Zestimate here. Overrides the heuristic ARV + rent so Cash Flow,
+            Cap Rate, and the 70% rule reflect real market values.
+          </div>
+          <a href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener"
+             class="fc-btn fc-btn-sm fc-btn-ghost" style="margin-bottom:12px;display:inline-block">
+            Open on Zillow ↗
+          </a>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label for="fc-z-arv-${sanitizedId}"
+                style="display:block;font-size:11px;font-weight:500;color:var(--ink);margin-bottom:4px">
+                Zestimate (ARV)
+              </label>
+              <input id="fc-z-arv-${sanitizedId}" type="number" inputmode="numeric"
+                placeholder="e.g. 425000" value="${zestimate}"
+                style="width:100%;padding:6px 10px;border:1px solid var(--hair);border-radius:3px;font-family:var(--f-mono);font-size:12px;background:var(--paper-2);box-sizing:border-box">
+            </div>
+            <div>
+              <label for="fc-z-rent-${sanitizedId}"
+                style="display:block;font-size:11px;font-weight:500;color:var(--ink);margin-bottom:4px">
+                Rent Zestimate (monthly)
+              </label>
+              <input id="fc-z-rent-${sanitizedId}" type="number" inputmode="numeric"
+                placeholder="e.g. 2400" value="${rent}"
+                style="width:100%;padding:6px 10px;border:1px solid var(--hair);border-radius:3px;font-family:var(--f-mono);font-size:12px;background:var(--paper-2);box-sizing:border-box">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label for="fc-z-notes-${sanitizedId}"
+              style="display:block;font-size:11px;font-weight:500;color:var(--ink);margin-bottom:4px">
+              Notes
+            </label>
+            <textarea id="fc-z-notes-${sanitizedId}" rows="2"
+              placeholder="Condition, comps, rehab scope…"
+              style="width:100%;padding:6px 10px;border:1px solid var(--hair);border-radius:3px;font-family:var(--f-ui);font-size:12px;background:var(--paper-2);box-sizing:border-box;resize:vertical">${escapeHtml(notes)}</textarea>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="fc-btn fc-btn-sm fc-btn-dark"
+              onclick="fcSaveZillowValues('${escapeAttr(p.id || '')}', '${sanitizedId}')">Save</button>
+            ${p._zillowValidated ? `<button class="fc-btn fc-btn-sm fc-btn-ghost"
+              onclick="fcClearZillowValues('${escapeAttr(p.id || '')}')">Clear</button>` : ''}
+            ${updated ? `<span style="font-size:10px;color:var(--muted);font-family:var(--f-mono)">Saved ${escapeHtml(updated)}</span>` : ''}
+          </div>
+        </div>
       </div>
     `;
   }
@@ -2055,6 +2235,19 @@ Return ONLY the 2-sentence analysis.`,
     font-family: var(--f-mono);
   }
   .fc-state-chips .fc-state-chip.active .fc-state-count { color: var(--muted); }
+  .fc-z-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-family: var(--f-mono);
+    font-weight: 600;
+    background: var(--sage);
+    color: var(--white);
+    border-radius: 2px;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
 
   /* ─── Utilities ─── */
   .fc-eyebrow {
