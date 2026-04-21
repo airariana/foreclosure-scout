@@ -1482,13 +1482,20 @@
     box-sizing: border-box;
   }
 
-  /* Every view container and every widget inside must claim full width so
-     no component shrink-wraps to its content. Applied defensively to every
-     known layout class used across the dashboard, listings, and placeholder
-     views. */
+  /* NUCLEAR full-width: every direct child of .fc-main-inner and every
+     direct child of a view container must claim 100% width. No element
+     inside the main area gets to shrink-wrap. */
+  .fc-main-inner > *,
+  #fc-view-dashboard > *,
+  #fc-view-listings > *,
+  #fc-view-map,
+  #fc-view-alerts > *,
+  #fc-view-rehab > *,
+  #fc-view-market > *,
+  #fc-view-brrrr > *,
+  #fc-view-settings > *,
   #fc-view-dashboard,
   #fc-view-listings,
-  #fc-view-map,
   #fc-view-alerts,
   #fc-view-rehab,
   #fc-view-market,
@@ -1498,18 +1505,39 @@
   .fc-kpi-grid,
   .fc-two-col,
   .fc-card,
-  .fc-stage-placeholder,
-  .fc-table {
+  .fc-stage-placeholder {
     width: 100% !important;
     max-width: none !important;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
   }
 
-  /* Grid layouts should use available space for their tracks instead of
-     collapsing to content. Re-declare grid-template-columns with fr units
-     so they fill the container regardless of content width. */
-  .fc-kpi-grid { grid-template-columns: repeat(4, 1fr) !important; }
-  .fc-two-col { grid-template-columns: 1.5fr 1fr !important; }
+  /* Tables: force full-width via table-layout auto so columns flex to fill
+     the card horizontally. The 'hidden' overflow on .fc-card was clipping
+     some tables visually — switch to auto so the table can drive width. */
+  .fc-card {
+    overflow: visible !important;
+  }
+  .fc-table {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
+    table-layout: auto !important;
+    display: table !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Grid layouts use fr units so they fill the parent fully */
+  .fc-kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+  .fc-two-col {
+    display: grid !important;
+    grid-template-columns: 1.5fr 1fr !important;
+  }
+
+  /* Thinner scrollbar so it doesn't steal visible width from content */
+  .fc-main::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
 
   /* ─── Page head ─── */
   .fc-page-head {
