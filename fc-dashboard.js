@@ -753,25 +753,30 @@
     // HUD REO additions
     const hudProps = props.filter(p => p.source === 'HUD HomeStore');
     if (hudProps.length) {
+      const hudStates = new Set(hudProps.map(p => (p.state || 'VA').toUpperCase()));
+      const stateList = Array.from(hudStates).sort().join('/');
       signals.push({
         type: '', tag: 'HUD INTEL',
         who: `${hudProps.length} HUD homes`,
-        what: `active in VA — FHA financing available on ${hudProps.filter(p => (p.hud_fha || '').startsWith('IN')).length} of them.`,
+        what: `active in ${stateList} — FHA financing available on ${hudProps.filter(p => (p.hud_fha || '').startsWith('IN')).length} of them.`,
         ctx: `List price median $${Math.round(median(hudProps.map(p => p.price || 0).filter(v => v > 0)) / 1000)}K.`,
         time: 'Weekly',
       });
     }
 
-    // Top county concentration
+    // Top county concentration — uses whichever states are currently in
+    // scope (respects the state filter chip). Label reads "DC/MD/VA" when
+    // unfiltered, or the specific state code when filtered.
     const counties = {};
     props.forEach(p => { counties[p.county] = (counties[p.county] || 0) + 1; });
     const top = Object.entries(counties).sort((a,b) => b[1] - a[1]).slice(0, 1)[0];
     if (top) {
+      const scopeLabel = __stateFilter === 'ALL' ? 'DC/MD/VA' : __stateFilter;
       signals.push({
         type: 'sky', tag: 'CONCENTRATION',
         who: top[0],
         what: `has the highest foreclosure volume — ${top[1]} active listings.`,
-        ctx: `${Math.round(top[1] / props.length * 100)}% of all VA activity this week.`,
+        ctx: `${Math.round(top[1] / props.length * 100)}% of all ${scopeLabel} activity this week.`,
         time: 'Now',
       });
     }
@@ -1590,7 +1595,7 @@ Return ONLY the 2-sentence analysis.`,
       </div>
       <div class="fc-topbar-sep"></div>
       <div class="fc-workspace">
-        <strong>VA Foreclosures</strong>
+        <strong>DC/MD/VA Foreclosures</strong>
         ${ICO.chevR}
         <span>Command Center</span>
       </div>
