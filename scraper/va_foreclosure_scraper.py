@@ -1282,8 +1282,11 @@ def run(gmaps_key: str = "") -> dict:
         p["mao70"]          = pr.get("mao_70") or 0
         p["dscr"]           = pr.get("dscr") or 0
         p["zip"]            = p.get("zip_code") or ""
-        # Trustee sales are classified as "Pre-Foreclosure" in the UI's type filter.
-        p["listingType"]    = p.get("listingType") or "Pre-Foreclosure"
+        # Trustee-firm listings have a set auction date + courthouse location,
+        # so they map to "Auction" on the map legend. HUD REO and any other
+        # source that sets listingType explicitly (e.g., "REO/Bank-Owned") is
+        # preserved here.
+        p["listingType"]    = p.get("listingType") or "Auction"
         # Rehab default: assume 8% of ARV for a typical foreclosure ($20K on a
         # $250K home). User can override in the calculator drawer per-property.
         p["rehabEstimate"]  = p.get("rehabEstimate") or round((pr.get("arv") or 0) * 0.08)

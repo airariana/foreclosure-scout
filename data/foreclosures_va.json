@@ -206,7 +206,7 @@
       "mao70": 196075,
       "dscr": 0.95,
       "zip": "24333",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -391,7 +391,7 @@
       "mao70": 148800,
       "dscr": 1.76,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19200,
       "yearBuilt": null
     },
@@ -582,7 +582,7 @@
       "mao70": 170500,
       "dscr": 0.6,
       "zip": "22503",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -772,7 +772,7 @@
       "mao70": 170500,
       "dscr": 1.01,
       "zip": "23188",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -962,7 +962,7 @@
       "mao70": 145700,
       "dscr": 1.21,
       "zip": "23701",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 18800
     },
     {
@@ -1152,7 +1152,7 @@
       "mao70": 145700,
       "dscr": 1.26,
       "zip": "23704",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 18800
     },
     {
@@ -1342,7 +1342,7 @@
       "mao70": 170500,
       "dscr": 0.96,
       "zip": "23350",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -1532,7 +1532,7 @@
       "mao70": 170500,
       "dscr": 0.83,
       "zip": "23888",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -1722,7 +1722,7 @@
       "mao70": 170500,
       "dscr": 1.05,
       "zip": "23086",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -1912,7 +1912,7 @@
       "mao70": 145700,
       "dscr": 1.37,
       "zip": "23702",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 18800
     },
     {
@@ -2102,7 +2102,7 @@
       "mao70": 170500,
       "dscr": 0.96,
       "zip": "24541",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -2292,7 +2292,7 @@
       "mao70": 170500,
       "dscr": 1.3,
       "zip": "23430",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -2482,7 +2482,7 @@
       "mao70": 213900,
       "dscr": 1.12,
       "zip": "23321",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 27600
     },
     {
@@ -2672,7 +2672,7 @@
       "mao70": 176700,
       "dscr": 1.16,
       "zip": "23225",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22800
     },
     {
@@ -2862,7 +2862,7 @@
       "mao70": 148800,
       "dscr": 1.2,
       "zip": "23661",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 19200
     },
     {
@@ -3052,7 +3052,7 @@
       "mao70": 170500,
       "dscr": 1.4,
       "zip": "22733",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -3242,7 +3242,7 @@
       "mao70": 148800,
       "dscr": 1.67,
       "zip": "23605",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 19200
     },
     {
@@ -3432,7 +3432,7 @@
       "mao70": 170500,
       "dscr": 1.33,
       "zip": "23890",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -3622,7 +3622,7 @@
       "mao70": 170500,
       "dscr": 1.6,
       "zip": "24588",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -3812,7 +3812,7 @@
       "mao70": 170500,
       "dscr": 1.63,
       "zip": "23860",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -4002,7 +4002,7 @@
       "mao70": 201500,
       "dscr": 1.46,
       "zip": "23075",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 26000
     },
     {
@@ -4192,7 +4192,7 @@
       "mao70": 170500,
       "dscr": 1.48,
       "zip": "23851",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -4381,7 +4381,7 @@
       "mao70": 170500,
       "dscr": 1.27,
       "zip": "23803",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000,
       "yearBuilt": 1920
     },
@@ -4572,7 +4572,7 @@
       "mao70": 170500,
       "dscr": 1.26,
       "zip": "24112",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -4762,7 +4762,7 @@
       "mao70": 158100,
       "dscr": 2.13,
       "zip": "23607",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 20400
     },
     {
@@ -4952,7 +4952,7 @@
       "mao70": 170500,
       "dscr": 2.05,
       "zip": "24201",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -5142,7 +5142,7 @@
       "mao70": 170500,
       "dscr": 2.18,
       "zip": "24112",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -5327,7 +5327,7 @@
       "mao70": 231725,
       "dscr": 1.37,
       "zip": "23231",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29900
     },
     {
@@ -5513,7 +5513,7 @@
       "mao70": 201500,
       "dscr": 1.24,
       "zip": "23231",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -5699,7 +5699,7 @@
       "mao70": 196075,
       "dscr": 1.95,
       "zip": "23168",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -5885,7 +5885,7 @@
       "mao70": 170500,
       "dscr": 1.5,
       "zip": "23692",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -6072,7 +6072,7 @@
       "mao70": 398815,
       "dscr": 1.4,
       "zip": "22192",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 51460
     },
     {
@@ -6259,7 +6259,7 @@
       "mao70": 201500,
       "dscr": 1.26,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -6446,7 +6446,7 @@
       "mao70": 170500,
       "dscr": 1.38,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -6633,7 +6633,7 @@
       "mao70": 59675,
       "dscr": 3.82,
       "zip": "24013",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 7700
     },
     {
@@ -6823,7 +6823,7 @@
       "mao70": 170500,
       "dscr": 0.84,
       "zip": "22015",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -7013,7 +7013,7 @@
       "mao70": 238700,
       "dscr": 1.25,
       "zip": "22554",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 30800
     },
     {
@@ -7198,7 +7198,7 @@
       "mao70": 170500,
       "dscr": 1.62,
       "zip": "24614",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -7381,7 +7381,7 @@
       "mao70": 170500,
       "dscr": 1.62,
       "zip": "24219",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000,
       "yearBuilt": null
     },
@@ -7572,7 +7572,7 @@
       "mao70": 170500,
       "dscr": 1.26,
       "zip": "24018",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -7758,7 +7758,7 @@
       "mao70": 114700,
       "dscr": 1.99,
       "zip": "23805",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 14800
     },
     {
@@ -7944,7 +7944,7 @@
       "mao70": 295895,
       "dscr": 1.42,
       "zip": "22172",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 38180
     },
     {
@@ -8130,7 +8130,7 @@
       "mao70": 231725,
       "dscr": 1.54,
       "zip": "22407",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29900
     },
     {
@@ -8316,7 +8316,7 @@
       "mao70": 188945,
       "dscr": 1.88,
       "zip": "23509",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 24380
     },
     {
@@ -8502,7 +8502,7 @@
       "mao70": 164300,
       "dscr": 2.01,
       "zip": "23503",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21200
     },
     {
@@ -8688,7 +8688,7 @@
       "mao70": 167555,
       "dscr": 1.83,
       "zip": "23707",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21620
     },
     {
@@ -8874,7 +8874,7 @@
       "mao70": 144894,
       "dscr": 1.92,
       "zip": "23225",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 18696
     },
     {
@@ -9061,7 +9061,7 @@
       "mao70": 245830,
       "dscr": 1.86,
       "zip": "23435",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 31720
     },
     {
@@ -9247,7 +9247,7 @@
       "mao70": 153450,
       "dscr": 1.02,
       "zip": "24013",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -9433,7 +9433,7 @@
       "mao70": 153450,
       "dscr": 1.53,
       "zip": "24017",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -9619,7 +9619,7 @@
       "mao70": 153450,
       "dscr": 1.36,
       "zip": "24017",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -9806,7 +9806,7 @@
       "mao70": 170500,
       "dscr": 1.56,
       "zip": "24258",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -9993,7 +9993,7 @@
       "mao70": 221650,
       "dscr": 1.79,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28600
     },
     {
@@ -10179,7 +10179,7 @@
       "mao70": 170500,
       "dscr": 1.26,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -10369,7 +10369,7 @@
       "mao70": 170500,
       "dscr": 1.65,
       "zip": "23970",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "REO/Bank-Owned",
       "rehabEstimate": 22000
     },
     {
@@ -10554,7 +10554,7 @@
       "mao70": 196075,
       "dscr": 1.64,
       "zip": "24201",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -10739,7 +10739,7 @@
       "mao70": 264275,
       "dscr": 1.62,
       "zip": "24326",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 34100
     },
     {
@@ -10924,7 +10924,7 @@
       "mao70": 170500,
       "dscr": 1.26,
       "zip": "23888",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -11111,7 +11111,7 @@
       "mao70": 148800,
       "dscr": 2.23,
       "zip": "23669",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19200
     },
     {
@@ -11298,7 +11298,7 @@
       "mao70": 205530,
       "dscr": 1.84,
       "zip": "23602",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26520
     },
     {
@@ -11485,7 +11485,7 @@
       "mao70": 129642,
       "dscr": 1.43,
       "zip": "23607",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 16728
     },
     {
@@ -11672,7 +11672,7 @@
       "mao70": 164300,
       "dscr": 1.78,
       "zip": "23504",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21200
     },
     {
@@ -11859,7 +11859,7 @@
       "mao70": 164300,
       "dscr": 1.35,
       "zip": "23523",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21200
     },
     {
@@ -12046,7 +12046,7 @@
       "mao70": 167555,
       "dscr": 2.11,
       "zip": "23703",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21620
     },
     {
@@ -12233,7 +12233,7 @@
       "mao70": 294190,
       "dscr": 1.38,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 37960
     },
     {
@@ -12420,7 +12420,7 @@
       "mao70": 226300,
       "dscr": 1.42,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29200
     },
     {
@@ -12607,7 +12607,7 @@
       "mao70": 226300,
       "dscr": 1.27,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29200
     },
     {
@@ -12793,7 +12793,7 @@
       "mao70": 564200,
       "dscr": 1.57,
       "zip": "22201",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 72800
     },
     {
@@ -12979,7 +12979,7 @@
       "mao70": 317130,
       "dscr": 1.52,
       "zip": "23112",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 40920
     },
     {
@@ -13165,7 +13165,7 @@
       "mao70": 167772,
       "dscr": 1.86,
       "zip": "23237",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21648
     },
     {
@@ -13350,7 +13350,7 @@
       "mao70": 218178,
       "dscr": 1.2,
       "zip": "22304",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28152
     },
     {
@@ -13536,7 +13536,7 @@
       "mao70": 133920,
       "dscr": 1.61,
       "zip": "23669",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 17280
     },
     {
@@ -13722,7 +13722,7 @@
       "mao70": 133920,
       "dscr": 1.68,
       "zip": "23666",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 17280
     },
     {
@@ -13908,7 +13908,7 @@
       "mao70": 201500,
       "dscr": 1.6,
       "zip": "23060",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -14094,7 +14094,7 @@
       "mao70": 153450,
       "dscr": 1.22,
       "zip": "22842",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -14281,7 +14281,7 @@
       "mao70": 196075,
       "dscr": 1.62,
       "zip": "24421",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -14468,7 +14468,7 @@
       "mao70": 196075,
       "dscr": 1.56,
       "zip": "22942",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -14654,7 +14654,7 @@
       "mao70": 221650,
       "dscr": 1.38,
       "zip": "24503",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28600
     },
     {
@@ -14840,7 +14840,7 @@
       "mao70": 164300,
       "dscr": 1.97,
       "zip": "23518",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21200
     },
     {
@@ -15026,7 +15026,7 @@
       "mao70": 145700,
       "dscr": 2.09,
       "zip": "23703",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 18800
     },
     {
@@ -15212,7 +15212,7 @@
       "mao70": 153450,
       "dscr": 0.82,
       "zip": "24112",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -15398,7 +15398,7 @@
       "mao70": 153450,
       "dscr": 1.97,
       "zip": "22508",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -15584,7 +15584,7 @@
       "mao70": 264275,
       "dscr": 0.93,
       "zip": "24594",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 34100
     },
     {
@@ -15771,7 +15771,7 @@
       "mao70": 148800,
       "dscr": 1.56,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19200
     },
     {
@@ -15958,7 +15958,7 @@
       "mao70": 148800,
       "dscr": 1.99,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19200
     },
     {
@@ -16145,7 +16145,7 @@
       "mao70": 170500,
       "dscr": 1.09,
       "zip": "24112",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -16332,7 +16332,7 @@
       "mao70": 218178,
       "dscr": 1.45,
       "zip": "22304",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28152
     },
     {
@@ -16519,7 +16519,7 @@
       "mao70": 196075,
       "dscr": 2.79,
       "zip": "22309",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -16706,7 +16706,7 @@
       "mao70": 257300,
       "dscr": 1.51,
       "zip": "22025",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 33200
     },
     {
@@ -16892,7 +16892,7 @@
       "mao70": 600625,
       "dscr": 1.58,
       "zip": "22042",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 77500
     },
     {
@@ -17079,7 +17079,7 @@
       "mao70": 170500,
       "dscr": 1.54,
       "zip": "24401",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -17265,7 +17265,7 @@
       "mao70": 213900,
       "dscr": 1.66,
       "zip": "23323",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 27600
     },
     {
@@ -17451,7 +17451,7 @@
       "mao70": 196075,
       "dscr": 1.75,
       "zip": "23188",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -17637,7 +17637,7 @@
       "mao70": 153450,
       "dscr": 1.73,
       "zip": "22503",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -17822,7 +17822,7 @@
       "mao70": 170500,
       "dscr": 2.1,
       "zip": "23185",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000,
       "yearBuilt": null
     },
@@ -18010,7 +18010,7 @@
       "mao70": 153450,
       "dscr": 1.38,
       "zip": "24151",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -18197,7 +18197,7 @@
       "mao70": 264275,
       "dscr": 1.51,
       "zip": "22655",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 34100
     },
     {
@@ -18382,7 +18382,7 @@
       "mao70": 170500,
       "dscr": 1.62,
       "zip": "24127",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -18568,7 +18568,7 @@
       "mao70": 334490,
       "dscr": 1.56,
       "zip": "20110",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 43160
     },
     {
@@ -18755,7 +18755,7 @@
       "mao70": 564200,
       "dscr": 1.88,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 72800
     },
     {
@@ -18942,7 +18942,7 @@
       "mao70": 196075,
       "dscr": 1.84,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -19129,7 +19129,7 @@
       "mao70": 153450,
       "dscr": 2.52,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -19316,7 +19316,7 @@
       "mao70": 205530,
       "dscr": 1.75,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26520
     },
     {
@@ -19503,7 +19503,7 @@
       "mao70": 145700,
       "dscr": 1.67,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 18800
     },
     {
@@ -19690,7 +19690,7 @@
       "mao70": 147870,
       "dscr": 1.76,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19080
     },
     {
@@ -19877,7 +19877,7 @@
       "mao70": 181350,
       "dscr": 1.6,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 23400
     },
     {
@@ -20064,7 +20064,7 @@
       "mao70": 59675,
       "dscr": 3.34,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 7700
     },
     {
@@ -20251,7 +20251,7 @@
       "mao70": 245830,
       "dscr": 1.87,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 31720
     },
     {
@@ -20438,7 +20438,7 @@
       "mao70": 213900,
       "dscr": 1.66,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 27600
     },
     {
@@ -20625,7 +20625,7 @@
       "mao70": 188945,
       "dscr": 1.92,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 24380
     },
     {
@@ -20812,7 +20812,7 @@
       "mao70": 196075,
       "dscr": 1.65,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -20998,7 +20998,7 @@
       "mao70": 145700,
       "dscr": 1.64,
       "zip": "23704",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 18800
     },
     {
@@ -21185,7 +21185,7 @@
       "mao70": 196075,
       "dscr": 1.24,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -21372,7 +21372,7 @@
       "mao70": 196075,
       "dscr": 1.66,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -21559,7 +21559,7 @@
       "mao70": 293105,
       "dscr": 1.64,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 37820
     },
     {
@@ -21746,7 +21746,7 @@
       "mao70": 230640,
       "dscr": 1.92,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29760
     },
     {
@@ -21933,7 +21933,7 @@
       "mao70": 148800,
       "dscr": 1.91,
       "zip": "23663",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19200
     },
     {
@@ -22120,7 +22120,7 @@
       "mao70": 257300,
       "dscr": 1.83,
       "zip": "20111",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 33200
     },
     {
@@ -22307,7 +22307,7 @@
       "mao70": 257300,
       "dscr": 1.23,
       "zip": "22172",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 33200
     },
     {
@@ -22494,7 +22494,7 @@
       "mao70": 158100,
       "dscr": 2.71,
       "zip": "23608",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 20400
     },
     {
@@ -22681,7 +22681,7 @@
       "mao70": 124775,
       "dscr": 1.4,
       "zip": "20165",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 16100
     },
     {
@@ -22868,7 +22868,7 @@
       "mao70": 170500,
       "dscr": 1.06,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -23054,7 +23054,7 @@
       "mao70": 170500,
       "dscr": 1.25,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -23241,7 +23241,7 @@
       "mao70": 92496,
       "dscr": 13.73,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 11935
     },
     {
@@ -23428,7 +23428,7 @@
       "mao70": 196075,
       "dscr": 3.7,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -23615,7 +23615,7 @@
       "mao70": 153450,
       "dscr": 1.08,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -23802,7 +23802,7 @@
       "mao70": 170500,
       "dscr": 2.61,
       "zip": "24015",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -23989,7 +23989,7 @@
       "mao70": 170500,
       "dscr": 5.0,
       "zip": "24014",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -24176,7 +24176,7 @@
       "mao70": 170500,
       "dscr": 1.46,
       "zip": "24315",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -24362,7 +24362,7 @@
       "mao70": 170500,
       "dscr": 2.95,
       "zip": "24175",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -24548,7 +24548,7 @@
       "mao70": 170500,
       "dscr": 5.79,
       "zip": "24136",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -24733,7 +24733,7 @@
       "mao70": 170500,
       "dscr": 2.77,
       "zip": "24175",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000,
       "yearBuilt": null
     },
@@ -24921,7 +24921,7 @@
       "mao70": 355880,
       "dscr": 2.96,
       "zip": "22204",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 45920
     },
     {
@@ -25108,7 +25108,7 @@
       "mao70": 201500,
       "dscr": 3.11,
       "zip": "23060",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -25295,7 +25295,7 @@
       "mao70": 201500,
       "dscr": 1.32,
       "zip": "23233",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -25482,7 +25482,7 @@
       "mao70": 201500,
       "dscr": 1.46,
       "zip": "23227",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 26000
     },
     {
@@ -25669,7 +25669,7 @@
       "mao70": 189100,
       "dscr": 1.28,
       "zip": "23434",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 24400
     },
     {
@@ -25856,7 +25856,7 @@
       "mao70": 226300,
       "dscr": 2.79,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29200
     },
     {
@@ -26041,7 +26041,7 @@
       "mao70": 185566,
       "dscr": 2.6,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 23944,
       "yearBuilt": null
     },
@@ -26229,7 +26229,7 @@
       "mao70": 145700,
       "dscr": 3.02,
       "zip": "23701",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 18800
     },
     {
@@ -26416,7 +26416,7 @@
       "mao70": 226300,
       "dscr": 2.38,
       "zip": "23453",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 29200
     },
     {
@@ -26603,7 +26603,7 @@
       "mao70": 189100,
       "dscr": 7.03,
       "zip": "23434",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 24400
     },
     {
@@ -26790,7 +26790,7 @@
       "mao70": 134726,
       "dscr": 2.07,
       "zip": "23504",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 17384
     },
     {
@@ -26977,7 +26977,7 @@
       "mao70": 257300,
       "dscr": 1.92,
       "zip": "20136",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 33200
     },
     {
@@ -27164,7 +27164,7 @@
       "mao70": 387500,
       "dscr": 1.75,
       "zip": "22153",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 50000
     },
     {
@@ -27351,7 +27351,7 @@
       "mao70": 170500,
       "dscr": 1.37,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -27538,7 +27538,7 @@
       "mao70": 170500,
       "dscr": 1.54,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 22000
     },
     {
@@ -27725,7 +27725,7 @@
       "mao70": 196075,
       "dscr": 1.14,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 25300
     },
     {
@@ -27912,7 +27912,7 @@
       "mao70": 153450,
       "dscr": 0.87,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -28099,7 +28099,7 @@
       "mao70": 217465,
       "dscr": 1.65,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28060
     },
     {
@@ -28286,7 +28286,7 @@
       "mao70": 217465,
       "dscr": 1.68,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 28060
     },
     {
@@ -28473,7 +28473,7 @@
       "mao70": 260245,
       "dscr": 1.37,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 33580
     },
     {
@@ -28660,7 +28660,7 @@
       "mao70": 245985,
       "dscr": 1.56,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 31740
     },
     {
@@ -28847,7 +28847,7 @@
       "mao70": 153450,
       "dscr": 2.49,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 19800
     },
     {
@@ -29034,7 +29034,7 @@
       "mao70": 131130,
       "dscr": 2.19,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 16920
     },
     {
@@ -29221,7 +29221,7 @@
       "mao70": 164300,
       "dscr": 1.85,
       "zip": "",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 21200
     },
     {
@@ -29408,7 +29408,7 @@
       "mao70": 387500,
       "dscr": 1.49,
       "zip": "20151",
-      "listingType": "Pre-Foreclosure",
+      "listingType": "Auction",
       "rehabEstimate": 50000
     }
   ]
