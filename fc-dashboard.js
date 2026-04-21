@@ -652,10 +652,14 @@
     const body = document.getElementById('fc-priority-body');
     if (!body) return;
     let props = (d.foreclosures || []).slice();
+    // Filter by listingType (matches the map legend). 'all' is pass-through.
+    // Legacy 'hud'/'trustee' values still work as aliases for back-compat.
     if (filter === 'hud') {
-      props = props.filter(p => p.source === 'HUD HomeStore');
+      props = props.filter(p => p.listingType === 'HUD Home');
     } else if (filter === 'trustee') {
-      props = props.filter(p => p.source !== 'HUD HomeStore');
+      props = props.filter(p => p.listingType === 'Auction');
+    } else if (filter && filter !== 'all') {
+      props = props.filter(p => p.listingType === filter);
     }
     // Sort by score descending, break ties by days_to_sale ascending (soonest first)
     props.sort((a, b) => {
@@ -1667,8 +1671,12 @@ Return ONLY the 2-sentence analysis.`,
                 <span class="fc-pill" id="fc-pq-count">—</span>
                 <div style="margin-left:auto;display:flex;gap:4px">
                   <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter active" data-filter="all">All</button>
-                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="hud">HUD</button>
-                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="trustee">Trustee</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="Auction">Auction</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="HUD Home">HUD</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="Distressed">Distressed</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="REO/Bank-Owned">REO</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="Pre-Foreclosure">Pre-FC</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="Short Sale">Short Sale</button>
                 </div>
               </div>
               <table class="fc-table" id="fc-priority-table">

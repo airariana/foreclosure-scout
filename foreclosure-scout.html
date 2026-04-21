@@ -2479,12 +2479,16 @@ async function callGemini(prompt, system){
   if(!key){ showKeyModal(); throw new Error('No Gemini API key set'); }
   const fullPrompt = system ? system + '\n\n' + prompt : prompt;
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+key;
+  // responseMimeType is left at the Gemini default (text/plain) — the
+  // AI-analysis and offer-letter prompts return natural language. Forcing
+  // application/json caused 400s on the 2.5-flash model when the prompt
+  // didn't specify a JSON schema.
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: "application/json" }
+      generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }
     })
   });
   if(!res.ok){
