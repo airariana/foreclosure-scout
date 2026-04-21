@@ -9,7 +9,7 @@ each scheduled run, one file per state.
 
 HUD data quality is significantly better than trustee-firm scrapes:
   - Actual list price (not estimated) → HIGH-confidence pricing
-  - Real beds / baths / sqft / year built (no RentCast needed for these)
+  - Real beds / baths / sqft / year built — no enrichment needed
   - FHA financing indicator ("IN (Insured)", "IE (Insured Escrow)", "UI (Uninsured)")
   - List date + bid deadline
 

@@ -30,13 +30,6 @@ jobs:
     - name: Run VA foreclosure scraper
       env:
         GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-        RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
-        # Hard kill-switch: prevent any RentCast API billing after the
-        # user's subscription was removed. Cache-only mode still applies
-        # already-cached enrichment to properties that were seen before,
-        # so the 227 existing enriched records keep their data. Flip to
-        # "0" (or remove) if the subscription is ever reinstated.
-        SKIP_RENTCAST: "1"
       run: |
         python3 scraper/va_foreclosure_scraper.py
 

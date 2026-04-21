@@ -196,16 +196,10 @@ def build_pricing(
     sqft: int | None = None,
     opening_bid: float | None = None,
     original_loan: float | None = None,
-    rent_override: float | None = None,
 ) -> dict:
     """
     Build the auction pricing estimate for a property.
     Returns a dict with eav, arv, confidence, and derived metrics.
-
-    `rent_override`: if supplied (from RentCast enrichment), use this as the
-    monthly rent instead of the 0.7%-of-ARV heuristic. Cash flow, cap rate,
-    and score all derive from this, so real rent data substantially improves
-    downstream accuracy.
     """
     # ── Tier 1: Direct price signal ─────────────────────────────────────────
     if opening_bid and opening_bid > 50_000:
@@ -240,20 +234,9 @@ def build_pricing(
             confidence = "LOW — County average only"
 
     # ── Derived financial metrics ───────────────────────────────────────────
-    # Real market rent from RentCast beats the 0.7%-of-ARV heuristic. If a
-    # rent override is supplied AND positive, use it directly and note that
-    # the monthly rent is market-validated in the confidence string.
-    if rent_override and rent_override > 0:
-        monthly_rent = float(rent_override)
-        confidence = confidence.replace(
-            "MEDIUM — Derived from county, type, and size",
-            "MEDIUM — County + type + size + RentCast rent",
-        ).replace(
-            "LOW — County average only",
-            "MEDIUM — County average + RentCast rent",
-        )
-    else:
-        monthly_rent = arv * 0.007
+    # Heuristic: 0.7%-of-ARV monthly rent. County-level averages are the most
+    # specific signal available without paid property-data enrichment.
+    monthly_rent = arv * 0.007
     mortgage_payment = eav * 0.006
     prop_tax = arv * 0.009 / 12
     insurance = arv * 0.005 / 12
@@ -323,7 +306,7 @@ def build_pricing(
         "opening_bid":          opening_bid,
         "original_loan":        original_loan,
         "monthly_rent_estimate": round(monthly_rent),
-        "rent_source":          "RentCast" if rent_override else "heuristic",
+        "rent_source":          "heuristic",
         "cash_flow_estimate":   round(cash_flow),
         "cap_rate":             round(cap_rate, 1),
         "discount_to_arv":      round(discount_to_arv, 1),
@@ -1267,7 +1250,6 @@ def geocode_missing(properties: list[dict], api_key: str) -> list[dict]:
 def run(gmaps_key: str = "") -> dict:
     import os
     api_key = gmaps_key or os.environ.get("GOOGLE_MAPS_API_KEY", "")
-    rentcast_key = os.environ.get("RENTCAST_API_KEY", "")
 
     # Scrape all sources
     all_props = []
@@ -1301,33 +1283,8 @@ def run(gmaps_key: str = "") -> dict:
     # Deduplicate
     all_props = deduplicate(all_props)
 
-    # Enrich with RentCast (beds/baths/sqft/yearBuilt + real rent estimate).
-    # Uses local cache so only NEW properties hit the API each week. Properties
-    # RentCast can't match go into a retry queue for next run. After enrichment,
-    # we rebuild the pricing object so real sqft upgrades LOW→MEDIUM confidence
-    # and real rent flows into cash flow / cap rate / score.
-    if rentcast_key:
-        from rentcast_enrich import enrich_properties
-        stats = enrich_properties(all_props, rentcast_key)
-        log.info(
-            f"RentCast: {stats['cache_hits']} cache hits, "
-            f"{stats['api_calls']} API calls, {stats['succeeded']} enriched, "
-            f"{stats['retried']} queued for retry, {stats['skipped']} skipped"
-        )
-        # Rebuild pricing for any property that got new sqft or rent data.
-        for p in all_props:
-            if p.get("_enriched"):
-                pr = p.get("pricing", {}) or {}
-                p["pricing"] = build_pricing(
-                    county=p.get("county", "Unknown County"),
-                    property_type=p.get("property_type", "Unknown"),
-                    sqft=p.get("sqft") or None,
-                    opening_bid=pr.get("opening_bid"),
-                    original_loan=pr.get("original_loan"),
-                    rent_override=p.get("_rent_override"),
-                )
-    else:
-        log.info("RentCast: RENTCAST_API_KEY not set — skipping enrichment")
+    # Pricing is derived purely from county + property type + size using the
+    # heuristic matrix in build_pricing(). No third-party enrichment layer.
 
     # Geocode
     if api_key:
@@ -1392,11 +1349,8 @@ def run(gmaps_key: str = "") -> dict:
         sources[s] = sources.get(s, 0) + 1
 
     counties = sorted({p["county"] for p in all_props if p["county"] != "Unknown County"})
-    enriched_count = sum(1 for p in all_props if p.get("_enriched"))
-    rent_sourced = sum(1 for p in all_props if p.get("pricing", {}).get("rent_source") == "RentCast")
 
-    # State breakdown — now that we cover VA + MD, surface the per-state counts
-    # so the frontend can show state filter chips with live counts.
+    # State breakdown so the frontend can show state filter chip counts.
     states = {}
     for p in all_props:
         st = (p.get("state") or "VA").upper()
@@ -1414,15 +1368,11 @@ def run(gmaps_key: str = "") -> dict:
                 "medium": med_conf,
                 "low":    low_conf,
             },
-            "enrichment": {
-                "rentcast_enriched":  enriched_count,
-                "market_rent_used":   rent_sourced,
-            },
             "pricing_note": (
                 "EAV (Estimated Auction Value) derived from county base values, "
                 "property type, and auction discount. "
                 "Confidence: HIGH = direct price signal from notice, "
-                "MEDIUM = derived from county + type + size (+ RentCast rent when available), "
+                "MEDIUM = derived from county + type + size, "
                 "LOW = county average only. Not a formal appraisal."
             ),
         },

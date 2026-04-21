@@ -298,27 +298,6 @@ header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-i
 .ep-row{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);margin-bottom:3px;}
 .ep-row span{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink);}
 
-/* Market Comparison */
-.market-comp{background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);border:1px solid var(--border);border-left:3px solid #e74c3c;border-radius:4px;padding:14px 16px;margin-bottom:12px;}
-.market-comp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.market-comp-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:var(--ink);display:flex;align-items:center;gap:8px;}
-.market-comp-source{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;background:#e74c3c;color:white;border-radius:2px;letter-spacing:0.5px;}
-.comp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
-.comp-cell{background:white;border:1px solid rgba(0,0,0,0.08);border-radius:3px;padding:10px;text-align:center;}
-.comp-val{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--ink);}
-.comp-val.savings{color:#27ae60;}
-.comp-val.higher{color:#e74c3c;}
-.comp-key{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:3px;}
-.comp-listings{margin-top:10px;max-height:200px;overflow-y:auto;}
-.comp-listing{background:white;border:1px solid rgba(0,0,0,0.08);border-radius:3px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;}
-.comp-listing:hover{border-color:var(--accent2);box-shadow:0 2px 6px rgba(0,0,0,0.06);}
-.comp-listing-addr{font-size:11px;font-weight:500;color:var(--ink);margin-bottom:2px;}
-.comp-listing-meta{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);}
-.comp-listing-price{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--ink);text-align:right;}
-.comp-listing-diff{font-family:'IBM Plex Mono',monospace;font-size:9px;color:#27ae60;text-align:right;}
-.comp-listing-link{font-size:9px;color:var(--accent2);text-decoration:none;margin-top:2px;display:inline-block;}
-.comp-listing-link:hover{text-decoration:underline;}
-
 .ai-box{background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:3px;padding:10px 12px;font-size:12px;line-height:1.7;color:var(--ink2);font-family:'IBM Plex Mono',monospace;}
 .ai-box.loading{display:flex;align-items:center;gap:10px;color:var(--muted);}
 .spinner{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;}
@@ -1891,7 +1870,7 @@ async function displayVAForeclosures() {
   
   // Convert VA foreclosures to your app's property format.
   // As of v2.1 the scraper produces real price, ARV, beds/baths/sqft/yearBuilt,
-  // RentCast market rent, cash flow, cap rate, score. Map those through
+  // heuristic market rent, cash flow, cap rate, score. Map those through
   // instead of using hardcoded defaults.
   const vaProperties = vaForeclosures.map(property => {
     // Skip if no coordinates
@@ -1922,7 +1901,7 @@ async function displayVAForeclosures() {
     const insurance   = Math.round(arv * 0.005);   // 0.5% of ARV / year
 
     const rentSourceRaw = property.pricing && property.pricing.rent_source;
-    const rentSource = rentSourceRaw === 'RentCast' ? 'RentCast ✓' : 'Estimated';
+    const rentSource = 'Estimated';
 
     return {
       id: id,
@@ -1962,7 +1941,7 @@ async function displayVAForeclosures() {
       cashLeft: cashLeft,
       coc: coc,
       isNew: false,
-      enriched: Boolean(property._enriched),
+      enriched: false,
       rentSource: rentSource,
       taxSource: 'Estimated',
       // Expose v2.1 extras for future features (rehab calculator, confidence UI, etc.)
@@ -2795,9 +2774,6 @@ async function openDrawer(p){
         ${ePanels.length?`<div class="enrich-panels">${ePanels.join('')}</div>`:''}
         <div class="ai-box loading" id="drawerAI"><div class="spinner"></div>Generating AI analysis...</div>
         
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:12px 0 8px;padding-top:12px;border-top:1px solid var(--border)">MARKET COMPARISON</div>
-        <div id="market-comp-${p.id}"></div>
-        
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:12px 0 8px;padding-top:12px;border-top:1px solid var(--border)">PROPERTY INTELLIGENCE</div>
         <div id="intel-${p.id}"><div class="data-loading"><div class="spinner"></div><span style="font-family:IBM Plex Mono,monospace;font-size:10px">Loading Street View · FEMA · Census · BLS...</span></div></div>
 
@@ -2841,151 +2817,6 @@ Return ONLY the 2-sentence analysis.`,'You are a seasoned real estate investor. 
     const el=document.getElementById('drawerAI');
     if(el){el.className='ai-box';el.textContent=analysis;}
   }catch(e){const el=document.getElementById('drawerAI');if(el){el.className='ai-box';el.textContent='Review metrics above for deal assessment.';}}
-  
-  // Load market comparison data
-  loadMarketComparison(p);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// Market Comparison — RentCast sale AVM + nearby comparable sales
-// ═══════════════════════════════════════════════════════════════════
-// Sale comps are fetched at scrape time (see scraper/rentcast_enrich.py)
-// and embedded in each property's JSON as `sale_comps` + `avm_value`.
-// This renderer is fully synchronous — no fetch, no proxy, no fallback data.
-
-function loadMarketComparison(property) {
-  const compId = `market-comp-${property.id}`;
-  const compEl = document.getElementById(compId);
-  if (!compEl) return;
-
-  const comps = Array.isArray(property.sale_comps) ? property.sale_comps : [];
-  if (!comps.length) {
-    compEl.innerHTML = `
-      <div class="market-comp">
-        <div class="market-comp-header">
-          <div class="market-comp-title"><span>📊 Market Comparison</span></div>
-          <div class="market-comp-source">RENTCAST AVM</div>
-        </div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);padding:14px;text-align:center">
-          No recent comparable sales available for this address.
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  const pricedComps = comps.filter(c => c.price);
-  const avgPrice = pricedComps.length
-    ? Math.round(pricedComps.reduce((s, c) => s + c.price, 0) / pricedComps.length)
-    : 0;
-  const sqftComps = comps.filter(c => c.price_per_sqft);
-  const avgPricePerSqft = sqftComps.length
-    ? Math.round(sqftComps.reduce((s, c) => s + c.price_per_sqft, 0) / sqftComps.length)
-    : 0;
-  const domComps = comps.filter(c => c.days_on_market != null);
-  const avgDOM = domComps.length
-    ? Math.round(domComps.reduce((s, c) => s + c.days_on_market, 0) / domComps.length)
-    : 0;
-
-  // Prefer the AVM estimate over the raw comp average for "market value" —
-  // it's what RentCast actually returned as the valuation for this address.
-  const marketValue = property.avm_value || avgPrice;
-  const savings = marketValue - property.price;
-  const savingsPercent = marketValue > 0 ? Math.round((savings / marketValue) * 100) : 0;
-  const foreclosurePricePerSqft = property.sqft ? Math.round(property.price / property.sqft) : 0;
-
-  const sortedComps = pricedComps.slice().sort((a, b) => a.price - b.price);
-  const listingsHTML = sortedComps.slice(0, 8).map(comp => {
-    const diff = comp.price - property.price;
-    const diffPercent = comp.price > 0 ? Math.round((diff / comp.price) * 100) : 0;
-    const distanceText = comp.distance != null ? `${comp.distance.toFixed(2)}mi` : 'nearby';
-    const beds  = comp.beds  ?? '—';
-    const baths = comp.baths ?? '—';
-    const sqft  = comp.sqft ? comp.sqft.toLocaleString() : '—';
-    const dom   = comp.days_on_market != null ? `${comp.days_on_market}d DOM` : '';
-    const yb    = comp.year_built ? ` · Built ${comp.year_built}` : '';
-
-    return `
-      <div class="comp-listing">
-        <div style="flex:1">
-          <div class="comp-listing-addr">${comp.address || 'Nearby sale'}</div>
-          <div class="comp-listing-meta">
-            ${beds}bd · ${baths}ba · ${sqft}sf · ${distanceText}${dom ? ' · ' + dom : ''}${yb}
-          </div>
-        </div>
-        <div style="text-align:right;min-width:120px">
-          <div class="comp-listing-price">$${comp.price.toLocaleString()}</div>
-          <div class="comp-listing-diff">${diff > 0 ? '+' : ''}$${Math.abs(diff).toLocaleString()} (${diffPercent > 0 ? '+' : ''}${diffPercent}%)</div>
-          ${comp.price_per_sqft ? `<div style="font-size:9px;color:var(--muted);margin-top:2px">$${comp.price_per_sqft}/sf</div>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const avmRangeText = (property.avm_range_low && property.avm_range_high)
-    ? ` (range $${property.avm_range_low.toLocaleString()}–$${property.avm_range_high.toLocaleString()})`
-    : '';
-
-  compEl.innerHTML = `
-    <div class="market-comp">
-      <div class="market-comp-header">
-        <div class="market-comp-title">
-          <span>📊 Market Comparison</span>
-        </div>
-        <div class="market-comp-source">RENTCAST AVM</div>
-      </div>
-
-      <div class="comp-grid">
-        <div class="comp-cell">
-          <div class="comp-val ${savings > 0 ? 'savings' : 'higher'}">
-            ${savings > 0 ? '-' : '+'}$${Math.abs(savings).toLocaleString()}
-          </div>
-          <div class="comp-key">${savings > 0 ? 'Below Market' : 'Above Market'} (${Math.abs(savingsPercent)}%)</div>
-        </div>
-        <div class="comp-cell">
-          <div class="comp-val">$${marketValue.toLocaleString()}</div>
-          <div class="comp-key">${property.avm_value ? 'AVM Estimate' : 'Avg Comp Price'}</div>
-        </div>
-        <div class="comp-cell">
-          <div class="comp-val">$${avgPricePerSqft}/sf</div>
-          <div class="comp-key">Market Price/SF</div>
-        </div>
-      </div>
-
-      <div class="comp-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
-        <div class="comp-cell">
-          <div class="comp-val" style="color:var(--ink2)">$${foreclosurePricePerSqft}/sf</div>
-          <div class="comp-key">Your Price/SF</div>
-        </div>
-        <div class="comp-cell">
-          <div class="comp-val" style="color:var(--ink2)">${avgDOM ? avgDOM + 'd' : '—'}</div>
-          <div class="comp-key">Avg Days on Market</div>
-        </div>
-        <div class="comp-cell">
-          <div class="comp-val" style="color:var(--ink2)">${comps.length}</div>
-          <div class="comp-key">Comparable Sales</div>
-        </div>
-      </div>
-
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:12px;padding:10px;background:${savings > 0 ? 'rgba(39,174,96,0.08)' : 'rgba(231,76,60,0.08)'};border-radius:3px;border-left:3px solid ${savings > 0 ? '#27ae60' : '#e74c3c'}">
-        ${savings > 0
-          ? `💡 This foreclosure is priced at <strong>$${foreclosurePricePerSqft}/sf</strong> vs market avg of <strong>$${avgPricePerSqft}/sf</strong> — potential <strong>${savingsPercent}%</strong> below market value.`
-          : `⚠️ This property is priced <strong>${Math.abs(savingsPercent)}%</strong> above the market estimate. Verify condition and location advantages.`
-        }
-        <br><br>
-        ${comps.length} RentCast comparable ${comps.length === 1 ? 'sale' : 'sales'} near this address${avmRangeText}.
-      </div>
-
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
-        <span>🏠 Comparable Recent Sales</span>
-        <span style="font-size:9px;color:var(--muted2)">RentCast AVM</span>
-      </div>
-
-      <div class="comp-listings">
-        ${listingsHTML}
-      </div>
-    </div>
-  `;
 }
 
 function closeDrawer(){

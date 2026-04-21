@@ -34,12 +34,10 @@ ARCGIS_URL = (
 # so we paginate with resultOffset.
 PAGE_SIZE = 2000
 
-# Cap the number of DC Vacant entries we include. Two reasons:
-#   1. RentCast budget — the Developer tier is 2K calls/mo; 2,400 DC Vacant
-#      would blow through it in one run. We skip RentCast for these records
-#      (see _skip_rentcast flag) but a cap is still a safety net.
-#   2. Map readability — 2,400 pins concentrated in DC is visual noise.
-# Override via DC_VACANT_LIMIT env var. Set to 0 for no cap.
+# Cap the number of DC Vacant entries we include. 2,400 pins concentrated
+# in DC makes the map unreadable at country-level zoom; 300 is still dense
+# enough to show the distress pattern in the hot wards. Override via
+# DC_VACANT_LIMIT env var. Set to 0 for no cap.
 DC_VACANT_LIMIT = int(os.environ.get("DC_VACANT_LIMIT", "300"))
 
 
@@ -47,7 +45,7 @@ def scrape_dc_vacant() -> list[dict]:
     """
     Fetch active vacant/blighted DC properties from the ArcGIS registry,
     capped at DC_VACANT_LIMIT. Returns property dicts matching the shared
-    v2.1 schema, flagged with _skip_rentcast so enrichment skips them.
+    v2.1 schema.
     """
     log.info("Scraping DC Vacant & Blighted registry ...")
     properties: list[dict] = []
@@ -157,10 +155,6 @@ def _build_property(feature: dict) -> dict | None:
         "status":           status or "Active",
         "scraped_at":       datetime.utcnow().isoformat() + "Z",
         "days_to_sale":     None,
-        # These are leads, not listings. RentCast would waste ~3 API calls
-        # per record (property/rent/avm) for enrichment data the user
-        # doesn't need to decide whether to pursue an owner outreach.
-        "_skip_rentcast":   True,
     }
 
 
