@@ -1473,7 +1473,18 @@ Return ONLY the 2-sentence analysis.`,
       ${kpiTile({
         label: 'Total Properties',
         value: totalCount.toLocaleString(),
-        delta: `${props.filter(p => p.source === 'HUD HomeStore').length} HUD + ${props.filter(p => p.source !== 'HUD HomeStore').length} Trustee`,
+        delta: (() => {
+          const hud = props.filter(p => p.listingType === 'HUD Home').length;
+          const trustee = props.filter(p => p.listingType === 'Auction').length;
+          const distressed = props.filter(p => p.listingType === 'Distressed').length;
+          const other = props.length - hud - trustee - distressed;
+          const parts = [];
+          if (hud)        parts.push(`${hud} HUD`);
+          if (trustee)    parts.push(`${trustee} Trustee`);
+          if (distressed) parts.push(`${distressed} Distressed`);
+          if (other)      parts.push(`${other} Other`);
+          return parts.join(' + ');
+        })(),
         deltaClass: 'muted',
         spark: sparkUp,
         sparkColor: 'var(--gold-deep)',
