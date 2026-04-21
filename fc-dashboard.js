@@ -51,7 +51,6 @@
   function buildShell() {
     if (document.getElementById('fc-dash-root')) return;
 
-    // Hide the existing mobile-frame wrapper on desktop.
     const mobileFrame = document.querySelector('.mobile-frame');
     if (mobileFrame) mobileFrame.style.display = 'none';
 
@@ -60,6 +59,33 @@
     root.className = 'fc-dash';
     root.innerHTML = SHELL_HTML;
     document.body.appendChild(root);
+
+    // Move the existing mobile-frame INSIDE fc-main → #fc-view-map. This
+    // sidesteps all stacking-context issues since the frame is now a child
+    // of the main pane; the sidebar and topbar stay visible naturally. The
+    // Google Maps component inside the frame keeps its initialization intact.
+    if (mobileFrame) {
+      const mapView = root.querySelector('#fc-view-map');
+      if (mapView) {
+        mapView.appendChild(mobileFrame);
+        // Strip the mobile-frame's phone-bezel chrome since it's now an
+        // embedded pane, not a standalone device mockup.
+        mobileFrame.style.cssText = [
+          'display: none',           // shown only when map view is active
+          'position: relative',
+          'width: 100%',
+          'max-width: none',
+          'min-width: 0',
+          'height: calc(100vh - 48px)',
+          'margin: 0',
+          'padding: 0',
+          'border-radius: 0',
+          'box-shadow: none',
+          'background: #FAF8F3',
+          'overflow: hidden',
+        ].join('; ') + ';';
+      }
+    }
 
     wireNav(root);
   }
@@ -97,53 +123,29 @@
     });
     // Toggle visibility of the existing mobile-frame (hosts Google Map) when
     // user picks Map — it becomes a full-width canvas.
-    const mobileFrame = document.querySelector('.mobile-frame');
-    const dashMain = document.querySelector('#fc-dash-root .fc-main');
+    // Show / hide views within fc-main. Map view is special: it shows the
+    // mobile-frame we relocated into #fc-view-map on init.
+    const mobileFrame = document.querySelector('#fc-view-map .mobile-frame');
     const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
-    if (view === 'map') {
-      if (mobileFrame) {
-        // Override all the mobile-frame's default chrome so it behaves as a
-        // full-pane canvas inside our 220px-sidebar + 48px-topbar layout.
-        // z-index stays BELOW the sidebar (25) and topbar (30) so they
-        // visually sit on top of the map edges if there's any overlap.
-        mobileFrame.style.cssText = [
-          'display: block',
-          'position: fixed',
-          'top: 48px',
-          'left: 220px',
-          'right: 0',
-          'bottom: 0',
-          'max-width: none',
-          'width: auto',
-          'height: auto',
-          'min-height: 0',
-          'border-radius: 0',
-          'box-shadow: none',
-          'margin: 0',
-          'padding: 0',
-          'background: #FAF8F3',
-          'z-index: 5',
-          'overflow: hidden',
-        ].join('; ') + ';';
-      }
-      if (appInner) {
-        appInner.style.cssText = [
-          'max-height: none',
-          'height: 100%',
-          'overflow: auto',
-        ].join('; ') + ';';
-      }
-      if (dashMain) dashMain.style.display = 'none';
-    } else {
-      if (mobileFrame) mobileFrame.style.display = 'none';
-      if (dashMain) dashMain.style.display = '';
-    }
 
-    // Show / hide view sections within fc-main
-    ['dashboard', 'listings', 'alerts', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+    ['dashboard', 'listings', 'map', 'alerts', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
       const el = document.getElementById(`fc-view-${v}`);
       if (el) el.style.display = (v === view) ? '' : 'none';
     });
+
+    // The mobile-frame inside #fc-view-map has its own display toggle so
+    // Google Maps doesn't get torn down on every view switch.
+    if (mobileFrame) {
+      mobileFrame.style.display = (view === 'map') ? 'block' : 'none';
+    }
+    if (appInner && view === 'map') {
+      appInner.style.cssText = [
+        'max-height: none',
+        'height: 100%',
+        'overflow: auto',
+        'position: relative',
+      ].join('; ') + ';';
+    }
 
     // Update page title + eyebrow per view
     const titles = {
@@ -879,6 +881,11 @@
             </div>
           </div>
 
+          <!-- Map view — the existing mobile-frame will be moved inside this
+               container on init so Google Maps keeps working but lives in the
+               natural layout flow under the topbar/sidebar. -->
+          <div id="fc-view-map" style="display:none; margin:-24px -32px"></div>
+
           <!-- Placeholder views -->
           ${['alerts', 'rehab', 'market', 'brrrr', 'settings'].map(v => `
             <div id="fc-view-${v}" style="display:none">
@@ -977,8 +984,6 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    position: relative;
-    z-index: 1;
   }
   #fc-dash-root.fc-dash * { box-sizing: border-box; }
   #fc-dash-root.fc-dash svg { flex-shrink: 0; }
@@ -990,8 +995,6 @@
     border-bottom: 1px solid var(--hair);
     background: var(--paper);
     flex-shrink: 0;
-    position: relative;
-    z-index: 30;
   }
   .fc-brand {
     display: flex; align-items: center; gap: 10px;
@@ -1064,8 +1067,6 @@
     background: var(--paper);
     display: flex; flex-direction: column;
     padding: 12px 0;
-    position: relative;
-    z-index: 25;
   }
   .fc-side-section { padding: 8px 10px; }
   .fc-side-label {
