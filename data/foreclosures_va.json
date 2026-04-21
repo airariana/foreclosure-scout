@@ -1,7 +1,7 @@
 {
   "metadata": {
     "total_properties": 160,
-    "scraped_at": "2026-04-21T04:54:43.352995Z",
+    "scraped_at": "2026-04-21T05:02:55.087813Z",
     "sources": {
       "Samuel I. White, P.C.": 43,
       "Orlans Law Group": 23,
@@ -69,7 +69,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536879Z",
+      "scraped_at": "2026-04-21T05:01:58.929359Z",
       "days_to_sale": 0,
       "lot_size": 2613,
       "_enriched": true,
@@ -139,7 +139,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.138052Z",
+      "scraped_at": "2026-04-21T05:02:03.697327Z",
       "days_to_sale": 0,
       "yearBuilt": 1975,
       "lot_size": 14985,
@@ -209,7 +209,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.855651Z",
+      "scraped_at": "2026-04-21T05:02:16.305799Z",
       "days_to_sale": 0,
       "_enriched": true,
       "_rent_override": 1820,
@@ -281,7 +281,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-07-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.034446Z",
+      "scraped_at": "2026-04-21T05:02:17.512163Z",
       "days_to_sale": 0,
       "yearBuilt": 1992,
       "lot_size": 331056,
@@ -354,7 +354,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-04-23",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.034640Z",
+      "scraped_at": "2026-04-21T05:02:17.512354Z",
       "days_to_sale": 0,
       "yearBuilt": 1996,
       "lot_size": 6534,
@@ -427,7 +427,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-18",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.034715Z",
+      "scraped_at": "2026-04-21T05:02:17.512429Z",
       "days_to_sale": 0,
       "yearBuilt": 2006,
       "lot_size": 43560,
@@ -500,7 +500,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-08-04",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.034787Z",
+      "scraped_at": "2026-04-21T05:02:17.512500Z",
       "days_to_sale": 0,
       "yearBuilt": 1961,
       "lot_size": 6098,
@@ -573,7 +573,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-06-20",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.034857Z",
+      "scraped_at": "2026-04-21T05:02:17.512569Z",
       "days_to_sale": 0,
       "yearBuilt": 1930,
       "lot_size": 21344,
@@ -646,7 +646,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-25",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.034927Z",
+      "scraped_at": "2026-04-21T05:02:17.512637Z",
       "days_to_sale": 0,
       "yearBuilt": 1900,
       "lot_size": 16779,
@@ -719,7 +719,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-04-21",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.034997Z",
+      "scraped_at": "2026-04-21T05:02:17.512705Z",
       "days_to_sale": 0,
       "yearBuilt": 2022,
       "lot_size": 87991,
@@ -792,7 +792,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-08-25",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035134Z",
+      "scraped_at": "2026-04-21T05:02:17.512840Z",
       "days_to_sale": 0,
       "yearBuilt": 1929,
       "lot_size": 8712,
@@ -865,7 +865,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-07",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035202Z",
+      "scraped_at": "2026-04-21T05:02:17.512907Z",
       "days_to_sale": 0,
       "yearBuilt": 1986,
       "lot_size": 416869,
@@ -938,7 +938,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-04-23",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035341Z",
+      "scraped_at": "2026-04-21T05:02:17.513039Z",
       "days_to_sale": 0,
       "yearBuilt": 1965,
       "lot_size": 13504,
@@ -1011,7 +1011,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-04",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035409Z",
+      "scraped_at": "2026-04-21T05:02:17.513106Z",
       "days_to_sale": 0,
       "yearBuilt": 2005,
       "lot_size": 871,
@@ -1084,7 +1084,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-06-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035477Z",
+      "scraped_at": "2026-04-21T05:02:17.513172Z",
       "days_to_sale": 0,
       "yearBuilt": 1978,
       "lot_size": 13499,
@@ -1157,7 +1157,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-08",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035566Z",
+      "scraped_at": "2026-04-21T05:02:17.513237Z",
       "days_to_sale": 0,
       "yearBuilt": 1964,
       "lot_size": 5001,
@@ -1230,7 +1230,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2999-12-31",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035642Z",
+      "scraped_at": "2026-04-21T05:02:17.513330Z",
       "days_to_sale": 0,
       "yearBuilt": 1954,
       "lot_size": 43560,
@@ -1303,7 +1303,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-07-31",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035711Z",
+      "scraped_at": "2026-04-21T05:02:17.513401Z",
       "days_to_sale": 0,
       "yearBuilt": 1970,
       "lot_size": 3999,
@@ -1376,7 +1376,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-06",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035777Z",
+      "scraped_at": "2026-04-21T05:02:17.513469Z",
       "days_to_sale": 0,
       "yearBuilt": 2005,
       "lot_size": 9932,
@@ -1449,7 +1449,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-08-16",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035842Z",
+      "scraped_at": "2026-04-21T05:02:17.513536Z",
       "days_to_sale": 0,
       "yearBuilt": 1970,
       "lot_size": 28750,
@@ -1522,7 +1522,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-08-02",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035909Z",
+      "scraped_at": "2026-04-21T05:02:17.513601Z",
       "days_to_sale": 0,
       "yearBuilt": 1946,
       "lot_size": 4600,
@@ -1595,7 +1595,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035975Z",
+      "scraped_at": "2026-04-21T05:02:17.513668Z",
       "days_to_sale": 0,
       "yearBuilt": 1934,
       "lot_size": 5842,
@@ -1668,7 +1668,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-06-27",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.036041Z",
+      "scraped_at": "2026-04-21T05:02:17.513735Z",
       "days_to_sale": 0,
       "yearBuilt": 1990,
       "lot_size": 4095,
@@ -1741,7 +1741,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.036173Z",
+      "scraped_at": "2026-04-21T05:02:17.513868Z",
       "days_to_sale": 0,
       "lot_size": 38419920,
       "_enriched": true,
@@ -1814,7 +1814,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-07-25",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.036239Z",
+      "scraped_at": "2026-04-21T05:02:17.513934Z",
       "days_to_sale": 0,
       "yearBuilt": 1960,
       "lot_size": 10890,
@@ -1887,7 +1887,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-04-21",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.036307Z",
+      "scraped_at": "2026-04-21T05:02:17.513999Z",
       "days_to_sale": 0,
       "yearBuilt": 1925,
       "lot_size": 4356,
@@ -1960,7 +1960,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-08-11",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.036373Z",
+      "scraped_at": "2026-04-21T05:02:17.514064Z",
       "days_to_sale": 0,
       "yearBuilt": 1966,
       "lot_size": 14810,
@@ -2033,7 +2033,7 @@
       "hud_bid_open": "2026-04-21",
       "hud_deadline": "2026-09-13",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.036439Z",
+      "scraped_at": "2026-04-21T05:02:17.514129Z",
       "days_to_sale": 0,
       "yearBuilt": 1972,
       "lot_size": 20909,
@@ -2102,7 +2102,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661170Z",
+      "scraped_at": "2026-04-21T05:01:59.053127Z",
       "days_to_sale": 1,
       "yearBuilt": 1977,
       "lot_size": 12455,
@@ -2171,7 +2171,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661218Z",
+      "scraped_at": "2026-04-21T05:01:59.053173Z",
       "days_to_sale": 1,
       "yearBuilt": 2018,
       "_enriched": true,
@@ -2239,7 +2239,7 @@
         "James City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767386Z",
+      "scraped_at": "2026-04-21T05:01:59.158478Z",
       "days_to_sale": 1,
       "yearBuilt": 2022,
       "lot_size": 7318,
@@ -2308,7 +2308,7 @@
         "York County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.814547Z",
+      "scraped_at": "2026-04-21T05:01:59.205090Z",
       "days_to_sale": 1,
       "yearBuilt": 1987,
       "lot_size": 1786,
@@ -2378,7 +2378,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.152142Z",
+      "scraped_at": "2026-04-21T05:02:03.711714Z",
       "days_to_sale": 1,
       "yearBuilt": 1985,
       "lot_size": 14923,
@@ -2448,7 +2448,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.855825Z",
+      "scraped_at": "2026-04-21T05:02:16.305995Z",
       "days_to_sale": 1,
       "yearBuilt": 1958,
       "lot_size": 14948,
@@ -2518,7 +2518,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.855979Z",
+      "scraped_at": "2026-04-21T05:02:16.306153Z",
       "days_to_sale": 2,
       "yearBuilt": 1991,
       "lot_size": 29534,
@@ -2588,7 +2588,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.165923Z",
+      "scraped_at": "2026-04-21T05:02:03.725620Z",
       "days_to_sale": 3,
       "yearBuilt": 1925,
       "lot_size": 5188,
@@ -2661,7 +2661,7 @@
       "hud_bid_open": "2026-04-24",
       "hud_deadline": "2026-04-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.034556Z",
+      "scraped_at": "2026-04-21T05:02:17.512250Z",
       "days_to_sale": 3,
       "yearBuilt": 1979,
       "lot_size": 2356,
@@ -2734,7 +2734,7 @@
       "hud_bid_open": "2026-04-24",
       "hud_deadline": "2026-04-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.035066Z",
+      "scraped_at": "2026-04-21T05:02:17.512773Z",
       "days_to_sale": 3,
       "yearBuilt": 1976,
       "lot_size": 2774,
@@ -2803,7 +2803,7 @@
         "Buchanan County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536487Z",
+      "scraped_at": "2026-04-21T05:01:58.928976Z",
       "days_to_sale": 6,
       "yearBuilt": 1960,
       "lot_size": 5532120,
@@ -2871,7 +2871,7 @@
         "Wise County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.768031Z",
+      "scraped_at": "2026-04-21T05:01:59.159054Z",
       "days_to_sale": 6,
       "_enriched": true,
       "latitude": 36.8765248,
@@ -2942,7 +2942,7 @@
       "hud_bid_open": "2026-04-27",
       "hud_deadline": "2026-04-29",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-21T04:54:00.035273Z",
+      "scraped_at": "2026-04-21T05:02:17.512974Z",
       "days_to_sale": 6,
       "yearBuilt": 1996,
       "lot_size": 19602,
@@ -3011,7 +3011,7 @@
         "Petersburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660593Z",
+      "scraped_at": "2026-04-21T05:01:59.052539Z",
       "days_to_sale": 7,
       "yearBuilt": 1956,
       "lot_size": 17498,
@@ -3080,7 +3080,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767767Z",
+      "scraped_at": "2026-04-21T05:01:59.158794Z",
       "days_to_sale": 7,
       "yearBuilt": 1971,
       "lot_size": 20865,
@@ -3149,7 +3149,7 @@
         "Spotsylvania County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767927Z",
+      "scraped_at": "2026-04-21T05:01:59.158950Z",
       "days_to_sale": 7,
       "yearBuilt": 1997,
       "lot_size": 18960,
@@ -3218,7 +3218,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660381Z",
+      "scraped_at": "2026-04-21T05:01:59.052342Z",
       "days_to_sale": 8,
       "yearBuilt": 1915,
       "lot_size": 10341,
@@ -3287,7 +3287,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660453Z",
+      "scraped_at": "2026-04-21T05:01:59.052420Z",
       "days_to_sale": 8,
       "yearBuilt": 1942,
       "lot_size": 8616,
@@ -3356,7 +3356,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660652Z",
+      "scraped_at": "2026-04-21T05:01:59.052597Z",
       "days_to_sale": 8,
       "yearBuilt": 1934,
       "lot_size": 14723,
@@ -3425,7 +3425,7 @@
         "Richmond City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660803Z",
+      "scraped_at": "2026-04-21T05:01:59.052754Z",
       "days_to_sale": 8,
       "yearBuilt": 1950,
       "lot_size": 7852,
@@ -3495,7 +3495,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.215568Z",
+      "scraped_at": "2026-04-21T05:02:03.775468Z",
       "days_to_sale": 8,
       "yearBuilt": 2011,
       "lot_size": 25700,
@@ -3564,7 +3564,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660856Z",
+      "scraped_at": "2026-04-21T05:01:59.052808Z",
       "days_to_sale": 9,
       "yearBuilt": 1900,
       "lot_size": 4369,
@@ -3633,7 +3633,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660904Z",
+      "scraped_at": "2026-04-21T05:01:59.052855Z",
       "days_to_sale": 9,
       "yearBuilt": 1960,
       "lot_size": 16826,
@@ -3702,7 +3702,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660952Z",
+      "scraped_at": "2026-04-21T05:01:59.052901Z",
       "days_to_sale": 9,
       "yearBuilt": 1956,
       "lot_size": 6416,
@@ -3772,7 +3772,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.221895Z",
+      "scraped_at": "2026-04-21T05:02:03.782093Z",
       "days_to_sale": 9,
       "yearBuilt": 1992,
       "lot_size": 876863,
@@ -3842,7 +3842,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.856113Z",
+      "scraped_at": "2026-04-21T05:02:16.306311Z",
       "days_to_sale": 9,
       "yearBuilt": 1983,
       "lot_size": 47045,
@@ -3912,7 +3912,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.856245Z",
+      "scraped_at": "2026-04-21T05:02:16.306450Z",
       "days_to_sale": 9,
       "yearBuilt": 1970,
       "_enriched": true,
@@ -3984,7 +3984,7 @@
       "hud_bid_open": "2026-04-30",
       "hud_deadline": "2026-05-04",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-21T04:54:00.036107Z",
+      "scraped_at": "2026-04-21T05:02:17.513802Z",
       "days_to_sale": 9,
       "yearBuilt": 1995,
       "lot_size": 55000,
@@ -4053,7 +4053,7 @@
         "Bristol City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536770Z",
+      "scraped_at": "2026-04-21T05:01:58.929218Z",
       "days_to_sale": 13,
       "yearBuilt": 1941,
       "_enriched": true,
@@ -4121,7 +4121,7 @@
         "Grayson County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661114Z",
+      "scraped_at": "2026-04-21T05:01:59.053070Z",
       "days_to_sale": 13,
       "yearBuilt": 1861,
       "lot_size": 1524600,
@@ -4189,7 +4189,7 @@
         "Sussex County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767978Z",
+      "scraped_at": "2026-04-21T05:01:59.159001Z",
       "days_to_sale": 13,
       "yearBuilt": 1965,
       "_enriched": true,
@@ -4258,7 +4258,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.233173Z",
+      "scraped_at": "2026-04-21T05:02:03.793657Z",
       "days_to_sale": 13,
       "yearBuilt": 1953,
       "lot_size": 7501,
@@ -4328,7 +4328,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.236380Z",
+      "scraped_at": "2026-04-21T05:02:03.796921Z",
       "days_to_sale": 13,
       "yearBuilt": 2000,
       "lot_size": 14375,
@@ -4398,7 +4398,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.239716Z",
+      "scraped_at": "2026-04-21T05:02:03.800314Z",
       "days_to_sale": 13,
       "yearBuilt": 1930,
       "lot_size": 2614,
@@ -4468,7 +4468,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.249510Z",
+      "scraped_at": "2026-04-21T05:02:03.810020Z",
       "days_to_sale": 13,
       "yearBuilt": 1974,
       "lot_size": 5266,
@@ -4538,7 +4538,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.252826Z",
+      "scraped_at": "2026-04-21T05:02:03.813320Z",
       "days_to_sale": 13,
       "yearBuilt": 1910,
       "lot_size": 5227,
@@ -4608,7 +4608,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.256369Z",
+      "scraped_at": "2026-04-21T05:02:03.816695Z",
       "days_to_sale": 13,
       "yearBuilt": 1995,
       "lot_size": 10019,
@@ -4678,7 +4678,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.259719Z",
+      "scraped_at": "2026-04-21T05:02:03.819979Z",
       "days_to_sale": 13,
       "yearBuilt": 2006,
       "lot_size": 5002,
@@ -4748,7 +4748,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.263084Z",
+      "scraped_at": "2026-04-21T05:02:03.823364Z",
       "days_to_sale": 13,
       "yearBuilt": 1974,
       "lot_size": 2280,
@@ -4818,7 +4818,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.266305Z",
+      "scraped_at": "2026-04-21T05:02:03.826648Z",
       "days_to_sale": 13,
       "yearBuilt": 1981,
       "lot_size": 9039,
@@ -4887,7 +4887,7 @@
         "Arlington County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536158Z",
+      "scraped_at": "2026-04-21T05:01:58.928655Z",
       "days_to_sale": 14,
       "yearBuilt": 1998,
       "lot_size": 7380,
@@ -4956,7 +4956,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536587Z",
+      "scraped_at": "2026-04-21T05:01:58.929048Z",
       "days_to_sale": 14,
       "yearBuilt": 2021,
       "lot_size": 15163,
@@ -5025,7 +5025,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536653Z",
+      "scraped_at": "2026-04-21T05:01:58.929103Z",
       "days_to_sale": 14,
       "yearBuilt": 2005,
       "lot_size": 28750,
@@ -5094,7 +5094,7 @@
         "Alexandria City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536713Z",
+      "scraped_at": "2026-04-21T05:01:58.929162Z",
       "days_to_sale": 14,
       "yearBuilt": 1965,
       "_enriched": true,
@@ -5162,7 +5162,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536928Z",
+      "scraped_at": "2026-04-21T05:01:58.929410Z",
       "days_to_sale": 14,
       "yearBuilt": 1988,
       "lot_size": 1947,
@@ -5231,7 +5231,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536977Z",
+      "scraped_at": "2026-04-21T05:01:58.929458Z",
       "days_to_sale": 14,
       "yearBuilt": 1986,
       "lot_size": 1440,
@@ -5300,7 +5300,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661266Z",
+      "scraped_at": "2026-04-21T05:01:59.053227Z",
       "days_to_sale": 14,
       "yearBuilt": 1993,
       "lot_size": 11781,
@@ -5369,7 +5369,7 @@
         "Shenandoah County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767874Z",
+      "scraped_at": "2026-04-21T05:01:59.158899Z",
       "days_to_sale": 14,
       "yearBuilt": 1956,
       "lot_size": 7013,
@@ -5439,7 +5439,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.275892Z",
+      "scraped_at": "2026-04-21T05:02:03.837924Z",
       "days_to_sale": 14,
       "yearBuilt": 1909,
       "lot_size": 53579,
@@ -5509,7 +5509,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.283883Z",
+      "scraped_at": "2026-04-21T05:02:03.844332Z",
       "days_to_sale": 14,
       "yearBuilt": 2002,
       "lot_size": 137911,
@@ -5578,7 +5578,7 @@
         "Lynchburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.537083Z",
+      "scraped_at": "2026-04-21T05:01:58.929562Z",
       "days_to_sale": 15,
       "yearBuilt": 1954,
       "lot_size": 33816,
@@ -5647,7 +5647,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660509Z",
+      "scraped_at": "2026-04-21T05:01:59.052477Z",
       "days_to_sale": 15,
       "yearBuilt": 1955,
       "lot_size": 7745,
@@ -5716,7 +5716,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660702Z",
+      "scraped_at": "2026-04-21T05:01:59.052653Z",
       "days_to_sale": 15,
       "yearBuilt": 2001,
       "lot_size": 3920,
@@ -5785,7 +5785,7 @@
         "Martinsville City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.537136Z",
+      "scraped_at": "2026-04-21T05:01:58.929615Z",
       "days_to_sale": 16,
       "yearBuilt": 1941,
       "lot_size": 13242,
@@ -5854,7 +5854,7 @@
         "Orange County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767653Z",
+      "scraped_at": "2026-04-21T05:01:59.158686Z",
       "days_to_sale": 16,
       "yearBuilt": 1994,
       "lot_size": 265498,
@@ -5923,7 +5923,7 @@
         "Pittsylvania County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767711Z",
+      "scraped_at": "2026-04-21T05:01:59.158741Z",
       "days_to_sale": 16,
       "yearBuilt": 2006,
       "lot_size": 186001,
@@ -5993,7 +5993,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.856390Z",
+      "scraped_at": "2026-04-21T05:02:16.306587Z",
       "days_to_sale": 16,
       "yearBuilt": 1964,
       "lot_size": 6377,
@@ -6063,7 +6063,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.856522Z",
+      "scraped_at": "2026-04-21T05:02:16.306720Z",
       "days_to_sale": 16,
       "yearBuilt": 1973,
       "lot_size": 9100,
@@ -6133,7 +6133,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.410654Z",
+      "scraped_at": "2026-04-21T05:02:03.966894Z",
       "days_to_sale": 17,
       "yearBuilt": 1950,
       "lot_size": 22651,
@@ -6203,7 +6203,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.421731Z",
+      "scraped_at": "2026-04-21T05:02:03.976986Z",
       "days_to_sale": 20,
       "yearBuilt": 1980,
       "lot_size": 1062,
@@ -6273,7 +6273,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.428466Z",
+      "scraped_at": "2026-04-21T05:02:03.983672Z",
       "days_to_sale": 20,
       "yearBuilt": 1958,
       "lot_size": 25520,
@@ -6343,7 +6343,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.431783Z",
+      "scraped_at": "2026-04-21T05:02:03.987072Z",
       "days_to_sale": 20,
       "yearBuilt": 1995,
       "lot_size": 1516,
@@ -6412,7 +6412,7 @@
         "Fairfax County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661061Z",
+      "scraped_at": "2026-04-21T05:01:59.053018Z",
       "days_to_sale": 21,
       "yearBuilt": 2015,
       "lot_size": 18208,
@@ -6482,7 +6482,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.475166Z",
+      "scraped_at": "2026-04-21T05:02:04.030879Z",
       "days_to_sale": 21,
       "yearBuilt": 1976,
       "lot_size": 12848,
@@ -6551,7 +6551,7 @@
         "Chesapeake City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.536825Z",
+      "scraped_at": "2026-04-21T05:01:58.929272Z",
       "days_to_sale": 22,
       "yearBuilt": 1971,
       "lot_size": 7492,
@@ -6620,7 +6620,7 @@
         "James City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767455Z",
+      "scraped_at": "2026-04-21T05:01:59.158548Z",
       "days_to_sale": 22,
       "yearBuilt": 1960,
       "lot_size": 36634,
@@ -6689,7 +6689,7 @@
         "Lancaster County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767573Z",
+      "scraped_at": "2026-04-21T05:01:59.158621Z",
       "days_to_sale": 22,
       "yearBuilt": 1974,
       "lot_size": 46522,
@@ -6758,7 +6758,7 @@
         "York County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.814625Z",
+      "scraped_at": "2026-04-21T05:01:59.205157Z",
       "days_to_sale": 22,
       "lot_size": 88427,
       "_enriched": true,
@@ -6828,7 +6828,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.478323Z",
+      "scraped_at": "2026-04-21T05:02:04.034174Z",
       "days_to_sale": 23,
       "yearBuilt": 1973,
       "lot_size": 20189,
@@ -6898,7 +6898,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:48.489308Z",
+      "scraped_at": "2026-04-21T05:02:04.045590Z",
       "days_to_sale": 24,
       "yearBuilt": 2005,
       "lot_size": 12197,
@@ -6967,7 +6967,7 @@
         "Craig County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.661005Z",
+      "scraped_at": "2026-04-21T05:01:59.052963Z",
       "days_to_sale": 27,
       "yearBuilt": 1998,
       "lot_size": 217800,
@@ -7035,7 +7035,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.767818Z",
+      "scraped_at": "2026-04-21T05:01:59.158842Z",
       "days_to_sale": 28,
       "yearBuilt": 1965,
       "lot_size": 15614,
@@ -7105,7 +7105,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.857473Z",
+      "scraped_at": "2026-04-21T05:02:16.307619Z",
       "days_to_sale": 29,
       "yearBuilt": 1950,
       "lot_size": 6348,
@@ -7175,7 +7175,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.857649Z",
+      "scraped_at": "2026-04-21T05:02:16.307762Z",
       "days_to_sale": 29,
       "yearBuilt": 1987,
       "lot_size": 21301,
@@ -7245,7 +7245,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.857784Z",
+      "scraped_at": "2026-04-21T05:02:16.307896Z",
       "days_to_sale": 29,
       "yearBuilt": 1974,
       "lot_size": 1400,
@@ -7315,7 +7315,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.857916Z",
+      "scraped_at": "2026-04-21T05:02:16.308029Z",
       "days_to_sale": 30,
       "yearBuilt": 2007,
       "lot_size": 7623,
@@ -7385,7 +7385,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858047Z",
+      "scraped_at": "2026-04-21T05:02:16.308162Z",
       "days_to_sale": 30,
       "yearBuilt": 1955,
       "lot_size": 8712,
@@ -7455,7 +7455,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858178Z",
+      "scraped_at": "2026-04-21T05:02:16.308333Z",
       "days_to_sale": 30,
       "yearBuilt": 1954,
       "lot_size": 7170,
@@ -7525,7 +7525,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858308Z",
+      "scraped_at": "2026-04-21T05:02:16.308477Z",
       "days_to_sale": 31,
       "yearBuilt": 1981,
       "lot_size": 10000,
@@ -7595,7 +7595,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858436Z",
+      "scraped_at": "2026-04-21T05:02:16.308610Z",
       "days_to_sale": 42,
       "yearBuilt": 1904,
       "lot_size": 5214,
@@ -7665,7 +7665,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858592Z",
+      "scraped_at": "2026-04-21T05:02:16.308742Z",
       "days_to_sale": 45,
       "yearBuilt": 1993,
       "lot_size": 16117,
@@ -7735,7 +7735,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858725Z",
+      "scraped_at": "2026-04-21T05:02:16.308872Z",
       "days_to_sale": 45,
       "yearBuilt": 1966,
       "lot_size": 9235,
@@ -7805,7 +7805,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858852Z",
+      "scraped_at": "2026-04-21T05:02:16.309000Z",
       "days_to_sale": 45,
       "yearBuilt": 2011,
       "lot_size": 5985,
@@ -7874,7 +7874,7 @@
         "Hopewell City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.537030Z",
+      "scraped_at": "2026-04-21T05:01:58.929511Z",
       "days_to_sale": 49,
       "yearBuilt": 1968,
       "lot_size": 6000,
@@ -7944,7 +7944,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.858979Z",
+      "scraped_at": "2026-04-21T05:02:16.309127Z",
       "days_to_sale": 49,
       "yearBuilt": 2003,
       "lot_size": 34848,
@@ -8013,7 +8013,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:41.660750Z",
+      "scraped_at": "2026-04-21T05:01:59.052701Z",
       "days_to_sale": 51,
       "yearBuilt": 1957,
       "lot_size": 7405,
@@ -8083,7 +8083,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859106Z",
+      "scraped_at": "2026-04-21T05:02:16.309254Z",
       "days_to_sale": 56,
       "yearBuilt": 1927,
       "lot_size": 11391,
@@ -8153,7 +8153,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859232Z",
+      "scraped_at": "2026-04-21T05:02:16.309405Z",
       "days_to_sale": 56,
       "yearBuilt": 1961,
       "lot_size": 45846,
@@ -8223,7 +8223,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859357Z",
+      "scraped_at": "2026-04-21T05:02:16.309533Z",
       "days_to_sale": 62,
       "yearBuilt": 1987,
       "lot_size": 152024,
@@ -8293,7 +8293,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859483Z",
+      "scraped_at": "2026-04-21T05:02:16.309660Z",
       "days_to_sale": 62,
       "yearBuilt": 1996,
       "lot_size": 6874,
@@ -8363,7 +8363,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.490414Z",
+      "scraped_at": "2026-04-21T05:02:13.937916Z",
       "days_to_sale": 64,
       "yearBuilt": 1964,
       "lot_size": 22011,
@@ -8433,7 +8433,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.493711Z",
+      "scraped_at": "2026-04-21T05:02:13.941322Z",
       "days_to_sale": 64,
       "yearBuilt": 2009,
       "lot_size": 11021,
@@ -8503,7 +8503,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.497019Z",
+      "scraped_at": "2026-04-21T05:02:13.944584Z",
       "days_to_sale": 64,
       "yearBuilt": 1960,
       "lot_size": 9148,
@@ -8573,7 +8573,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.500512Z",
+      "scraped_at": "2026-04-21T05:02:13.948029Z",
       "days_to_sale": 64,
       "yearBuilt": 1972,
       "lot_size": 10454,
@@ -8643,7 +8643,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.503728Z",
+      "scraped_at": "2026-04-21T05:02:13.951607Z",
       "days_to_sale": 64,
       "yearBuilt": 1994,
       "lot_size": 2614,
@@ -8713,7 +8713,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.506819Z",
+      "scraped_at": "2026-04-21T05:02:13.954843Z",
       "days_to_sale": 64,
       "yearBuilt": 1920,
       "lot_size": 4792,
@@ -8783,7 +8783,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.509934Z",
+      "scraped_at": "2026-04-21T05:02:13.958478Z",
       "days_to_sale": 64,
       "yearBuilt": 1954,
       "lot_size": 12197,
@@ -8853,7 +8853,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.513171Z",
+      "scraped_at": "2026-04-21T05:02:13.961669Z",
       "days_to_sale": 64,
       "yearBuilt": 1956,
       "lot_size": 7100,
@@ -8923,7 +8923,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.516337Z",
+      "scraped_at": "2026-04-21T05:02:13.964917Z",
       "days_to_sale": 64,
       "yearBuilt": 1960,
       "lot_size": 12197,
@@ -8993,7 +8993,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.519462Z",
+      "scraped_at": "2026-04-21T05:02:13.968088Z",
       "days_to_sale": 64,
       "yearBuilt": 2006,
       "lot_size": 6970,
@@ -9063,7 +9063,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859642Z",
+      "scraped_at": "2026-04-21T05:02:16.309788Z",
       "days_to_sale": 64,
       "yearBuilt": 1972,
       "lot_size": 52272,
@@ -9133,7 +9133,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859772Z",
+      "scraped_at": "2026-04-21T05:02:16.309915Z",
       "days_to_sale": 64,
       "yearBuilt": 2022,
       "_enriched": true,
@@ -9202,7 +9202,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.859897Z",
+      "scraped_at": "2026-04-21T05:02:16.310050Z",
       "days_to_sale": 64,
       "yearBuilt": 2024,
       "lot_size": 18013,
@@ -9272,7 +9272,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860021Z",
+      "scraped_at": "2026-04-21T05:02:16.310177Z",
       "days_to_sale": 64,
       "yearBuilt": 2006,
       "lot_size": 1384,
@@ -9342,7 +9342,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860145Z",
+      "scraped_at": "2026-04-21T05:02:16.310326Z",
       "days_to_sale": 64,
       "yearBuilt": 1983,
       "lot_size": 17219,
@@ -9412,7 +9412,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.465220Z",
+      "scraped_at": "2026-04-21T05:02:13.906701Z",
       "days_to_sale": 65,
       "yearBuilt": 1950,
       "lot_size": 8716,
@@ -9482,7 +9482,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.476989Z",
+      "scraped_at": "2026-04-21T05:02:13.918079Z",
       "days_to_sale": 65,
       "yearBuilt": 1993,
       "lot_size": 728193,
@@ -9552,7 +9552,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.480510Z",
+      "scraped_at": "2026-04-21T05:02:13.927746Z",
       "days_to_sale": 65,
       "yearBuilt": 1962,
       "_enriched": true,
@@ -9621,7 +9621,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.483832Z",
+      "scraped_at": "2026-04-21T05:02:13.931265Z",
       "days_to_sale": 65,
       "yearBuilt": 1976,
       "_enriched": true,
@@ -9690,7 +9690,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.487153Z",
+      "scraped_at": "2026-04-21T05:02:13.934566Z",
       "days_to_sale": 65,
       "_enriched": true,
       "_rent_override": 2160,
@@ -9759,7 +9759,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.454042Z",
+      "scraped_at": "2026-04-21T05:02:13.896744Z",
       "days_to_sale": 66,
       "yearBuilt": 1950,
       "lot_size": 3002,
@@ -9829,7 +9829,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.433716Z",
+      "scraped_at": "2026-04-21T05:02:13.881357Z",
       "days_to_sale": 69,
       "yearBuilt": 1999,
       "lot_size": 53867,
@@ -9899,7 +9899,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.444864Z",
+      "scraped_at": "2026-04-21T05:02:13.887870Z",
       "days_to_sale": 69,
       "yearBuilt": 1974,
       "lot_size": 100722,
@@ -9969,7 +9969,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.423244Z",
+      "scraped_at": "2026-04-21T05:02:13.871052Z",
       "days_to_sale": 70,
       "yearBuilt": 2010,
       "lot_size": 5227,
@@ -10039,7 +10039,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.426944Z",
+      "scraped_at": "2026-04-21T05:02:13.874729Z",
       "days_to_sale": 70,
       "_enriched": true,
       "_rent_override": 1720,
@@ -10108,7 +10108,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.430298Z",
+      "scraped_at": "2026-04-21T05:02:13.878058Z",
       "days_to_sale": 70,
       "yearBuilt": 1985,
       "lot_size": 5591,
@@ -10178,7 +10178,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.437143Z",
+      "scraped_at": "2026-04-21T05:02:13.884604Z",
       "days_to_sale": 70,
       "yearBuilt": 1986,
       "lot_size": 2500,
@@ -10248,7 +10248,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.411361Z",
+      "scraped_at": "2026-04-21T05:02:13.859753Z",
       "days_to_sale": 71,
       "yearBuilt": 1901,
       "lot_size": 430891,
@@ -10318,7 +10318,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.418972Z",
+      "scraped_at": "2026-04-21T05:02:13.866880Z",
       "days_to_sale": 71,
       "yearBuilt": 1979,
       "lot_size": 1742,
@@ -10388,7 +10388,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860271Z",
+      "scraped_at": "2026-04-21T05:02:16.310458Z",
       "days_to_sale": 71,
       "yearBuilt": 1995,
       "lot_size": 58806,
@@ -10458,7 +10458,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860396Z",
+      "scraped_at": "2026-04-21T05:02:16.310584Z",
       "days_to_sale": 71,
       "yearBuilt": 1991,
       "lot_size": 74923,
@@ -10528,7 +10528,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860545Z",
+      "scraped_at": "2026-04-21T05:02:16.310709Z",
       "days_to_sale": 72,
       "yearBuilt": 1970,
       "lot_size": 14810,
@@ -10598,7 +10598,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860681Z",
+      "scraped_at": "2026-04-21T05:02:16.310835Z",
       "days_to_sale": 72,
       "yearBuilt": 1934,
       "lot_size": 33106,
@@ -10668,7 +10668,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860815Z",
+      "scraped_at": "2026-04-21T05:02:16.310960Z",
       "days_to_sale": 78,
       "yearBuilt": 2018,
       "lot_size": 6970,
@@ -10738,7 +10738,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.860939Z",
+      "scraped_at": "2026-04-21T05:02:16.311091Z",
       "days_to_sale": 78,
       "yearBuilt": 2015,
       "lot_size": 6534,
@@ -10808,7 +10808,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861065Z",
+      "scraped_at": "2026-04-21T05:02:16.311221Z",
       "days_to_sale": 78,
       "yearBuilt": 1994,
       "lot_size": 10005,
@@ -10878,7 +10878,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861198Z",
+      "scraped_at": "2026-04-21T05:02:16.311378Z",
       "days_to_sale": 78,
       "yearBuilt": 1972,
       "lot_size": 17685,
@@ -10948,7 +10948,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861325Z",
+      "scraped_at": "2026-04-21T05:02:16.311509Z",
       "days_to_sale": 78,
       "yearBuilt": 1993,
       "lot_size": 4879,
@@ -11018,7 +11018,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861459Z",
+      "scraped_at": "2026-04-21T05:02:16.311636Z",
       "days_to_sale": 78,
       "yearBuilt": 1963,
       "lot_size": 10054,
@@ -11088,7 +11088,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861618Z",
+      "scraped_at": "2026-04-21T05:02:16.311767Z",
       "days_to_sale": 78,
       "yearBuilt": 1941,
       "lot_size": 5663,
@@ -11158,7 +11158,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:58.861747Z",
+      "scraped_at": "2026-04-21T05:02:16.311896Z",
       "days_to_sale": 78,
       "yearBuilt": 1912,
       "lot_size": 2862,
@@ -11228,7 +11228,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-21T04:53:56.415161Z",
+      "scraped_at": "2026-04-21T05:02:13.863307Z",
       "days_to_sale": 85,
       "yearBuilt": 2000,
       "lot_size": 897,
