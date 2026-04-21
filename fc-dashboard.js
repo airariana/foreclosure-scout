@@ -671,7 +671,7 @@
     });
     const top = props.slice(0, 8);
     if (top.length === 0) {
-      body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">No properties match.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">No properties match.</td></tr>`;
       return;
     }
     body.innerHTML = top.map(p => {
@@ -687,6 +687,7 @@
             <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(sourceTag)}</div>
           </td>
+          <td>${typePill(p.listingType)}</td>
           <td><span class="fc-pill ink">${escapeHtml((p.status || 'Active').slice(0, 14))}</span></td>
           <td>${gradeBadge(p.grade)}</td>
           <td style="text-align:right">${rule70Pill(p)}</td>
@@ -1700,6 +1701,7 @@ Return ONLY the 2-sentence analysis.`,
                   <tr>
                     <th style="width:28px"></th>
                     <th>Property / source</th>
+                    <th>Type</th>
                     <th>Status</th>
                     <th style="text-align:center">Grade</th>
                     <th style="text-align:right">70% Rule</th>
@@ -1708,7 +1710,7 @@ Return ONLY the 2-sentence analysis.`,
                   </tr>
                 </thead>
                 <tbody id="fc-priority-body">
-                  <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr>
+                  <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
