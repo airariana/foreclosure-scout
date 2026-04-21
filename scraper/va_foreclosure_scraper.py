@@ -231,7 +231,21 @@ def build_pricing(
 
     discount_to_arv = ((1 - eav / arv) * 100) if arv > 0 else 0
 
-    # ── Investment score (0–100) ────────────────────────────────────────────
+    # ── 70% Rule ────────────────────────────────────────────────────────────
+    # Industry-standard investor benchmark (BiggerPockets, Rocket Mortgage,
+    # DealCheck all use it). MAO = ARV × 0.70 − rehab estimate. A property
+    # "passes" if its list price is at or below MAO.
+    rehab_assumed = round(arv * 0.08)  # 8% of ARV is the scraper's default rehab guess
+    mao_70        = round(arv * 0.70 - rehab_assumed)
+    gap_to_mao    = round(eav - mao_70)  # negative = deal, positive = overpay
+    passes_70     = eav > 0 and eav <= mao_70
+
+    # ── DSCR (Debt Service Coverage Ratio) ──────────────────────────────────
+    # DSCR ≥ 1.0 means rent covers mortgage; ≥ 1.25 is institutional-grade
+    # BRRRR-ready. 2026 DSCR lenders use this for refi qualification.
+    dscr = round(monthly_rent / mortgage_payment, 2) if mortgage_payment > 0 else 0
+
+    # ── Investment score (0–100) with red-flag subtractors ──────────────────
     score = 0
     score += min(30, discount_to_arv * 1.2)
     score += min(25, max(0, cap_rate * 3))
@@ -246,6 +260,25 @@ def build_pricing(
         score += 10
     elif "MEDIUM" in confidence:
         score += 5
+    # Bonuses / penalties from the research-based signals
+    if passes_70:
+        score += 5   # bonus: clears the gold-standard flip benchmark
+    if dscr >= 1.25:
+        score += 5   # bonus: institutional-grade BRRRR refi candidate
+    elif dscr < 1.0 and dscr > 0:
+        score -= 5   # penalty: can't refi cleanly, negative leverage
+    if not sqft:
+        score -= 5   # penalty: can't comp without sqft
+
+    score = max(0, min(100, round(score)))
+
+    # ── Letter grade for investor glance-ability ────────────────────────────
+    # Matches FlipperForce / Rehab Valuator convention.
+    if score >= 90:   grade = "A+"
+    elif score >= 80: grade = "A"
+    elif score >= 70: grade = "B"
+    elif score >= 60: grade = "C"
+    else:             grade = "D"
 
     return {
         "eav":                  round(eav),
@@ -260,7 +293,12 @@ def build_pricing(
         "cash_flow_estimate":   round(cash_flow),
         "cap_rate":             round(cap_rate, 1),
         "discount_to_arv":      round(discount_to_arv, 1),
-        "score":                min(100, round(score)),
+        "mao_70":               mao_70,
+        "gap_to_mao":           gap_to_mao,
+        "passes_70_rule":       passes_70,
+        "dscr":                 dscr,
+        "score":                score,
+        "grade":                grade,
     }
 
 
@@ -1239,6 +1277,10 @@ def run(gmaps_key: str = "") -> dict:
         p["cashFlow"]       = pr.get("cash_flow_estimate") or 0
         p["capRate"]        = pr.get("cap_rate") or 0
         p["score"]          = pr.get("score") or 0
+        p["grade"]          = pr.get("grade") or "D"
+        p["passes70"]       = pr.get("passes_70_rule") or False
+        p["mao70"]          = pr.get("mao_70") or 0
+        p["dscr"]           = pr.get("dscr") or 0
         p["zip"]            = p.get("zip_code") or ""
         # Trustee sales are classified as "Pre-Foreclosure" in the UI's type filter.
         p["listingType"]    = p.get("listingType") or "Pre-Foreclosure"

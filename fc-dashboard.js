@@ -238,8 +238,6 @@
       const days = p.days_to_sale;
       const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
       const saleUrgent = days != null && days >= 0 && days <= 3;
-      const discount = (p.arv && p.price && p.arv > p.price) ? Math.round((1 - p.price / p.arv) * 100) : null;
-      const scoreColor = (p.score || 0) >= 75 ? 'var(--sage)' : (p.score || 0) >= 60 ? 'var(--gold-ink)' : 'var(--muted)';
       return `
         <tr>
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
@@ -249,12 +247,13 @@
           </td>
           <td style="font-size:12px;color:var(--ink-3)">${escapeHtml(p.county || '—')}</td>
           <td><span class="fc-pill">${escapeHtml(sourceTag)}</span></td>
-          <td class="fc-mono" style="font-size:12px">${p.beds || 0}bd/${p.baths || 0}ba</td>
+          <td class="fc-mono" style="font-size:12px">${p.beds || 0}/${p.baths || 0}</td>
           <td style="text-align:right" class="fc-mono">${(p.sqft || 0).toLocaleString()}</td>
           <td style="text-align:right" class="fc-mono" style="font-weight:500">$${Math.round((p.price || 0)/1000)}K</td>
           <td style="text-align:right" class="fc-mono">$${Math.round((p.arv || 0)/1000)}K</td>
-          <td style="text-align:right" class="fc-mono" style="color:${discount >= 25 ? 'var(--sage)' : 'var(--muted)'}">${discount == null ? '—' : discount + '%'}</td>
-          <td style="text-align:right"><span class="fc-mono" style="color:${scoreColor};font-weight:600">${p.score || 0}</span></td>
+          <td style="text-align:right" class="fc-mono" style="color:var(--ink-3)">$${Math.round((p.mao70 || 0)/1000)}K</td>
+          <td style="text-align:center">${gradeBadge(p.grade)}</td>
+          <td style="text-align:right">${rule70Pill(p)}</td>
           <td style="text-align:right">
             <div class="fc-mono" style="color:${saleUrgent ? 'var(--coral)' : 'var(--ink)'}">${saleLabel}</div>
           </td>
@@ -412,15 +411,11 @@
       return;
     }
     body.innerHTML = top.map(p => {
-      const conf = (p.pricing && p.pricing.confidence) || '';
-      const confTier = conf.split('—')[0].trim();
-      const confClass = confTier === 'HIGH' ? 'gold' : confTier === 'MEDIUM' ? 'sky' : '';
       const sourceTag = p.source === 'HUD HomeStore' ? 'HUD' : (p.source || '').split(' ')[0] || 'VA';
       const days = p.days_to_sale;
       const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
       const saleUrgent = days != null && days >= 0 && days <= 3;
       const initials = (p.city || p.address || '??').slice(0, 2).toUpperCase();
-      const scoreColor = (p.score || 0) >= 75 ? 'var(--sage)' : (p.score || 0) >= 60 ? 'var(--gold-ink)' : 'var(--muted)';
       return `
         <tr>
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
@@ -429,8 +424,8 @@
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(sourceTag)}</div>
           </td>
           <td><span class="fc-pill ink">${escapeHtml((p.status || 'Active').slice(0, 14))}</span></td>
-          <td>${confClass ? `<span class="fc-pill ${confClass}">${escapeHtml(confTier)}</span>` : `<span class="fc-pill">${escapeHtml(confTier || '—')}</span>`}</td>
-          <td style="text-align:right"><span class="fc-mono" style="color:${scoreColor};font-weight:600">${p.score || 0}</span></td>
+          <td>${gradeBadge(p.grade)}</td>
+          <td style="text-align:right">${rule70Pill(p)}</td>
           <td style="text-align:right">
             <div class="fc-mono" style="color:${saleUrgent ? 'var(--coral)' : 'var(--ink)'}">${saleLabel}</div>
             <div class="fc-mono" style="font-size:10px;color:var(--muted)">${escapeHtml(p.sale_date || '')}</div>
@@ -539,6 +534,32 @@
   function escapeHtml(s) {
     if (s == null) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ─── Deal-quality badge helpers ─────────────────────────────────────────
+  // Letter grade badge (A+/A/B/C/D) with color coding — FlipperForce convention
+  function gradeBadge(grade) {
+    const g = grade || 'D';
+    const colors = {
+      'A+': { bg: 'var(--sage-soft)',  fg: 'var(--sage)',     bd: 'var(--sage)' },
+      'A':  { bg: 'var(--sage-soft)',  fg: 'var(--sage)',     bd: 'transparent' },
+      'B':  { bg: 'var(--gold-soft)',  fg: 'var(--gold-ink)', bd: 'transparent' },
+      'C':  { bg: 'var(--paper-2)',   fg: 'var(--ink-3)',    bd: 'var(--hair)'  },
+      'D':  { bg: 'var(--coral-soft)', fg: 'var(--coral)',    bd: 'transparent' },
+    };
+    const c = colors[g] || colors.D;
+    return `<span class="fc-grade" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${escapeHtml(g)}</span>`;
+  }
+
+  // 70% Rule status pill — "Passes" in sage if below MAO, or "$+15K over" if over
+  function rule70Pill(p) {
+    if (!p.arv || !p.price) return `<span class="fc-mono" style="font-size:11px;color:var(--muted)">—</span>`;
+    const gap = p.price - (p.mao70 || 0);
+    if (gap <= 0) {
+      const under = Math.abs(gap);
+      return `<span class="fc-pill sage" title="Clears 70% rule (MAO $${(p.mao70/1000).toFixed(0)}K)">✓ $${Math.round(under/1000)}K under</span>`;
+    }
+    return `<span class="fc-pill coral" title="Over MAO of $${(p.mao70/1000).toFixed(0)}K">$${Math.round(gap/1000)}K over</span>`;
   }
 
   function updateSubline(d) {
@@ -801,8 +822,8 @@
                     <th style="width:28px"></th>
                     <th>Property / source</th>
                     <th>Status</th>
-                    <th>Confidence</th>
-                    <th style="text-align:right">Score</th>
+                    <th style="text-align:center">Grade</th>
+                    <th style="text-align:right">70% Rule</th>
                     <th style="text-align:right">Sale</th>
                     <th></th>
                   </tr>
@@ -867,12 +888,13 @@
                     <th>Address</th>
                     <th>County</th>
                     <th>Source</th>
-                    <th>Beds/Baths</th>
+                    <th>Bd/Ba</th>
                     <th style="text-align:right">Sqft</th>
                     <th style="text-align:right">Price</th>
                     <th style="text-align:right">ARV</th>
-                    <th style="text-align:right">Disc</th>
-                    <th style="text-align:right">Score</th>
+                    <th style="text-align:right">MAO 70%</th>
+                    <th style="text-align:center">Grade</th>
+                    <th style="text-align:right">70% Rule</th>
                     <th style="text-align:right">Sale</th>
                   </tr>
                 </thead>
@@ -1238,6 +1260,17 @@
     font-size: 11px; color: var(--muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 240px;
+  }
+
+  /* ─── Letter grade badge ─── */
+  .fc-grade {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--f-serif); font-weight: 700;
+    font-size: 14px; letter-spacing: -0.02em;
+    min-width: 32px; height: 28px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
   }
 
   /* ─── Hot counties rows ─── */

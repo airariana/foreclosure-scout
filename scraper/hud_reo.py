@@ -172,6 +172,31 @@ def _build_property(row: tuple, idx: dict) -> dict | None:
     noi_annual            = (monthly_rent_estimate - prop_tax - insurance - vacancy) * 12
     cap_rate              = round((noi_annual / list_price * 100), 1) if list_price else 0
 
+    # 70% rule + DSCR for HUD (same benchmarks as trustee sources)
+    rehab_assumed = int(round(arv_estimate * 0.08))
+    mao_70 = int(round(arv_estimate * 0.70 - rehab_assumed)) if arv_estimate else 0
+    gap_to_mao = int((list_price or 0) - mao_70)
+    passes_70 = bool(list_price) and list_price <= mao_70
+    dscr = round(monthly_rent_estimate / mortgage_monthly, 2) if mortgage_monthly > 0 else 0
+
+    score = _compute_score(list_price, arv_estimate, cash_flow, cap_rate, county)
+    # Apply the same research-based bonuses/penalties as main scraper
+    if passes_70:
+        score += 5
+    if dscr >= 1.25:
+        score += 5
+    elif dscr < 1.0 and dscr > 0:
+        score -= 5
+    if not sqft:
+        score -= 5
+    score = max(0, min(100, score))
+
+    if score >= 90:   grade = "A+"
+    elif score >= 80: grade = "A"
+    elif score >= 70: grade = "B"
+    elif score >= 60: grade = "C"
+    else:             grade = "D"
+
     pricing = {
         "eav":                     list_price or 0,
         "arv":                     arv_estimate,
@@ -185,7 +210,12 @@ def _build_property(row: tuple, idx: dict) -> dict | None:
         "cash_flow_estimate":      cash_flow,
         "cap_rate":                cap_rate,
         "discount_to_arv":         round((1 - list_price / arv_estimate) * 100, 1) if list_price and arv_estimate else 0,
-        "score":                   _compute_score(list_price, arv_estimate, cash_flow, cap_rate, county),
+        "mao_70":                  mao_70,
+        "gap_to_mao":              gap_to_mao,
+        "passes_70_rule":          passes_70,
+        "dscr":                    dscr,
+        "score":                   score,
+        "grade":                   grade,
     }
 
     tags = ["VA Foreclosure", "HUD REO"]
