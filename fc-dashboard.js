@@ -635,6 +635,57 @@
     // JS API (avoids needing Street View Static API or Maps Embed API as
     // separate activations).
     initDrawerMedia(p);
+
+    // Kick off async sections — AI analysis, property intel, offer letter.
+    // All three call global functions defined in foreclosure-scout.html's
+    // main <script>; they fail gracefully if any API key is missing.
+    initDrawerAsyncSections(p);
+  }
+
+  async function initDrawerAsyncSections(p) {
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+
+    // AI analysis (Gemini 2-sentence opportunity/risk)
+    const aiEl = document.getElementById(`fc-drawer-ai-${sanitizedId}`);
+    if (aiEl && typeof window.callGemini === 'function') {
+      const cf    = p.cashFlow || 0;
+      const cfStr = (cf >= 0 ? '+' : '') + '$' + cf.toLocaleString();
+      const rn    = p.rentSource === 'HUD FMR' ? 'Rent validated by HUD Fair Market Rent. ' : '';
+      const tags  = Array.isArray(p.tags) ? p.tags.join(', ') : '';
+      try {
+        const analysis = await window.callGemini(
+          `2 sentences only. One biggest opportunity, one biggest risk for this DC/MD/VA foreclosure. Be specific.
+${p.address}, ${p.city} ${p.state} | ${p.listingType || 'Trustee Sale'} via ${p.source}
+Price: $${(p.price || 0).toLocaleString()} | ARV: $${(p.arv || 0).toLocaleString()} | Rehab: $${(p.rehabEstimate || 0).toLocaleString()}
+Cash Flow: ${cfStr}/mo | Cap Rate: ${p.capRate || 0}% | Score: ${p.score || 0}/100
+${rn}Tags: ${tags}
+Return ONLY the 2-sentence analysis.`,
+          'You are a seasoned real estate investor. Direct, specific, concise. No labels, no preamble.'
+        );
+        aiEl.className = 'ai-box';
+        aiEl.textContent = analysis;
+      } catch (e) {
+        aiEl.className = 'ai-box';
+        aiEl.textContent = 'AI analysis unavailable. Review the metrics above for deal assessment.';
+      }
+    }
+
+    // Property intelligence (Street View + FEMA + Census + BLS)
+    if (typeof window.loadPropertyIntelligence === 'function') {
+      try {
+        await window.loadPropertyIntelligence(p, `fc-drawer-intel-${sanitizedId}`);
+      } catch (e) {
+        const intelEl = document.getElementById(`fc-drawer-intel-${sanitizedId}`);
+        if (intelEl) intelEl.innerHTML = '<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--muted);padding:10px">Property intelligence unavailable.</div>';
+      }
+    }
+
+    // Offer letter (Gemini-drafted)
+    if (typeof window.generateOfferLetter === 'function') {
+      try {
+        await window.generateOfferLetter(p);
+      } catch (e) { /* generateOfferLetter handles its own failure state */ }
+    }
   }
 
   function initDrawerMedia(p) {
@@ -892,6 +943,21 @@
 
         ${marketComparisonSection(p)}
 
+        ${section('AI analysis', `
+          <div class="ai-box loading" id="fc-drawer-ai-${sanitizedId}">
+            <div class="spinner"></div>Generating AI analysis...
+          </div>
+        `)}
+
+        ${section('Property intelligence', `
+          <div id="fc-drawer-intel-${sanitizedId}">
+            <div class="data-loading">
+              <div class="spinner"></div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">Loading Street View · FEMA · Census · BLS...</span>
+            </div>
+          </div>
+        `)}
+
         ${section('Property details', `
           ${kvRow('Beds / Baths', `${p.beds || 0}bd / ${p.baths || 0}ba`)}
           ${kvRow('Square Footage', (p.sqft || 0).toLocaleString() + ' sf')}
@@ -930,17 +996,46 @@
           ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">HUD.gov detail page has interior photos, condition notes, disclosures, and the bid submission form.</div>' : ''}
         `)}
 
+        ${section('Mortgage calculator', `
+          <div class="calc-section">
+            <div class="calc-row">
+              <div class="calc-field"><span class="calc-label">Purchase Price ($)</span>
+                <input class="calc-input" id="calc-price-${p.id}" type="number" value="${p.price || 0}" oninput="recalcMortgage('${p.id}')"></div>
+              <div class="calc-field"><span class="calc-label">Down Payment (%)</span>
+                <input class="calc-input" id="calc-down-${p.id}" type="number" value="25" min="3" max="100" oninput="recalcMortgage('${p.id}')"></div>
+              <div class="calc-field"><span class="calc-label">Interest Rate (%)</span>
+                <input class="calc-input" id="calc-rate-${p.id}" type="number" value="7.0" step="0.1" oninput="recalcMortgage('${p.id}')"></div>
+              <div class="calc-field"><span class="calc-label">Monthly Rent ($)</span>
+                <input class="calc-input" id="calc-rent-${p.id}" type="number" value="${p.monthlyRent || 0}" oninput="recalcMortgage('${p.id}')"></div>
+            </div>
+            <div class="calc-result" id="calc-result-${p.id}">
+              <div><div class="cr-val ${(p.cashFlow || 0) >= 300 ? 'pos' : (p.cashFlow || 0) < 0 ? 'neg' : 'neu'}" id="cr-cf-${p.id}">${(p.cashFlow || 0) >= 0 ? '+$' : '−$'}${Math.abs(p.cashFlow || 0).toLocaleString()}</div><div class="cr-key">Cash Flow/mo</div></div>
+              <div><div class="cr-val neu" id="cr-pi-${p.id}">${p.monthlyPI ? '$' + p.monthlyPI.toLocaleString() : '—'}</div><div class="cr-key">P&I Payment</div></div>
+              <div><div class="cr-val neu" id="cr-cap-${p.id}">${p.capRate || 0}%</div><div class="cr-key">Cap Rate</div></div>
+            </div>
+          </div>
+        `)}
+
+        ${section('Offer letter generator', `
+          <div class="offer-box loading" id="offer-${p.id}">
+            <div class="spinner"></div>Generating offer letter...
+          </div>
+          <div class="offer-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="offer-btn offer-btn-copy" onclick="copyOffer('${p.id}')">Copy Letter</button>
+            <button class="offer-btn offer-btn-regen" onclick="regenOffer('${p.id}')">↻ Regenerate</button>
+            <button class="offer-btn" style="background:rgba(45,106,79,0.1);color:var(--green);border-color:rgba(45,106,79,0.3)"
+                    onclick="toggleSaveDeal('${p.id}');this.textContent=isSaved('${p.id}')?'★ Saved':'☆ Save Deal'">
+              ${typeof isSaved === 'function' && isSaved(p.id) ? '★ Saved' : '☆ Save Deal'}
+            </button>
+          </div>
+        `)}
+
         ${section(`Closing playbook — ${playbook.title}`, `
           <ol class="fc-playbook">
             ${playbook.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
           </ol>
           <div class="fc-playbook-note">${escapeHtml(playbook.notes)}</div>
         `)}
-
-        <div class="fc-drawer-actions">
-          <button class="fc-btn fc-btn-dark" style="flex:1">Add to Watchlist</button>
-          <button class="fc-btn" style="flex:1">Open Calculator</button>
-        </div>
       </div>
     `;
   }
