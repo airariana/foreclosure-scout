@@ -630,6 +630,79 @@
       backdrop.classList.add('open');
       drawer.classList.add('open');
     });
+
+    // Initialize the embedded Google Map using the already-loaded JS API
+    // (avoids needing Maps Embed API as a separate activation).
+    initDrawerMap(p);
+  }
+
+  function initDrawerMap(p) {
+    if (!window.google || !window.google.maps) {
+      // JS Maps API not ready yet — retry briefly, then give up silently.
+      let retries = 10;
+      const waitForMaps = setInterval(() => {
+        if (window.google && window.google.maps) {
+          clearInterval(waitForMaps);
+          initDrawerMap(p);
+        } else if (--retries <= 0) {
+          clearInterval(waitForMaps);
+          console.warn('[FC Drawer] Google Maps JS API never loaded');
+        }
+      }, 200);
+      return;
+    }
+    const mapDivId = `fc-drawer-map-${(p.id || 'x').replace(/[^a-z0-9]/gi, '')}`;
+    const el = document.getElementById(mapDivId);
+    if (!el) return;
+
+    // Prefer lat/lng from the scraper; fall back to geocoding the address
+    // via the existing Geocoder if coordinates are missing.
+    const hasCoords = p.lat && p.lng && (typeof p.lat === 'number') && (typeof p.lng === 'number');
+    const gold = 'oklch(0.72 0.13 85)';
+
+    const render = (lat, lng) => {
+      const map = new google.maps.Map(el, {
+        center: { lat, lng },
+        zoom: 16,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
+      });
+      new google.maps.Marker({
+        position: { lat, lng },
+        map,
+        title: p.address,
+        icon: {
+          path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+          fillColor: '#D4A93A',
+          fillOpacity: 1,
+          strokeColor: '#0E1728',
+          strokeWeight: 1.5,
+          scale: 1.6,
+          anchor: new google.maps.Point(12, 22),
+        },
+      });
+    };
+
+    if (hasCoords) {
+      render(p.lat, p.lng);
+    } else {
+      const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+      try {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: fullAddress }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            render(loc.lat(), loc.lng());
+          } else {
+            el.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">Map unavailable for this address.</div>`;
+          }
+        });
+      } catch (e) {
+        el.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">Map unavailable.</div>`;
+      }
+    }
   }
 
   function closePropertyDrawer() {
@@ -661,9 +734,11 @@
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
     const encAddr = encodeURIComponent(fullAddress);
     const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=520x220&location=${encAddr}&fov=80&source=outdoor&key=${GMAPS_KEY}&return_error_codes=true`;
-    // Interactive Google Maps embed (iframe) — panning, zoom, and satellite
-    // are built in, no JS API bootstrapping needed.
-    const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GMAPS_KEY}&q=${encAddr}&zoom=16&maptype=roadmap`;
+    // Interactive Google Maps — rendered via the JS API that's already
+    // loaded and working in the main app (avoids needing a separate Maps
+    // Embed API activation). Unique container ID per render so multiple
+    // drawer opens don't collide.
+    const mapDivId = `fc-drawer-map-${(p.id || 'x').replace(/[^a-z0-9]/gi, '')}`;
 
     // External listing + photo search links. Zillow/Redfin/Realtor.com all
     // prohibit direct scraping in their T&Cs but their search URL pattern
@@ -733,12 +808,7 @@
         </div>
 
         <div class="fc-drawer-map-wrap">
-          <iframe
-            src="${escapeAttr(mapEmbedUrl)}"
-            class="fc-map-embed"
-            loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade"
-            allowfullscreen></iframe>
+          <div id="${escapeAttr(mapDivId)}" class="fc-map-embed"></div>
         </div>
 
         <div class="fc-drawer-media-actions">
