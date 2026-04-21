@@ -4,6 +4,7 @@ RentCast property enrichment for Foreclosure Scout.
 For each scraped property, looks up:
   - beds, baths, sqft, year_built, lot_size (via /v1/properties)
   - monthly rent estimate (via /v1/avm/rent/long-term)
+  - sale AVM + nearby comparable sales (via /v1/avm/value)
 
 Strategy:
   - Cache successful lookups by normalized address key → avoid repeat API calls
@@ -145,6 +146,85 @@ def _fetch_rent(full_addr: str, api_key: str) -> float | None:
         return None
 
 
+# Max comparables to store per property. RentCast typically returns 5-10
+# sorted by correlation; trimming keeps the JSON payload small.
+MAX_SALE_COMPS = 8
+
+
+def _fetch_sale_comps(full_addr: str, api_key: str) -> dict | None:
+    """
+    Look up sale AVM + nearby comparable sales.
+
+    Returns a dict shaped:
+      {
+        "avm_value":       412000,
+        "avm_range_low":   385000,
+        "avm_range_high":  440000,
+        "sale_comps": [
+          { address, beds, baths, sqft, price, distance, days_on_market,
+            year_built, price_per_sqft, correlation },
+          ...
+        ]
+      }
+
+    Returns None if RentCast can't value the address.
+    """
+    try:
+        r = requests.get(
+            f"{RENTCAST_BASE}/avm/value",
+            params={"address": full_addr},
+            headers={"X-Api-Key": api_key, "Accept": "application/json"},
+            timeout=15,
+        )
+        _log_response("avm_value", r, full_addr)
+        if r.status_code in (404, 401, 429):
+            return None
+        if r.status_code >= 400:
+            log.warning(
+                f"RentCast avm_value {r.status_code}: {r.text[:200]!r} (addr={full_addr!r})"
+            )
+            return None
+        data = r.json() or {}
+    except Exception as e:
+        log.warning(f"RentCast avm_value exception for {full_addr}: {e}")
+        return None
+
+    avm_value = _to_int(data.get("price") or data.get("value"))
+    avm_low   = _to_int(data.get("priceRangeLow"))
+    avm_high  = _to_int(data.get("priceRangeHigh"))
+
+    raw_comps = data.get("comparables") or []
+    comps: list[dict] = []
+    for c in raw_comps[:MAX_SALE_COMPS]:
+        price = _to_int(c.get("price"))
+        sqft  = _to_int(c.get("squareFootage"))
+        pps   = (price // sqft) if (price and sqft) else None
+        comps.append({
+            "address":        c.get("formattedAddress") or c.get("address"),
+            "beds":           _to_int(c.get("bedrooms")),
+            "baths":          _to_float(c.get("bathrooms")),
+            "sqft":           sqft,
+            "price":          price,
+            "distance":       _to_float(c.get("distance")),
+            "days_on_market": _to_int(c.get("daysOnMarket")),
+            "year_built":     _to_int(c.get("yearBuilt")),
+            "price_per_sqft": pps,
+            "correlation":    _to_float(c.get("correlation")),
+            "latitude":       _to_float(c.get("latitude")),
+            "longitude":      _to_float(c.get("longitude")),
+        })
+
+    if not (avm_value or comps):
+        return None
+
+    return {
+        "avm_value":      avm_value,
+        "avm_range_low":  avm_low,
+        "avm_range_high": avm_high,
+        "sale_comps":     comps,
+    }
+
+
 # ── Public entry point ───────────────────────────────────────────────────────
 
 def enrich_properties(properties: list[dict], api_key: str) -> dict:
@@ -178,10 +258,23 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
             p.get("state") or "VA",
             p.get("zip_code") or "",
         )
+        full_addr = _build_full_address(p)
 
-        # 1. Cache hit — use stored data, no API call.
+        # 1. Cache hit. Backfill sale_comps on old cache entries that pre-date
+        #    the AVM fetch, so we don't burn the full 2-call property+rent
+        #    budget again on already-enriched properties.
         if key in cache and cache[key]:
-            _apply(p, cache[key])
+            entry = cache[key]
+            if "sale_comps" not in entry and full_addr:
+                comps = _fetch_sale_comps(full_addr, api_key)
+                stats["api_calls"] += 1
+                time.sleep(RATE_LIMIT_SECONDS)
+                entry["avm_value"]      = (comps or {}).get("avm_value")
+                entry["avm_range_low"]  = (comps or {}).get("avm_range_low")
+                entry["avm_range_high"] = (comps or {}).get("avm_range_high")
+                entry["sale_comps"]     = (comps or {}).get("sale_comps") or []
+                cache[key] = entry
+            _apply(p, entry)
             stats["cache_hits"] += 1
             continue
 
@@ -191,7 +284,6 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
             continue
 
         # 3. Fetch fresh from RentCast.
-        full_addr = _build_full_address(p)
         if not full_addr:
             stats["skipped"] += 1
             continue
@@ -204,7 +296,11 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
         stats["api_calls"] += 1
         time.sleep(RATE_LIMIT_SECONDS)
 
-        if prop_data or rent_data:
+        comps_data = _fetch_sale_comps(full_addr, api_key)
+        stats["api_calls"] += 1
+        time.sleep(RATE_LIMIT_SECONDS)
+
+        if prop_data or rent_data or comps_data:
             enrichment = {
                 "beds":           _to_int(_first(prop_data, "bedrooms", "beds")),
                 "baths":          _to_float(_first(prop_data, "bathrooms", "baths")),
@@ -213,6 +309,10 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
                 "lot_size":       _to_int(_first(prop_data, "lotSize", "lot_size")),
                 "property_type":  (prop_data or {}).get("propertyType"),
                 "rent_estimate":  _to_int(rent_data),
+                "avm_value":      (comps_data or {}).get("avm_value"),
+                "avm_range_low":  (comps_data or {}).get("avm_range_low"),
+                "avm_range_high": (comps_data or {}).get("avm_range_high"),
+                "sale_comps":     (comps_data or {}).get("sale_comps") or [],
                 "enriched_at":    now,
             }
             cache[key] = enrichment
@@ -285,3 +385,8 @@ def _apply(p: dict, enr: dict) -> None:
     p["_enriched"] = True
     if enr.get("rent_estimate"):
         p["_rent_override"] = int(enr["rent_estimate"])
+    # Sale AVM + comps feed the frontend's market-comparison widget.
+    if enr.get("avm_value"):      p["avm_value"]      = int(enr["avm_value"])
+    if enr.get("avm_range_low"):  p["avm_range_low"]  = int(enr["avm_range_low"])
+    if enr.get("avm_range_high"): p["avm_range_high"] = int(enr["avm_range_high"])
+    if enr.get("sale_comps"):     p["sale_comps"]     = enr["sale_comps"]

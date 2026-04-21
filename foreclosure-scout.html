@@ -2781,7 +2781,7 @@ async function openDrawer(p){
         <div class="ai-box loading" id="drawerAI"><div class="spinner"></div>Generating AI analysis...</div>
         
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:12px 0 8px;padding-top:12px;border-top:1px solid var(--border)">MARKET COMPARISON</div>
-        <div id="market-comp-${p.id}"><div class="market-comp"><div class="comp-grid"><div class="comp-cell"><div class="spinner" style="margin:10px auto"></div><div class="comp-key">Loading Redfin...</div></div></div></div></div>
+        <div id="market-comp-${p.id}"></div>
         
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:12px 0 8px;padding-top:12px;border-top:1px solid var(--border)">PROPERTY INTELLIGENCE</div>
         <div id="intel-${p.id}"><div class="data-loading"><div class="spinner"></div><span style="font-family:IBM Plex Mono,monospace;font-size:10px">Loading Street View · FEMA · Census · BLS...</span></div></div>
@@ -2832,310 +2832,145 @@ Return ONLY the 2-sentence analysis.`,'You are a seasoned real estate investor. 
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Redfin Backend Integration - Live Market Comparables
+// Market Comparison — RentCast sale AVM + nearby comparable sales
 // ═══════════════════════════════════════════════════════════════════
+// Sale comps are fetched at scrape time (see scraper/rentcast_enrich.py)
+// and embedded in each property's JSON as `sale_comps` + `avm_value`.
+// This renderer is fully synchronous — no fetch, no proxy, no fallback data.
 
-const REDFIN_API_URL = 'https://foreclosure-scout-api.vercel.app';
-
-// ───────────────────────────────────────────────────────────────────
-// Fetch Real Redfin Comparables via Backend
-// ───────────────────────────────────────────────────────────────────
-async function loadMarketComparison(property) {
+function loadMarketComparison(property) {
   const compId = `market-comp-${property.id}`;
   const compEl = document.getElementById(compId);
   if (!compEl) return;
-  
-  // Show loading state
-  compEl.innerHTML = `
-    <div class="market-comp">
-      <div style="text-align:center;padding:30px">
-        <div class="spinner" style="margin:0 auto 10px"></div>
-        <div style="font-size:11px;color:var(--muted)">Fetching Redfin market data...</div>
+
+  const comps = Array.isArray(property.sale_comps) ? property.sale_comps : [];
+  if (!comps.length) {
+    compEl.innerHTML = `
+      <div class="market-comp">
+        <div class="market-comp-header">
+          <div class="market-comp-title"><span>📊 Market Comparison</span></div>
+          <div class="market-comp-source">RENTCAST AVM</div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);padding:14px;text-align:center">
+          No recent comparable sales available for this address.
+        </div>
       </div>
-    </div>
-  `;
-  
-  try {
-    console.log(`[Market Comp] Fetching for ${property.address}`);
-    
-    // BROWSER-SIDE LOGIC: Build smart Redfin URL
-    const price = property.price || 400000; // Default if unknown
-    const minPrice = Math.round(price * 0.7);
-    const maxPrice = Math.round(price * 1.3);
-    
-    const baseSqft = property.sqft || 1400;
-    const sqftRange = property.sqft ? Math.round(baseSqft * 0.2) : 300;
-    const minSqft = Math.max(baseSqft - sqftRange, 500);
-    const maxSqft = baseSqft + sqftRange;
-    
-    // Build Redfin API URL with smart filters
-    const redfinUrl = `https://www.redfin.com/stingray/api/gis?al=1&market=dc&num_homes=20&ord=redfin-recommended-asc&page_number=1&region_type=6&status=9&uipt=1,2,3&v=8&lat=${property.lat}&long=${property.lng}&max_price=${maxPrice}&min_price=${minPrice}&sf=${minSqft},${maxSqft}`;
-    
-    console.log(`[Market Comp] Smart filters - Price: $${minPrice.toLocaleString()}-$${maxPrice.toLocaleString()}, Sqft: ${minSqft}-${maxSqft}`);
-    
-    // Send URL to our proxy backend
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    const response = await fetch(`${REDFIN_API_URL}/api/redfin-proxy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ url: redfinUrl }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`Proxy error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Check if Redfin blocked us
-    if (data.error || data.blocked) {
-      throw new Error('Redfin blocked request');
-    }
-    
-    // Extract homes from Redfin response
-    const homes = data.payload?.homes || [];
-    
-    if (homes.length === 0) {
-      console.log('[Market Comp] No comparables found, using fallback');
-      throw new Error('No comparables found');
-    }
-    
-    // Map Redfin data to our format
-    const comparables = homes.slice(0, 10).map(home => ({
-      address: `${home.streetLine?.value || home.address || ''}, ${home.city || ''}`.trim(),
-      price: home.price?.value || 0,
-      beds: home.beds || property.beds || 3,
-      baths: home.baths || property.baths || 2,
-      sqft: home.sqFt?.value || property.sqft || 1400,
-      latitude: home.latLong?.latitude || property.lat,
-      longitude: home.latLong?.longitude || property.lng,
-      daysOnMarket: home.dom || 30,
-      pricePerSqft: home.pricePerSqFt?.value || Math.round((home.price?.value || 0) / (home.sqFt?.value || 1400)),
-      yearBuilt: home.yearBuilt?.value || null,
-      url: home.url ? `https://www.redfin.com${home.url}` : 'https://www.redfin.com/'
-    }));
-    
-    // Calculate stats
-    const stats = {
-      averagePrice: Math.round(comparables.reduce((sum, c) => sum + c.price, 0) / comparables.length),
-      averagePricePerSqft: Math.round(comparables.reduce((sum, c) => sum + c.pricePerSqft, 0) / comparables.length),
-      averageDaysOnMarket: Math.round(comparables.reduce((sum, c) => sum + c.daysOnMarket, 0) / comparables.length)
-    };
-    
-    console.log(`[Market Comp] Found ${comparables.length} REAL Redfin comparables!`);
-    
-    renderRedfinComparison(property, {
-      comparables: comparables.sort((a,b) => a.price - b.price),
-      stats,
-      count: comparables.length
-    }, compId);
-    
-  } catch (error) {
-    console.error('[Market Comp] Error:', error);
-    console.log('[Market Comp] Falling back to smart estimates');
-    
-    // Fallback to smart demo mode with accurate sqft matching
-    const demoComparables = generateDemoComparables(property);
-    const demoStats = {
-      averagePrice: Math.round(demoComparables.reduce((s,c)=>s+c.price,0)/demoComparables.length),
-      averagePricePerSqft: Math.round(demoComparables.reduce((s,c)=>s+c.pricePerSqft,0)/demoComparables.length),
-      averageDaysOnMarket: Math.round(demoComparables.reduce((s,c)=>s+c.daysOnMarket,0)/demoComparables.length)
-    };
-    
-    renderRedfinComparison(property, {
-      comparables: demoComparables,
-      stats: demoStats,
-      count: demoComparables.length
-    }, compId);
-    
-    // Show warning that it's fallback mode
-    setTimeout(() => {
-      const warning = document.createElement('div');
-      warning.style.cssText = 'background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.3);color:#f39c12;padding:8px 12px;border-radius:3px;font-size:10px;font-family:IBM Plex Mono,monospace;margin-top:10px';
-      warning.innerHTML = '⚠️ <strong>Estimated Data:</strong> Live Redfin unavailable. Showing smart estimates based on property specs.';
-      compEl.querySelector('.market-comp')?.appendChild(warning);
-    }, 100);
+    `;
+    return;
   }
-}
 
-// ───────────────────────────────────────────────────────────────────
-// Demo Comparables Generator (Fallback)
-// ───────────────────────────────────────────────────────────────────
-function generateDemoComparables(property) {
-  const numComps = 5 + Math.floor(Math.random() * 3);
-  const comparables = [];
-  const streets = ['Oak', 'Maple', 'Pine', 'Cedar', 'Elm', 'Birch', 'Willow', 'Cherry', 'Ash', 'Walnut'];
-  const suffixes = ['St', 'Ave', 'Dr', 'Ln', 'Ct', 'Way', 'Pl', 'Rd'];
-  
-  // Use property's actual sqft for smart matching
-  const baseSqft = property.sqft || 1400;
-  const price = property.price || 400000;
-  
-  for(let i = 0; i < numComps; i++) {
-    // Smart variance: ±15% price, ±10% sqft  
-    const priceVariance = 0.85 + (Math.random() * 0.3);
-    const sqftVariance = 0.90 + (Math.random() * 0.20);
-    
-    const compPrice = Math.round(price * priceVariance / 1000) * 1000;
-    const compSqft = Math.round(baseSqft * sqftVariance);
-    const streetNum = Math.floor(Math.random() * 9000) + 1000;
-    const address = `${streetNum} ${streets[Math.floor(Math.random()*streets.length)]} ${suffixes[Math.floor(Math.random()*suffixes.length)]}`;
-    
-    comparables.push({
-      address,
-      price: compPrice,
-      beds: property.beds || 3,
-      baths: property.baths || 2,
-      sqft: compSqft,
-      daysOnMarket: Math.floor(Math.random() * 60) + 15,
-      pricePerSqft: Math.round(compPrice / compSqft),
-      latitude: property.lat + (Math.random() - 0.5) * 0.01,
-      longitude: property.lng + (Math.random() - 0.5) * 0.01,
-      yearBuilt: property.yearBuilt ? property.yearBuilt + Math.floor(Math.random() * 10) - 5 : 1985 + Math.floor(Math.random() * 30),
-      url: `https://www.redfin.com/`
-    });
-  }
-  
-  return comparables.sort((a,b) => a.price - b.price);
-}
+  const pricedComps = comps.filter(c => c.price);
+  const avgPrice = pricedComps.length
+    ? Math.round(pricedComps.reduce((s, c) => s + c.price, 0) / pricedComps.length)
+    : 0;
+  const sqftComps = comps.filter(c => c.price_per_sqft);
+  const avgPricePerSqft = sqftComps.length
+    ? Math.round(sqftComps.reduce((s, c) => s + c.price_per_sqft, 0) / sqftComps.length)
+    : 0;
+  const domComps = comps.filter(c => c.days_on_market != null);
+  const avgDOM = domComps.length
+    ? Math.round(domComps.reduce((s, c) => s + c.days_on_market, 0) / domComps.length)
+    : 0;
 
-// ───────────────────────────────────────────────────────────────────
-// Render Redfin Comparison Data
-// ───────────────────────────────────────────────────────────────────
-function renderRedfinComparison(property, data, compId) {
-  const compEl = document.getElementById(compId);
-  if (!compEl) return;
-  
-  const { comparables, stats } = data;
-  const avgPrice = stats.averagePrice || 0;
-  const avgPricePerSqft = stats.averagePricePerSqft || 0;
-  const avgDOM = stats.averageDaysOnMarket || 0;
-  
-  const savings = avgPrice - property.price;
-  const savingsPercent = avgPrice > 0 ? Math.round((savings / avgPrice) * 100) : 0;
+  // Prefer the AVM estimate over the raw comp average for "market value" —
+  // it's what RentCast actually returned as the valuation for this address.
+  const marketValue = property.avm_value || avgPrice;
+  const savings = marketValue - property.price;
+  const savingsPercent = marketValue > 0 ? Math.round((savings / marketValue) * 100) : 0;
   const foreclosurePricePerSqft = property.sqft ? Math.round(property.price / property.sqft) : 0;
-  
-  // Calculate distance for each comparable (approximate)
-  const compsWithDistance = comparables.map(comp => {
-    if (comp.latitude && comp.longitude && property.lat && property.lng) {
-      const distance = calculateDistance(
-        property.lat, property.lng,
-        comp.latitude, comp.longitude
-      );
-      return { ...comp, distance: distance.toFixed(2) };
-    }
-    return { ...comp, distance: 'N/A' };
-  });
-  
-  // Generate listing cards HTML
-  const listingsHTML = compsWithDistance.slice(0, 8).map(comp => {
+
+  const sortedComps = pricedComps.slice().sort((a, b) => a.price - b.price);
+  const listingsHTML = sortedComps.slice(0, 8).map(comp => {
     const diff = comp.price - property.price;
-    const diffPercent = Math.round((diff / comp.price) * 100);
-    const distanceText = comp.distance !== 'N/A' ? `${comp.distance}mi` : 'nearby';
-    
+    const diffPercent = comp.price > 0 ? Math.round((diff / comp.price) * 100) : 0;
+    const distanceText = comp.distance != null ? `${comp.distance.toFixed(2)}mi` : 'nearby';
+    const beds  = comp.beds  ?? '—';
+    const baths = comp.baths ?? '—';
+    const sqft  = comp.sqft ? comp.sqft.toLocaleString() : '—';
+    const dom   = comp.days_on_market != null ? `${comp.days_on_market}d DOM` : '';
+    const yb    = comp.year_built ? ` · Built ${comp.year_built}` : '';
+
     return `
       <div class="comp-listing">
         <div style="flex:1">
-          <div class="comp-listing-addr">${comp.address}</div>
+          <div class="comp-listing-addr">${comp.address || 'Nearby sale'}</div>
           <div class="comp-listing-meta">
-            ${comp.beds}bd · ${comp.baths}ba · ${comp.sqft.toLocaleString()}sf · 
-            ${distanceText} · ${comp.daysOnMarket}d DOM
-            ${comp.yearBuilt ? ` · Built ${comp.yearBuilt}` : ''}
+            ${beds}bd · ${baths}ba · ${sqft}sf · ${distanceText}${dom ? ' · ' + dom : ''}${yb}
           </div>
-          ${comp.url ? `<a href="${comp.url}" target="_blank" class="comp-listing-link">View on Redfin →</a>` : ''}
         </div>
         <div style="text-align:right;min-width:120px">
           <div class="comp-listing-price">$${comp.price.toLocaleString()}</div>
           <div class="comp-listing-diff">${diff > 0 ? '+' : ''}$${Math.abs(diff).toLocaleString()} (${diffPercent > 0 ? '+' : ''}${diffPercent}%)</div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px">$${comp.pricePerSqft}/sf</div>
+          ${comp.price_per_sqft ? `<div style="font-size:9px;color:var(--muted);margin-top:2px">$${comp.price_per_sqft}/sf</div>` : ''}
         </div>
       </div>
     `;
   }).join('');
-  
-  // Render complete comparison
+
+  const avmRangeText = (property.avm_range_low && property.avm_range_high)
+    ? ` (range $${property.avm_range_low.toLocaleString()}–$${property.avm_range_high.toLocaleString()})`
+    : '';
+
   compEl.innerHTML = `
     <div class="market-comp">
       <div class="market-comp-header">
         <div class="market-comp-title">
-          <span>📊 Live Market Analysis</span>
+          <span>📊 Market Comparison</span>
         </div>
-        <div class="market-comp-source">REDFIN</div>
+        <div class="market-comp-source">RENTCAST AVM</div>
       </div>
-      
+
       <div class="comp-grid">
         <div class="comp-cell">
           <div class="comp-val ${savings > 0 ? 'savings' : 'higher'}">
             ${savings > 0 ? '-' : '+'}$${Math.abs(savings).toLocaleString()}
           </div>
-          <div class="comp-key">${savings > 0 ? 'Potential Savings' : 'Above Market'} (${Math.abs(savingsPercent)}%)</div>
+          <div class="comp-key">${savings > 0 ? 'Below Market' : 'Above Market'} (${Math.abs(savingsPercent)}%)</div>
         </div>
         <div class="comp-cell">
-          <div class="comp-val">$${avgPrice.toLocaleString()}</div>
-          <div class="comp-key">Avg Market Price</div>
+          <div class="comp-val">$${marketValue.toLocaleString()}</div>
+          <div class="comp-key">${property.avm_value ? 'AVM Estimate' : 'Avg Comp Price'}</div>
         </div>
         <div class="comp-cell">
           <div class="comp-val">$${avgPricePerSqft}/sf</div>
           <div class="comp-key">Market Price/SF</div>
         </div>
       </div>
-      
+
       <div class="comp-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
         <div class="comp-cell">
           <div class="comp-val" style="color:var(--ink2)">$${foreclosurePricePerSqft}/sf</div>
           <div class="comp-key">Your Price/SF</div>
         </div>
         <div class="comp-cell">
-          <div class="comp-val" style="color:var(--ink2)">${avgDOM}d</div>
+          <div class="comp-val" style="color:var(--ink2)">${avgDOM ? avgDOM + 'd' : '—'}</div>
           <div class="comp-key">Avg Days on Market</div>
         </div>
         <div class="comp-cell">
-          <div class="comp-val" style="color:var(--ink2)">${comparables.length}</div>
-          <div class="comp-key">Active Listings</div>
+          <div class="comp-val" style="color:var(--ink2)">${comps.length}</div>
+          <div class="comp-key">Comparable Sales</div>
         </div>
       </div>
-      
+
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:12px;padding:10px;background:${savings > 0 ? 'rgba(39,174,96,0.08)' : 'rgba(231,76,60,0.08)'};border-radius:3px;border-left:3px solid ${savings > 0 ? '#27ae60' : '#e74c3c'}">
-        ${savings > 0 
+        ${savings > 0
           ? `💡 This foreclosure is priced at <strong>$${foreclosurePricePerSqft}/sf</strong> vs market avg of <strong>$${avgPricePerSqft}/sf</strong> — potential <strong>${savingsPercent}%</strong> below market value.`
-          : `⚠️ This property is priced <strong>${Math.abs(savingsPercent)}%</strong> above comparable listings. Verify condition and location advantages.`
+          : `⚠️ This property is priced <strong>${Math.abs(savingsPercent)}%</strong> above the market estimate. Verify condition and location advantages.`
         }
         <br><br>
-        Found <strong>${comparables.length}</strong> active Redfin listings nearby · Avg ${avgDOM} days on market · Data from live Redfin MLS
+        ${comps.length} RentCast comparable ${comps.length === 1 ? 'sale' : 'sales'} near this address${avmRangeText}.
       </div>
-      
+
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
-        <span>🏠 Comparable Active Listings</span>
-        <span style="font-size:9px;color:var(--muted2)">Live MLS Data</span>
+        <span>🏠 Comparable Recent Sales</span>
+        <span style="font-size:9px;color:var(--muted2)">RentCast AVM</span>
       </div>
-      
+
       <div class="comp-listings">
         ${listingsHTML}
       </div>
     </div>
   `;
-}
-
-// ───────────────────────────────────────────────────────────────────
-// Calculate Distance Between Two Coordinates (Haversine Formula)
-// ───────────────────────────────────────────────────────────────────
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 3959; // Earth's radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
 }
 
 function closeDrawer(){

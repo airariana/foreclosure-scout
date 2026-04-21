@@ -790,41 +790,13 @@
     const mapDivId = `fc-drawer-map-${sanitizedId}`;
     const svDivId  = `fc-drawer-sv-${sanitizedId}`;
 
-    // External listing + photo search links. Zillow/Redfin/Realtor.com all
-    // prohibit direct scraping in their T&Cs but their search URL pattern
-    // is fine for user-driven linking — opening a new tab is exactly how
-    // they expect non-partner traffic to reach them.
     const listingUrl = isHUD && p.firm_file_number
       ? `https://www.hudhomestore.gov/listing/?caseNumber=${encodeURIComponent(p.firm_file_number)}`
       : (p.source_url || '');
     const openOnGMaps = `https://www.google.com/maps/search/?api=1&query=${encAddr}`;
     const addressSlug = (p.address || '').replace(/\s+/g, '-');
     const citySlug = (p.city || '').replace(/\s+/g, '-');
-    // Shortened street-suffix version for Redfin's URL slugs (Street → St, etc.)
-    const redfinSlug = addressSlug
-      .replace(/-Street\b/i, '-St')
-      .replace(/-Avenue\b/i, '-Ave')
-      .replace(/-Road\b/i, '-Rd')
-      .replace(/-Drive\b/i, '-Dr')
-      .replace(/-Lane\b/i, '-Ln')
-      .replace(/-Court\b/i, '-Ct')
-      .replace(/-Boulevard\b/i, '-Blvd')
-      .replace(/-Circle\b/i, '-Cir')
-      .replace(/-Place\b/i, '-Pl')
-      .replace(/-Terrace\b/i, '-Ter');
     const zillowUrl  = `https://www.zillow.com/homes/${addressSlug},-${citySlug},-${p.state || 'VA'}-${p.zip || ''}_rb/`;
-    // Redfin's /stingray/ endpoint gets CloudFront-403'd as a bot URL.
-    // Use the user-facing address pattern — falls back to zip search if
-    // Redfin doesn't have the specific property indexed.
-    const redfinUrl  = p.zip
-      ? `https://www.redfin.com/${p.state || 'VA'}/${citySlug}/${redfinSlug}-${p.zip}`
-      : `https://www.redfin.com/${p.state || 'VA'}/${citySlug}`;
-    // Realtor.com: their /realestateandhomes-detail/ URLs need a listing
-    // ID we don't have. Fall back to zip-code search which always resolves
-    // to real results (user can filter from there).
-    const realtorUrl = p.zip
-      ? `https://www.realtor.com/realestateandhomes-search/${p.zip}`
-      : `https://www.realtor.com/realestateandhomes-search/${citySlug}_${p.state || 'VA'}`;
     const playbook = isHUD ? {
       title: 'HUD REO Purchase',
       icon: 'H',
@@ -889,13 +861,11 @@
                 ${isHUD ? 'HUD.gov listing (photos) →' : 'Source listing →'}
               </a>` : ''}
             <a href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Zillow →</a>
-            <a href="${escapeAttr(redfinUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Redfin →</a>
-            <a href="${escapeAttr(realtorUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Realtor.com →</a>
             <a href="${escapeAttr(openOnGMaps)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Google Maps →</a>
           </div>
           ${!isHUD ? `
             <div class="fc-media-note">
-              Trustee-sale properties rarely have official photos. Zillow / Redfin / Realtor.com often have prior listing photos if the property sold retail in the last 5-10 years.
+              Trustee-sale properties rarely have official photos. Zillow often has prior listing photos if the property sold retail in the last 5-10 years.
             </div>
           ` : ''}
         </div>
