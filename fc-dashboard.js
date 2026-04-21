@@ -1463,16 +1463,33 @@
   }
 
   /* ─── Main ─── */
-  .fc-main { flex: 1; overflow: auto; background: var(--paper); }
+  .fc-main {
+    flex: 1 1 auto;
+    min-width: 0;   /* critical — without it, flex children can shrink-wrap */
+    overflow: auto;
+    background: var(--paper);
+  }
   .fc-main::-webkit-scrollbar { width: 10px; height: 10px; }
   .fc-main::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 10px; border: 2px solid var(--paper); }
   .fc-main::-webkit-scrollbar-track { background: var(--paper); }
-  /* Fully fluid — content fills whatever viewport width we have. On
-     ultrawide (2000px+) monitors the KPI grid and tables get extra room
-     rather than leaving empty side whitespace. This matches the Map
-     view's full-viewport behavior so every page feels consistent. */
+  /* Fully fluid — content fills whatever viewport width we have minus the
+     sidebar. No max-width constraint. box-sizing: border-box ensures the
+     32px padding is *inside* the 100% width rather than extending beyond. */
   .fc-main-inner {
     padding: 24px 32px;
+    width: 100%;
+    max-width: none !important;
+    box-sizing: border-box;
+  }
+
+  /* Every view container and grid/card inside must also claim full width */
+  #fc-view-dashboard,
+  #fc-view-listings,
+  #fc-view-alerts,
+  #fc-view-rehab,
+  #fc-view-market,
+  #fc-view-brrrr,
+  #fc-view-settings {
     width: 100%;
   }
 
