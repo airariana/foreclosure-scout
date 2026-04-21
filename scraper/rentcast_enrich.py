@@ -233,10 +233,43 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
     and monthly rent estimate from RentCast.
 
     Returns stats dict: {total, cache_hits, api_calls, succeeded, retried, skipped}.
+
+    Safety switches:
+      - RENTCAST_API_KEY unset → skip entirely, log and return.
+      - SKIP_RENTCAST=1 → cache-only mode: apply cached enrichment to
+        already-seen properties, but NEVER call the API (prevents surprise
+        billing even if a stale key is still in the env).
     """
+    import os
+
     if not api_key:
         log.warning("RENTCAST_API_KEY not set — skipping enrichment")
         return {"total": len(properties), "skipped": len(properties)}
+
+    cache_only = os.environ.get("SKIP_RENTCAST", "").lower() in ("1", "true", "yes")
+    if cache_only:
+        log.warning("SKIP_RENTCAST=1 — cache-only mode, no API calls will be made")
+        cache = _load_json(CACHE_PATH)
+        hits = 0
+        for p in properties:
+            if p.get("_skip_rentcast"):
+                continue
+            key = _normalize_key(
+                p.get("address") or "", p.get("city") or "",
+                p.get("state") or "VA", p.get("zip_code") or "",
+            )
+            if key in cache and cache[key]:
+                _apply(p, cache[key])
+                hits += 1
+        log.info(f"RentCast cache-only: {hits} cache hits applied, 0 API calls")
+        return {
+            "total": len(properties),
+            "cache_hits": hits,
+            "api_calls": 0,
+            "succeeded": 0,
+            "retried":   0,
+            "skipped":   len(properties) - hits,
+        }
 
     cache = _load_json(CACHE_PATH)
     retry = _load_json(RETRY_PATH)
