@@ -1877,56 +1877,87 @@ async function displayVAForeclosures() {
   
   console.log(`📍 Displaying ${vaForeclosures.length} VA foreclosures on map...`);
   
-  // Convert VA foreclosures to your app's property format
+  // Convert VA foreclosures to your app's property format.
+  // As of v2.1 the scraper produces real price, ARV, beds/baths/sqft/yearBuilt,
+  // RentCast market rent, cash flow, cap rate, score. Map those through
+  // instead of using hardcoded defaults.
   const vaProperties = vaForeclosures.map(property => {
     // Skip if no coordinates
     if (!property.latitude || !property.longitude) return null;
-    
-    // Generate unique ID
-    const id = 'va-' + property.firm_file_number;
-    
-    // Convert to your app's format (matching your allProperties structure)
+
+    const id = property.id || ('va-' + (property.firm_file_number || Math.random().toString(36).slice(2, 10)));
+
+    // Pull real scraped+enriched values (all already flattened in the JSON).
+    const price      = property.price || 0;
+    const arv        = property.arv   || 0;
+    const rehab      = property.rehabEstimate || Math.round(arv * 0.08);
+    const monthlyRent = property.monthlyRent || 0;
+    const cashFlow   = property.cashFlow || 0;
+    const capRate    = property.capRate || 0;
+
+    // BRRRR math derived from real price/ARV/rehab.
+    const refiLoan      = Math.round(arv * 0.75);                 // 75% LTV refi
+    const totalInvested = price + rehab;
+    const cashLeft      = Math.max(0, totalInvested - refiLoan);
+    const annualCF      = cashFlow * 12;
+    const coc           = cashLeft > 0 ? ((annualCF / cashLeft) * 100).toFixed(1) : '0';
+    const discount      = arv > 0 ? Math.round((1 - price / arv) * 100) : 0;
+
+    // Property tax + insurance estimates (VA statewide averages).
+    // Real tax rate varies 0.6-1.1% of assessed value across VA counties;
+    // 1% is a reasonable midpoint for investor underwriting.
+    const propertyTax = Math.round(arv * 0.010);   // 1.0% of ARV / year
+    const insurance   = Math.round(arv * 0.005);   // 0.5% of ARV / year
+
+    const rentSourceRaw = property.pricing && property.pricing.rent_source;
+    const rentSource = rentSourceRaw === 'RentCast' ? 'RentCast ✓' : 'Estimated';
+
     return {
       id: id,
       address: property.address,
       city: property.city,
       state: property.state,
-      zip: property.zip_code,
+      zip: property.zip || property.zip_code || '',
       county: property.county,
       lat: property.latitude,
       lng: property.longitude,
-      price: 150000, // Estimate - VA data doesn't have price
-      arv: 200000,
-      beds: 3,
-      baths: 2,
-      sqft: 1400,
-      yearBuilt: 1980,
+      price: price,
+      arv: arv,
+      beds: property.beds || 0,
+      baths: property.baths || 0,
+      sqft: property.sqft || 0,
+      yearBuilt: property.yearBuilt || property.year_built || null,
       source: property.source,
-      listingType: 'Auction',
-      daysOnMarket: 14,
-      rehabEstimate: 25000,
-      monthlyRent: 1500,
-      propertyTax: 2500,
-      insurance: 1000,
+      listingType: property.listingType || 'Pre-Foreclosure',
+      daysOnMarket: 14,  // trustee sales don't have "days on market"; placeholder
+      rehabEstimate: rehab,
+      monthlyRent: monthlyRent,
+      propertyTax: propertyTax,
+      insurance: insurance,
       hoaMonthly: 0,
-      score: 65,
-      tags: ['VA Foreclosure', 'Auction Sale'],
+      score: property.score || 0,
+      tags: property.tags || ['VA Foreclosure', 'Trustee Sale'],
       saleDate: property.sale_date,
       saleTime: property.sale_time,
       saleLocation: property.sale_location,
       firmFileNumber: property.firm_file_number,
       sourceUrl: property.source_url,
-      // Calculated fields (from your existing logic)
-      cashFlow: 250,
-      capRate: '6.5',
-      discount: '25',
-      refiLoan: 150000,
-      cashLeft: 25000,
-      coc: '12',
+      // Calculated BRRRR fields
+      cashFlow: cashFlow,
+      capRate: capRate.toString(),
+      discount: discount.toString(),
+      refiLoan: refiLoan,
+      cashLeft: cashLeft,
+      coc: coc,
       isNew: false,
-      enriched: false,
-      rentSource: 'Estimated',
-      taxSource: 'Estimated'
+      enriched: Boolean(property._enriched),
+      rentSource: rentSource,
+      taxSource: 'Estimated',
+      // Expose v2.1 extras for future features (rehab calculator, confidence UI, etc.)
+      pricing: property.pricing,
+      confidence: property.pricing && property.pricing.confidence,
+      propertyType: property.property_type,
+      lotSize: property.lot_size,
     };
   }).filter(Boolean); // Remove nulls
   
