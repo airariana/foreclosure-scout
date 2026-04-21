@@ -85,10 +85,119 @@
       renderKPIs(d);
       renderPriorityQueue(d);
       renderSignals(d);
+      renderHotCounties(d);
+      renderAICoach(d);
       updateSubline(d);
     } catch (e) {
       console.warn('[FC Dash] data load failed:', e);
     }
+  }
+
+  // ─── Hot counties — ranked by volume with score signal + ring ──────────
+  function renderHotCounties(d) {
+    const el = document.getElementById('fc-hot-counties');
+    const countPill = document.getElementById('fc-hc-count');
+    if (!el) return;
+
+    const props = d.foreclosures || [];
+    // Group by county
+    const groups = {};
+    props.forEach(p => {
+      const c = p.county || 'Unknown County';
+      if (!groups[c]) groups[c] = { county: c, count: 0, scores: [], hiConf: 0, priceSum: 0, priceN: 0 };
+      groups[c].count += 1;
+      if (p.score) groups[c].scores.push(p.score);
+      const conf = (p.pricing && p.pricing.confidence) || '';
+      if (conf.startsWith('HIGH')) groups[c].hiConf += 1;
+      if (p.price) { groups[c].priceSum += p.price; groups[c].priceN += 1; }
+    });
+    const ranked = Object.values(groups)
+      .filter(g => g.count >= 2)                 // drop one-offs
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    if (countPill) countPill.textContent = `${Object.keys(groups).length} counties`;
+
+    if (ranked.length === 0) {
+      el.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">No county data.</div>`;
+      return;
+    }
+
+    el.innerHTML = ranked.map(g => {
+      const avgScore = g.scores.length ? Math.round(g.scores.reduce((a,b)=>a+b,0) / g.scores.length) : 0;
+      const avgPrice = g.priceN ? Math.round(g.priceSum / g.priceN / 1000) : 0;
+      const initials = g.county.replace(/County|City/g, '').trim().slice(0, 2).toUpperCase();
+      const ringColor = avgScore >= 75 ? 'var(--sage)' : avgScore >= 60 ? 'var(--gold-deep)' : 'var(--muted)';
+      return `
+        <div class="fc-hc-row">
+          <div class="fc-prop-init" style="width:32px;height:32px;font-size:12px">${escapeHtml(initials)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;color:var(--ink)">${escapeHtml(g.county)}</div>
+            <div style="font-size:11px;color:var(--muted)">${g.count} listings · ${g.hiConf} HIGH conf · avg $${avgPrice}K</div>
+          </div>
+          <div style="text-align:right">
+            <div class="fc-mono" style="font-size:13px;color:var(--ink)">${g.count}</div>
+            <div style="font-size:10px;color:var(--muted)">listings</div>
+          </div>
+          <div>${ringSvg(avgScore, 32, 3, ringColor)}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ─── AI Coach — static heuristic insight (Gemini wiring optional later) ─
+  function renderAICoach(d) {
+    const el = document.getElementById('fc-ai-coach');
+    if (!el) return;
+    const props = d.foreclosures || [];
+    const m = d.metadata || {};
+
+    // Identify the strongest heuristic signal in the data.
+    const hiConf = props.filter(p => (p.pricing && p.pricing.confidence || '').startsWith('HIGH'));
+    const soon = props.filter(p => p.days_to_sale != null && p.days_to_sale >= 0 && p.days_to_sale <= 7);
+    const highScore = props.filter(p => (p.score || 0) >= 75);
+    const biggestDiscount = props.slice().sort((a, b) =>
+      ((b.arv && b.price) ? (1 - b.price/b.arv) : 0) - ((a.arv && a.price) ? (1 - a.price/a.arv) : 0)
+    )[0];
+
+    const topCounty = (() => {
+      const counts = {};
+      highScore.forEach(p => { counts[p.county] = (counts[p.county] || 0) + 1; });
+      const ranked = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+      return ranked[0] ? ranked[0][0] : null;
+    })();
+
+    let insight = '';
+    if (hiConf.length && soon.length && topCounty) {
+      insight = `You're sitting on <strong>${hiConf.length} HIGH-confidence deals</strong> with known list prices, and <strong>${soon.length}</strong> auctions close in the next 7 days. <u>${escapeHtml(topCounty)}</u> has the densest cluster of ${highScore.length >= 1 ? highScore.filter(p => p.county === topCounty).length : 'scored'} high-score properties — start there.`;
+    } else if (biggestDiscount && biggestDiscount.arv && biggestDiscount.price) {
+      const pct = Math.round((1 - biggestDiscount.price / biggestDiscount.arv) * 100);
+      insight = `Deepest discount in the pipeline: <strong>${escapeHtml(biggestDiscount.address)}</strong> in ${escapeHtml(biggestDiscount.city)} is listed ${pct}% below ARV. Run the comps before ${escapeHtml(biggestDiscount.sale_date || 'sale')}.`;
+    } else {
+      insight = `Pipeline is warming up. Re-check on Monday for the weekly scrape refresh.`;
+    }
+
+    const followUps = [
+      ['Deals to underwrite', hiConf.length.toString()],
+      ['Sales this week', soon.length.toString()],
+      ['Avg score ≥75', highScore.length.toString()],
+    ];
+
+    el.innerHTML = `
+      <div class="fc-coach-quote">"${insight}"</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+        <button class="fc-btn fc-btn-gold" id="fc-coach-pin">Pin to watchlist</button>
+        <button class="fc-btn">Dismiss</button>
+      </div>
+      <div class="fc-coach-stats">
+        ${followUps.map(([l, v]) => `
+          <div>
+            <div class="fc-eyebrow" style="font-size:9px;margin-bottom:3px">${escapeHtml(l)}</div>
+            <div class="fc-mono" style="font-size:15px;color:var(--ink)">${escapeHtml(v)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   // ─── Priority queue — top N scored properties ──────────────────────────
@@ -543,6 +652,28 @@
               </div>
             </div>
           </div>
+
+          <div class="fc-two-col" style="margin-top:20px; grid-template-columns: 1fr 1.2fr">
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Hot counties · concentration</div>
+                <span class="fc-pill" id="fc-hc-count">—</span>
+              </div>
+              <div id="fc-hot-counties">
+                <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Loading…</div>
+              </div>
+            </div>
+
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Coach · AI reads your pipeline</div>
+                <span class="fc-pill gold"><span class="fc-dot"></span> Gemini</span>
+              </div>
+              <div id="fc-ai-coach" style="padding:14px 16px">
+                <div style="padding:14px;color:var(--muted);font-size:13px">Analyzing your pipeline…</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -858,6 +989,39 @@
     font-size: 11px; color: var(--muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 240px;
+  }
+
+  /* ─── Hot counties rows ─── */
+  .fc-hc-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .fc-hc-row:last-child { border-bottom: none; }
+  .fc-hc-row:hover { background: var(--paper-2); }
+
+  /* ─── AI Coach ─── */
+  .fc-coach-quote {
+    font-family: var(--f-serif);
+    font-size: 15px; font-style: italic;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .fc-coach-quote strong { font-style: normal; font-weight: 600; }
+  .fc-coach-quote u { text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 3px; font-style: normal; }
+  .fc-coach-stats {
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--hair);
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  }
+
+  .fc-btn.fc-btn-gold {
+    background: var(--gold);
+    color: var(--ink);
+    border-color: var(--gold-deep);
+  }
+  .fc-btn.fc-btn-gold:hover {
+    background: oklch(0.76 0.13 85);
   }
 
   /* ─── Signals feed ─── */
