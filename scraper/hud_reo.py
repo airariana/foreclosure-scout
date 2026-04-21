@@ -237,7 +237,7 @@ def _build_property(row: tuple, idx: dict) -> dict | None:
         "sale_date_raw":    g_str("Bid Open Date") or g_str("List Date"),
         "sale_time":        None,
         "sale_location":    "HUD online bid submission",
-        "listingType":      "REO/Bank-Owned",  # HUD HomeStore lists post-foreclosure bank-owned REO
+        "listingType":      "HUD Home",  # HUD HomeStore = government-owned REO (blue pin, distinct from private bank REO)
         "property_type":    "Single Family",  # HUD REO is overwhelmingly SFH
         "sqft":             sqft,
         "beds":             beds,
