@@ -1265,12 +1265,13 @@ Return ONLY the 2-sentence analysis.`,
   // foreclosure-scout.html so the list and map stay visually consistent.
   function typePill(listingType) {
     const colors = {
-      'REO/Bank-Owned':  { bg: '#c84b2f', label: 'REO'     },
-      'Auction':         { bg: '#b8860b', label: 'Auction' },
-      'Pre-Foreclosure': { bg: '#2d6a4f', label: 'Pre-FC'  },
-      'HUD Home':        { bg: '#2a6496', label: 'HUD'     },
-      'HomePath':        { bg: '#2a6496', label: 'HomePath'},
-      'Short Sale':      { bg: '#6644aa', label: 'Short'   },
+      'REO/Bank-Owned':  { bg: '#c84b2f', label: 'REO'        },
+      'Auction':         { bg: '#b8860b', label: 'Auction'    },
+      'Pre-Foreclosure': { bg: '#2d6a4f', label: 'Pre-FC'     },
+      'HUD Home':        { bg: '#2a6496', label: 'HUD'        },
+      'HomePath':        { bg: '#2a6496', label: 'HomePath'   },
+      'Short Sale':      { bg: '#6644aa', label: 'Short'      },
+      'Distressed':      { bg: '#e67e22', label: 'Distressed' },
     };
     const t = colors[listingType];
     if (!t) return `<span class="fc-pill" title="${escapeAttr(listingType || 'Unknown')}">${escapeHtml(listingType || '—')}</span>`;

@@ -1267,6 +1267,7 @@ header,
       <div class="legend-item"><div class="legend-dot" style="background:#b8860b"></div>Auction</div>
       <div class="legend-item"><div class="legend-dot" style="background:#2d6a4f"></div>Pre-Foreclosure</div>
       <div class="legend-item"><div class="legend-dot" style="background:#6644aa"></div>Short Sale</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div>Distressed</div>
     </div>
   </div>
 </div>
@@ -2334,10 +2335,20 @@ function initMap(){
   setTimeout(() => {
     displayVAForeclosures();
   }, 1000);
+
+  // Auto-load CourtListener bankruptcy dockets (DC/MD/VA) once scraped
+  // foreclosures are in. Gated on KEYS.court being set — user enters their
+  // CourtListener API token in ⚙ Data Keys. loadCourtProperties already
+  // merges into allProperties + calls applyFilters().
+  setTimeout(() => {
+    if (KEYS.court && typeof loadCourtProperties === 'function') {
+      loadCourtProperties().catch(e => console.warn('[CourtListener] auto-load failed:', e));
+    }
+  }, 2500);
 }
 function setMapType(t,btn){map.setMapTypeId(t);document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function fitAll(){if(!markers.length)return;const b=new google.maps.LatLngBounds();markers.forEach(m=>b.extend(m.getPosition()));map.fitBounds(b);}
-function markerColor(t){return{'HUD Home':'#2a6496','REO/Bank-Owned':'#c84b2f','Auction':'#b8860b','Pre-Foreclosure':'#2d6a4f','Short Sale':'#6644aa'}[t]||'#4a4a44';}
+function markerColor(t){return{'HUD Home':'#2a6496','REO/Bank-Owned':'#c84b2f','Auction':'#b8860b','Pre-Foreclosure':'#2d6a4f','Short Sale':'#6644aa','Distressed':'#e67e22'}[t]||'#4a4a44';}
 function pinSVG(color){return{path:'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',fillColor:color,fillOpacity:1,strokeColor:'#ffffff',strokeWeight:1.5,scale:1.6,anchor:new google.maps.Point(12,22)};}
 function renderMarkers(){
   markers.forEach(m=>m.setMap(null)); markers=[];

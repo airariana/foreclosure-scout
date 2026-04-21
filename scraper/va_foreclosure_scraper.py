@@ -1280,14 +1280,23 @@ def run(gmaps_key: str = "") -> dict:
     all_props.extend(scrape_mwc())
     time.sleep(1)
 
-    # HUD REO from user-committed xlsx (data/hud_va.xlsx).
+    # HUD REO from user-committed xlsx (data/hud_{va,md,dc}.xlsx).
     # User manually exports from hudhomestore.gov weekly; committing the
-    # file triggers inclusion in the next scrape run.
+    # files triggers inclusion in the next scrape run.
     try:
         from hud_reo import scrape_hud_reo
         all_props.extend(scrape_hud_reo())
     except Exception as e:
         log.warning(f"HUD REO: loader failed: {e}")
+
+    # DC Vacant & Blighted registry — distress signal, not active listings.
+    # Blighted properties pay Class 3 tax rate (5x standard), making them
+    # strong pre-foreclosure / tax-sale candidates for off-market outreach.
+    try:
+        from dc_vacant import scrape_dc_vacant
+        all_props.extend(scrape_dc_vacant())
+    except Exception as e:
+        log.warning(f"DC Vacant: loader failed: {e}")
 
     # Deduplicate
     all_props = deduplicate(all_props)
