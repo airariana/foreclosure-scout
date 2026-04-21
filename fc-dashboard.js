@@ -126,6 +126,137 @@
     }
 
     wireNav(root);
+    wireDataKeysButton(root);
+  }
+
+  // ─── Data Keys modal ────────────────────────────────────────────────────
+  // Single source of truth for all API keys. Each field reads/writes the
+  // same localStorage entries the legacy modals use, so keys stay in sync
+  // whether set from here or from the mobile-frame's legacy UI.
+  function wireDataKeysButton(root) {
+    const btn = root.querySelector('#fc-tb-keys');
+    if (btn) btn.addEventListener('click', openDataKeysModal);
+  }
+
+  function openDataKeysModal() {
+    if (document.getElementById('fc-keys-modal')) return;
+
+    const fields = [
+      {
+        id:     'fc-k-gemini',
+        label:  'Gemini API Key',
+        ls:     'fs_gemini_key',
+        hint:   'aistudio.google.com/apikey — powers AI analysis + offer letter',
+      },
+      {
+        id:     'fc-k-court',
+        label:  'CourtListener Token',
+        ls:     'fs_key_court',
+        hint:   'courtlistener.com → Profile → API Token',
+      },
+      {
+        id:     'fc-k-hud',
+        label:  'HUD USER Token',
+        ls:     'fs_key_hud',
+        hint:   'huduser.gov/portal/dataset/fmr-api.html',
+      },
+      {
+        id:     'fc-k-estated',
+        label:  'Estated API Key',
+        ls:     'fs_key_estated',
+        hint:   'estated.com (property enrichment, optional)',
+      },
+    ];
+
+    const overlay = document.createElement('div');
+    overlay.id = 'fc-keys-modal';
+    overlay.style.cssText = [
+      'position: fixed', 'inset: 0', 'z-index: 10000',
+      'background: rgba(14, 23, 40, 0.45)',
+      'display: flex', 'align-items: center', 'justify-content: center',
+      'padding: 40px',
+    ].join(';');
+
+    const panel = document.createElement('div');
+    panel.style.cssText = [
+      'background: var(--white)', 'border-radius: 6px',
+      'box-shadow: 0 20px 60px rgba(14, 23, 40, 0.25)',
+      'width: min(520px, 100%)', 'max-height: 85vh', 'overflow: auto',
+      'padding: 24px', 'font-family: var(--f-ui)',
+    ].join(';');
+
+    panel.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:4px">Settings</div>
+          <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;color:var(--ink)">Data keys</div>
+        </div>
+        <button class="fc-btn fc-btn-sm" id="fc-keys-close" aria-label="Close">×</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.5">
+        Keys are stored locally in your browser only. They never leave your device.
+      </div>
+      ${fields.map(f => `
+        <div style="margin-bottom:16px">
+          <label for="${f.id}" style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px">${f.label}</label>
+          <input id="${f.id}" type="password" autocomplete="off" spellcheck="false"
+            style="width:100%;padding:8px 10px;border:1px solid var(--hair);border-radius:3px;font-family:var(--f-mono);font-size:12px;color:var(--ink);background:var(--paper-2);box-sizing:border-box">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--f-mono)">${f.hint}</div>
+        </div>
+      `).join('')}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:24px">
+        <button class="fc-btn" id="fc-keys-cancel">Cancel</button>
+        <button class="fc-btn fc-btn-dark" id="fc-keys-save">Save</button>
+      </div>
+    `;
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    // Load existing values
+    for (const f of fields) {
+      const el = document.getElementById(f.id);
+      if (el) el.value = localStorage.getItem(f.ls) || '';
+    }
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.getElementById('fc-keys-close').onclick = close;
+    document.getElementById('fc-keys-cancel').onclick = close;
+
+    document.getElementById('fc-keys-save').onclick = () => {
+      for (const f of fields) {
+        const el = document.getElementById(f.id);
+        const v = (el && el.value || '').trim();
+        if (v) localStorage.setItem(f.ls, v);
+        else localStorage.removeItem(f.ls);
+      }
+      // Nudge the legacy KEYS/status objects in foreclosure-scout.html so
+      // indicators update without a page reload. Falls through silently if
+      // any of those globals aren't defined yet.
+      try {
+        if (window.KEYS) {
+          window.KEYS.court   = localStorage.getItem('fs_key_court')   || '';
+          window.KEYS.hud     = localStorage.getItem('fs_key_hud')     || '';
+          window.KEYS.estated = localStorage.getItem('fs_key_estated') || '';
+        }
+        if (typeof window.setDot === 'function') {
+          window.setDot('court', window.KEYS && window.KEYS.court ? 'live' : 'error', window.KEYS && window.KEYS.court ? 'COURTLISTENER' : 'COURTLISTENER — NO KEY');
+          window.setDot('hud',   window.KEYS && window.KEYS.hud   ? 'live' : 'error', window.KEYS && window.KEYS.hud   ? 'HUD USER FMR' : 'HUD USER — NO KEY');
+        }
+      } catch (e) { /* best-effort */ }
+      close();
+      // Auto-trigger CourtListener load if a token was just added.
+      if (localStorage.getItem('fs_key_court') && typeof window.loadCourtProperties === 'function') {
+        window.loadCourtProperties().catch(() => {});
+      }
+    };
+
+    // Focus first empty field
+    for (const f of fields) {
+      const el = document.getElementById(f.id);
+      if (el && !el.value) { el.focus(); break; }
+    }
   }
 
   // ─── View routing ───────────────────────────────────────────────────────
@@ -903,12 +1034,7 @@ Return ONLY the 2-sentence analysis.`,
     // Source-specific closing playbook
     const isHUD = p.source === 'HUD HomeStore';
 
-    // The Google Maps key lives inside a function scope in the main HTML,
-    // so we hardcode the same public key here as well (it's already visible
-    // in page source — not a secret, just an API key).
-    const GMAPS_KEY = (typeof GOOGLE_MAPS_API_KEY !== 'undefined')
-      ? GOOGLE_MAPS_API_KEY
-      : (window.GOOGLE_MAPS_API_KEY || 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po');
+    const GMAPS_KEY = window.GOOGLE_MAPS_API_KEY || '';
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
     const encAddr = encodeURIComponent(fullAddress);
     // Interactive Street View + Map — both rendered via the JS API that's
@@ -1471,6 +1597,7 @@ Return ONLY the 2-sentence analysis.`,
       </div>
       <div class="fc-tb-right">
         <button class="fc-tb-btn" title="Notifications">${ICO.bell}</button>
+        <button class="fc-tb-btn" id="fc-tb-keys" title="Data Keys">${ICO.gear}</button>
         <button class="fc-tb-btn fc-primary">${ICO.plus} Watchlist</button>
         <div class="fc-avatar">AJ</div>
       </div>
