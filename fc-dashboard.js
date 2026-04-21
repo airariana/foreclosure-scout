@@ -1083,26 +1083,37 @@ Return ONLY the 2-sentence analysis.`,
   function renderDrawerStreetView(el, coords) {
     if (!el) return;
     const svService = new google.maps.StreetViewService();
-    // Check if Street View coverage exists near the address (within 50m).
-    svService.getPanorama({ location: coords, radius: 50, source: 'outdoor' }, (data, status) => {
-      if (status !== 'OK' || !data || !data.location) {
+    // Progressive search: try a close radius first for accuracy, then
+    // expand if nothing's found. 50m misses addresses inside gated
+    // communities or rural private drives where the nearest public
+    // Street View imagery can be hundreds of meters away.
+    const attempt = (radii) => {
+      if (!radii.length) {
         showSvFallback(el);
         return;
       }
-      new google.maps.StreetViewPanorama(el, {
-        pano: data.location.pano,
-        pov: { heading: computeHeadingToward(data.location.latLng, coords), pitch: 5 },
-        zoom: 0.6,
-        addressControl: false,
-        linksControl: false,
-        panControl: true,
-        enableCloseButton: false,
-        fullscreenControl: true,
-        zoomControl: true,
-        motionTracking: false,
-        motionTrackingControl: false,
+      const [radius, ...rest] = radii;
+      svService.getPanorama({ location: coords, radius, source: 'outdoor' }, (data, status) => {
+        if (status !== 'OK' || !data || !data.location) {
+          attempt(rest);
+          return;
+        }
+        new google.maps.StreetViewPanorama(el, {
+          pano: data.location.pano,
+          pov: { heading: computeHeadingToward(data.location.latLng, coords), pitch: 5 },
+          zoom: 0.6,
+          addressControl: false,
+          linksControl: false,
+          panControl: true,
+          enableCloseButton: false,
+          fullscreenControl: true,
+          zoomControl: true,
+          motionTracking: false,
+          motionTrackingControl: false,
+        });
       });
-    });
+    };
+    attempt([100, 300, 800]);
   }
 
   function computeHeadingToward(fromLatLng, toCoords) {
