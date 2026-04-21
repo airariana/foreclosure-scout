@@ -54,6 +54,8 @@ HEADERS = {
 
 # ── Auction Pricing Matrix ────────────────────────────────────────────────────
 
+ALLOWED_STATES = {"VA", "MD"}
+
 COUNTY_BASE_VALUES = {
     # Northern Virginia
     "Fairfax County":        625_000,
@@ -64,7 +66,7 @@ COUNTY_BASE_VALUES = {
     "Falls Church City":     700_000,
     "Manassas City":         325_000,
     "Manassas Park City":    300_000,
-    # DC-adjacent / I-95 corridor
+    # DC-adjacent / I-95 corridor (VA)
     "Stafford County":       385_000,
     "Spotsylvania County":   325_000,
     "Fredericksburg City":   310_000,
@@ -85,6 +87,35 @@ COUNTY_BASE_VALUES = {
     "Suffolk City":          305_000,
     "Portsmouth City":       235_000,
     "Poquoson City":         355_000,
+    # Maryland — DC suburbs
+    "Montgomery County":      625_000,
+    "Prince George's County": 360_000,
+    "Howard County":          525_000,
+    # Baltimore metro
+    "Anne Arundel County":    420_000,
+    "Baltimore County":       290_000,
+    "Baltimore City":         180_000,
+    "Carroll County":         400_000,
+    "Harford County":         330_000,
+    # Southern Maryland
+    "Charles County":         350_000,
+    "Calvert County":         430_000,
+    "St. Mary's County":      365_000,
+    # Western Maryland
+    "Frederick County":       400_000,
+    "Washington County":      260_000,
+    "Allegany County":        130_000,
+    "Garrett County":         280_000,
+    # Eastern Shore
+    "Cecil County":           310_000,
+    "Kent County":            300_000,
+    "Queen Anne's County":    465_000,
+    "Talbot County":          420_000,
+    "Caroline County":        265_000,
+    "Dorchester County":      200_000,
+    "Wicomico County":        210_000,
+    "Somerset County":        170_000,
+    "Worcester County":       320_000,
     # Default
     "DEFAULT":               275_000,
 }
@@ -559,7 +590,7 @@ def scrape_orlans() -> list[dict]:
 def _parse_orlans_item(text: str) -> dict | None:
     """
     Parse a single Orlans .sales-item block's visible text into a property dict.
-    Returns None if state != VA or status != Active.
+    Returns None if state not in ALLOWED_STATES or status != Active.
 
     Expected text format (one field-label per line, value on next line):
         File Number\n24-000825\nStatus\nActive\nProperty Address\n...\nProperty State\nVA\n...
@@ -582,7 +613,7 @@ def _parse_orlans_item(text: str) -> dict | None:
     # Filter
     state = fields.get("Property State", "").strip().upper()
     status = fields.get("Status", "").strip().lower()
-    if state != "VA" or status != "active":
+    if state not in ALLOWED_STATES or status != "active":
         return None
     address = fields.get("Property Address", "").strip()
     if not address:
@@ -596,10 +627,10 @@ def _parse_orlans_item(text: str) -> dict | None:
     except Exception:
         sale_date_iso = sale_date_raw or None
 
-    # County is "Fairfax, VA" or "City of Alexandria, VA" — strip state
+    # County is "Fairfax, VA" or "Prince George's, MD" — strip any state suffix.
     county_raw = fields.get("Property County", "").strip()
-    county_raw = re.sub(r",\s*VA\s*$", "", county_raw, flags=re.IGNORECASE).strip()
-    county = normalize_county(county_raw)
+    county_raw = re.sub(r",\s*[A-Z]{2}\s*$", "", county_raw, flags=re.IGNORECASE).strip()
+    county = normalize_county(county_raw, state)
 
     property_type = detect_property_type(address)
     pricing = build_pricing(county, property_type, None, None, None)
@@ -611,7 +642,7 @@ def _parse_orlans_item(text: str) -> dict | None:
         "firm_file_number": fields.get("File Number", "").strip() or None,
         "address":          address,
         "city":             fields.get("Property City", "").strip(),
-        "state":            "VA",
+        "state":            state,
         "zip_code":         fields.get("Property Zip", "").strip(),
         "county":           county,
         "lat":              None,
@@ -626,7 +657,7 @@ def _parse_orlans_item(text: str) -> dict | None:
         "baths":            None,
         "year_built":       None,
         "pricing":          pricing,
-        "tags":             ["VA Foreclosure", "Trustee Sale", county, "Orlans"],
+        "tags":             [f"{state} Foreclosure", "Trustee Sale", county, "Orlans"],
         "status":           "active",
         "scraped_at":       datetime.utcnow().isoformat() + "Z",
         "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
@@ -882,7 +913,8 @@ def _parse_bww_row(cells: list[str]) -> dict | None:
     file_number, address, city, state, zip_code, county_raw, date_listed, loan_amount_raw = \
         [c.strip() for c in cells[:8]]
 
-    if state.upper() != "VA" or not address:
+    state_upper = state.upper()
+    if state_upper not in ALLOWED_STATES or not address:
         return None
 
     # Parse "July 15, 2026 11:45 AM" into sale_date + sale_time
@@ -909,7 +941,7 @@ def _parse_bww_row(cells: list[str]) -> dict | None:
         except Exception:
             pass
 
-    county = normalize_county(county_raw)
+    county = normalize_county(county_raw, state_upper)
     property_type = detect_property_type(address)
     pricing = build_pricing(county, property_type, None, None, original_loan)
 
@@ -920,7 +952,7 @@ def _parse_bww_row(cells: list[str]) -> dict | None:
         "firm_file_number": file_number or None,
         "address":          address,
         "city":             city,
-        "state":            "VA",
+        "state":            state_upper,
         "zip_code":         zip_code,
         "county":           county,
         "lat":              None,
@@ -935,7 +967,7 @@ def _parse_bww_row(cells: list[str]) -> dict | None:
         "baths":            None,
         "year_built":       None,
         "pricing":          pricing,
-        "tags":             ["VA Foreclosure", "Trustee Sale", county, "Aldridge Pite"],
+        "tags":             [f"{state_upper} Foreclosure", "Trustee Sale", county, "Aldridge Pite"],
         "status":           "active",
         "scraped_at":       datetime.utcnow().isoformat() + "Z",
         "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
@@ -949,40 +981,52 @@ def _parse_bww_row(cells: list[str]) -> dict | None:
 # Columns: [Sale Date, Sale Time, County, Address, City, State, Mat No]
 
 MWC_VA_URL = "https://apps.mwc-law.com/SalesLists/VA.html"
+MWC_MD_URL = "https://apps.mwc-law.com/SalesLists/MD.html"
 
 
 def scrape_mwc() -> list[dict]:
-    """Scrape McCabe VA sales list via direct HTTP (HTML table)."""
+    """
+    Scrape McCabe sales lists (VA + MD) via direct HTTP (HTML tables).
+
+    Each state has its own URL on apps.mwc-law.com. MD URL may 404 if McCabe
+    doesn't publish MD sales separately — we swallow that quietly.
+    """
     log.info("Scraping McCabe, Weisberg & Conway ...")
     properties: list[dict] = []
 
-    try:
-        r = requests.get(MWC_VA_URL, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        table = soup.find("table")
-        if table is None:
-            log.warning("MWC: no table found")
-            return properties
+    for url, state_hint in ((MWC_VA_URL, "VA"), (MWC_MD_URL, "MD")):
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=15)
+            if r.status_code == 404:
+                log.info(f"MWC {state_hint}: 404 (not published at {url})")
+                continue
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+            table = soup.find("table")
+            if table is None:
+                log.warning(f"MWC {state_hint}: no table found")
+                continue
 
-        rows = table.find_all("tr")
-        # Header row is at index 1 (index 0 is title row "VA Sales List").
-        # Data starts at index 2.
-        log.info(f"MWC: {max(0, len(rows) - 2)} total listings")
-        for row in rows[2:]:
-            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
-            prop = _parse_mwc_row(cells)
-            if prop:
-                properties.append(prop)
+            rows = table.find_all("tr")
+            # Header row is at index 1 (index 0 is title row "VA Sales List").
+            # Data starts at index 2.
+            added = 0
+            for row in rows[2:]:
+                cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+                prop = _parse_mwc_row(cells, source_url=url)
+                if prop:
+                    properties.append(prop)
+                    added += 1
+            log.info(f"MWC {state_hint}: {added} properties (of {max(0, len(rows) - 2)} rows)")
 
-    except Exception as e:
-        log.error(f"MWC scrape failed: {e}")
+        except Exception as e:
+            log.error(f"MWC {state_hint} scrape failed: {e}")
 
-    log.info(f"MWC: {len(properties)} properties")
+    log.info(f"MWC: {len(properties)} total properties")
     return properties
 
 
-def _parse_mwc_row(cells: list[str]) -> dict | None:
+def _parse_mwc_row(cells: list[str], source_url: str = MWC_VA_URL) -> dict | None:
     """
     Parse an MWC sales-list row.
     Columns: [Sale Date, Sale Time, County, Address, City, State, Mat No, (blank)]
@@ -994,7 +1038,8 @@ def _parse_mwc_row(cells: list[str]) -> dict | None:
     sale_date_raw, sale_time, county_raw, address, city, state, mat_no = \
         [c.strip() for c in cells[:7]]
 
-    if state.upper() != "VA" or not address or sale_date_raw.lower() == "sale date":
+    state_upper = state.upper()
+    if state_upper not in ALLOWED_STATES or not address or sale_date_raw.lower() == "sale date":
         return None
 
     # Normalize sale date to ISO
@@ -1004,18 +1049,18 @@ def _parse_mwc_row(cells: list[str]) -> dict | None:
     except Exception:
         sale_date_iso = sale_date_raw or None
 
-    county = normalize_county(county_raw)
+    county = normalize_county(county_raw, state_upper)
     property_type = detect_property_type(address)
     pricing = build_pricing(county, property_type, None, None, None)
 
     return {
         "id":               make_id("mwc", address, sale_date_iso or ""),
         "source":           "McCabe, Weisberg & Conway",
-        "source_url":       MWC_VA_URL,
+        "source_url":       source_url,
         "firm_file_number": mat_no or None,
         "address":          address,
         "city":             city,
-        "state":            "VA",
+        "state":            state_upper,
         "zip_code":         "",
         "county":           county,
         "lat":              None,
@@ -1030,7 +1075,7 @@ def _parse_mwc_row(cells: list[str]) -> dict | None:
         "baths":            None,
         "year_built":       None,
         "pricing":          pricing,
-        "tags":             ["VA Foreclosure", "Trustee Sale", county, "McCabe"],
+        "tags":             [f"{state_upper} Foreclosure", "Trustee Sale", county, "McCabe"],
         "status":           "active",
         "scraped_at":       datetime.utcnow().isoformat() + "Z",
         "days_to_sale":     days_to_sale(sale_date_iso) if sale_date_iso else None,
@@ -1122,23 +1167,44 @@ def parse_generic_listing(element, text: str, source_key: str,
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
-def normalize_county(raw: str) -> str:
-    """Normalize county string to 'X County' or 'X City' format."""
-    raw = raw.strip().title()
+def normalize_county(raw: str, state: str = "VA") -> str:
+    """
+    Normalize county string to 'X County' or 'X City' format.
+
+    State-aware: VA has many independent cities (Alexandria, Fairfax, etc.)
+    that must render as 'X City'. MD has only one (Baltimore City). Apostrophes
+    like "Prince George's" survive .title() incorrectly ("Prince George'S"),
+    so we patch those common cases.
+    """
+    raw = raw.strip()
     if not raw:
         return "Unknown County"
-    known_cities = {
-        "Alexandria", "Fairfax", "Falls Church", "Manassas", "Manassas Park",
-        "Richmond", "Norfolk", "Virginia Beach", "Chesapeake", "Newport News",
-        "Hampton", "Portsmouth", "Suffolk", "Poquoson", "Fredericksburg",
-        "Colonial Heights", "Petersburg", "Lynchburg", "Roanoke",
-    }
-    for city in known_cities:
-        if city in raw and "County" not in raw:
-            return f"{city} City"
-    if "County" not in raw and "City" not in raw:
-        return f"{raw} County"
-    return raw
+
+    # Fix common apostrophe capitalization (MD has "Prince George's",
+    # "Queen Anne's", "St. Mary's"; VA has no apostrophe counties).
+    titled = raw.title()
+    titled = re.sub(r"([A-Za-z])'S\b", lambda m: m.group(1) + "'s", titled)
+    # St. Mary's preservation (title() mangles the dot but not much)
+
+    state = (state or "VA").upper()
+    if state == "VA":
+        va_cities = {
+            "Alexandria", "Fairfax", "Falls Church", "Manassas", "Manassas Park",
+            "Richmond", "Norfolk", "Virginia Beach", "Chesapeake", "Newport News",
+            "Hampton", "Portsmouth", "Suffolk", "Poquoson", "Fredericksburg",
+            "Colonial Heights", "Petersburg", "Lynchburg", "Roanoke",
+        }
+        for city in va_cities:
+            if city in titled and "County" not in titled:
+                return f"{city} City"
+    elif state == "MD":
+        # Baltimore City is the only MD independent city.
+        if "Baltimore" in titled and "County" not in titled:
+            return "Baltimore City"
+
+    if "County" not in titled and "City" not in titled:
+        return f"{titled} County"
+    return titled
 
 
 def deduplicate(properties: list[dict]) -> list[dict]:
@@ -1312,11 +1378,19 @@ def run(gmaps_key: str = "") -> dict:
     enriched_count = sum(1 for p in all_props if p.get("_enriched"))
     rent_sourced = sum(1 for p in all_props if p.get("pricing", {}).get("rent_source") == "RentCast")
 
+    # State breakdown — now that we cover VA + MD, surface the per-state counts
+    # so the frontend can show state filter chips with live counts.
+    states = {}
+    for p in all_props:
+        st = (p.get("state") or "VA").upper()
+        states[st] = states.get(st, 0) + 1
+
     output = {
         "metadata": {
             "total_properties":     len(all_props),
             "scraped_at":           datetime.utcnow().isoformat() + "Z",
             "sources":              sources,
+            "states":               states,
             "counties_covered":     len(counties),
             "pricing_confidence": {
                 "high":   high_conf,

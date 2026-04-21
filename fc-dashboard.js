@@ -215,6 +215,71 @@
     if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
   }
 
+  // ─── State filter ───────────────────────────────────────────────────────
+  // 'ALL' shows every foreclosure regardless of state; 'VA' or 'MD' narrows
+  // the entire dashboard (KPIs, Priority Queue, Signals, Hot Counties, AI
+  // Coach, Listings) and also the legacy map via applyFilters().
+  let __stateFilter = 'ALL';
+
+  function filterByState(d) {
+    if (!d || __stateFilter === 'ALL') return d;
+    const foreclosures = (d.foreclosures || []).filter(
+      p => (p.state || 'VA').toUpperCase() === __stateFilter
+    );
+    // Return a new d-shaped object so downstream renderers work unchanged.
+    return { ...d, foreclosures };
+  }
+
+  function updateStateChipCounts(d) {
+    const props = (d && d.foreclosures) || [];
+    const counts = { ALL: props.length, VA: 0, MD: 0 };
+    for (const p of props) {
+      const s = (p.state || 'VA').toUpperCase();
+      if (counts[s] != null) counts[s] += 1;
+    }
+    for (const s of ['ALL', 'VA', 'MD']) {
+      const el = document.getElementById(`fc-state-count-${s}`);
+      if (el) el.textContent = counts[s];
+    }
+  }
+
+  function wireStateChips() {
+    document.querySelectorAll('#fc-state-chips .fc-state-chip').forEach(btn => {
+      if (btn.__wired) return;
+      btn.__wired = true;
+      btn.onclick = () => {
+        const s = btn.getAttribute('data-state') || 'ALL';
+        if (s === __stateFilter) return;
+        __stateFilter = s;
+        document.querySelectorAll('#fc-state-chips .fc-state-chip')
+          .forEach(b => b.classList.toggle('active', b === btn));
+
+        // Re-render every dashboard surface from the current dataset.
+        const d = window.__fcData;
+        if (d) {
+          renderKPIs(d);
+          renderPriorityQueue(d);
+          renderSignals(d);
+          renderHotCounties(d);
+          renderAICoach(d);
+          updateSubline(d);
+          updateSidebarCounts(d);
+          renderListings(d);
+        }
+
+        // Sync to the legacy map: the hidden #stateFilter input feeds
+        // applyFilters(), which rebuilds filteredProperties + calls
+        // renderMarkers(). If applyFilters doesn't exist (e.g. mobile
+        // layout not loaded), skip silently.
+        const legacyInput = document.getElementById('stateFilter');
+        if (legacyInput) legacyInput.value = (s === 'ALL') ? '' : s;
+        if (typeof window.applyFilters === 'function') {
+          try { window.applyFilters(); } catch (e) { /* best-effort */ }
+        }
+      };
+    });
+  }
+
   // ─── Fetch foreclosure data + populate dashboard ────────────────────────
   async function loadData() {
     try {
@@ -222,6 +287,8 @@
       if (!r.ok) throw new Error('fetch failed: ' + r.status);
       const d = await r.json();
       window.__fcData = d;
+      wireStateChips();
+      updateStateChipCounts(d);
       renderKPIs(d);
       renderPriorityQueue(d);
       renderSignals(d);
@@ -237,7 +304,8 @@
   }
 
   function updateSidebarCounts(d) {
-    const count = (d.foreclosures || []).length;
+    const filtered = filterByState(d);
+    const count = (filtered.foreclosures || []).length;
     const el = document.getElementById('fc-sc-listings');
     if (el) el.textContent = count;
   }
@@ -262,7 +330,8 @@
       }
     });
 
-    let props = (d.foreclosures || []).slice();
+    const filtered = filterByState(d);
+    let props = (filtered.foreclosures || []).slice();
     const sortFns = {
       score:    (a, b) => (b.score || 0) - (a.score || 0),
       days:     (a, b) => (a.days_to_sale == null ? 9999 : a.days_to_sale) - (b.days_to_sale == null ? 9999 : b.days_to_sale),
@@ -318,6 +387,7 @@
 
   // ─── Hot counties — ranked by volume with score signal + ring ──────────
   function renderHotCounties(d) {
+    d = filterByState(d);
     const el = document.getElementById('fc-hot-counties');
     const countPill = document.getElementById('fc-hc-count');
     if (!el) return;
@@ -370,6 +440,7 @@
 
   // ─── AI Coach — static heuristic insight (Gemini wiring optional later) ─
   function renderAICoach(d) {
+    d = filterByState(d);
     const el = document.getElementById('fc-ai-coach');
     if (!el) return;
     const props = d.foreclosures || [];
@@ -425,6 +496,7 @@
 
   // ─── Priority queue — top N scored properties ──────────────────────────
   function renderPriorityQueue(d) {
+    d = filterByState(d);
     const body = document.getElementById('fc-priority-body');
     const countPill = document.getElementById('fc-pq-count');
     if (!body) return;
@@ -443,6 +515,9 @@
   }
 
   function renderPriorityTable(d, filter) {
+    // d is already filtered by state when called from renderPriorityQueue;
+    // called standalone (filter-button onclick) we re-filter defensively.
+    d = (d && d.__stateFiltered) ? d : filterByState(d);
     const body = document.getElementById('fc-priority-body');
     if (!body) return;
     let props = (d.foreclosures || []).slice();
@@ -496,6 +571,7 @@
 
   // ─── Signals feed — derive from live data (sources, recency, status) ────
   function renderSignals(d) {
+    d = filterByState(d);
     const el = document.getElementById('fc-signals');
     if (!el) return;
     const props = d.foreclosures || [];
@@ -1203,12 +1279,15 @@ Return ONLY the 2-sentence analysis.`,
   }
 
   function updateSubline(d) {
-    const m = d.metadata || {};
-    const hi = (m.pricing_confidence || {}).high || 0;
+    const filtered = filterByState(d);
+    const props = filtered.foreclosures || [];
+    const counties = new Set(props.map(p => p.county).filter(c => c && c !== 'Unknown County'));
+    const hi = props.filter(p => ((p.pricing && p.pricing.confidence) || '').startsWith('HIGH')).length;
+    const stateLabel = __stateFilter === 'ALL' ? 'DC/MD/VA' : __stateFilter;
     const sub = document.getElementById('fc-subline');
     const eyebrow = document.getElementById('fc-date-eyebrow');
     if (sub) {
-      sub.textContent = `${m.total_properties || 0} active listings across ${m.counties_covered || 0} VA counties. ${hi} high-confidence deals ready to underwrite.`;
+      sub.textContent = `${props.length} active listings across ${counties.size} ${stateLabel} counties. ${hi} high-confidence deals ready to underwrite.`;
     }
     if (eyebrow) {
       const d2 = new Date();
@@ -1220,6 +1299,7 @@ Return ONLY the 2-sentence analysis.`,
 
   // ─── KPI computation + rendering ────────────────────────────────────────
   function renderKPIs(d) {
+    d = filterByState(d);
     const props = d.foreclosures || [];
     const m = d.metadata || {};
     const totalCount = props.length;
@@ -1237,9 +1317,10 @@ Return ONLY the 2-sentence analysis.`,
       ? (discounts.reduce((a,b) => a+b, 0) / discounts.length).toFixed(1)
       : '0';
 
-    // High-confidence count (= actionable deals with real price signal or HUD list)
-    const hiConfCount = (m.pricing_confidence || {}).high || 0;
-    const medConfCount = (m.pricing_confidence || {}).medium || 0;
+    // High-confidence count — recompute from filtered props since metadata
+    // reflects unfiltered totals.
+    const hiConfCount = props.filter(p => ((p.pricing && p.pricing.confidence) || '').startsWith('HIGH')).length;
+    const medConfCount = props.filter(p => ((p.pricing && p.pricing.confidence) || '').startsWith('MEDIUM')).length;
 
     // Generate sparkline shapes. We don't yet have real history — use deterministic
     // variations of the current value so the sparkline feels "alive" without lying.
@@ -1431,6 +1512,11 @@ Return ONLY the 2-sentence analysis.`,
               </div>
             </div>
             <div class="fc-page-actions">
+              <div class="fc-state-chips" id="fc-state-chips" role="group" aria-label="Filter by state">
+                <button class="fc-btn fc-btn-sm fc-state-chip active" data-state="ALL">All <span class="fc-state-count" id="fc-state-count-ALL">—</span></button>
+                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="VA">VA <span class="fc-state-count" id="fc-state-count-VA">—</span></button>
+                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="MD">MD <span class="fc-state-count" id="fc-state-count-MD">—</span></button>
+              </div>
               <button class="fc-btn">${ICO.plus} Add watchlist</button>
               <button class="fc-btn fc-btn-dark">${ICO.search} Search listings</button>
             </div>
@@ -1864,7 +1950,41 @@ Return ONLY the 2-sentence analysis.`,
     color: var(--ink); margin: 0;
   }
   .fc-page-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
-  .fc-page-actions { display: flex; gap: 8px; }
+  .fc-page-actions { display: flex; gap: 8px; align-items: center; }
+  .fc-state-chips {
+    display: inline-flex;
+    gap: 0;
+    background: var(--paper-2);
+    border: 1px solid var(--hair);
+    border-radius: 5px;
+    padding: 2px;
+    margin-right: 4px;
+  }
+  .fc-state-chips .fc-state-chip {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 3px;
+    font-weight: 500;
+    padding: 0 10px;
+    height: 24px;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .fc-state-chips .fc-state-chip:hover { color: var(--ink); }
+  .fc-state-chips .fc-state-chip.active {
+    background: var(--white);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 40, 0.08);
+  }
+  .fc-state-count {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 10px;
+    color: var(--muted-2);
+    font-family: var(--f-mono);
+  }
+  .fc-state-chips .fc-state-chip.active .fc-state-count { color: var(--muted); }
 
   /* ─── Utilities ─── */
   .fc-eyebrow {

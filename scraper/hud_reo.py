@@ -68,10 +68,9 @@ def scrape_hud_reo() -> list[dict]:
         for raw_row in rows[1:]:
             if not raw_row or not raw_row[idx["Address"]]:
                 continue
-            # Skip any stray non-VA rows (belt + suspenders; the export is
-            # already filtered to VA but the user could one day pull multi-state)
+            # Accept VA + MD; skip anything outside our coverage.
             state = str(raw_row[idx.get("State", -1)] or "").strip().upper()
-            if state != "VA":
+            if state not in {"VA", "MD"}:
                 continue
 
             prop = _build_property(raw_row, idx)
@@ -82,7 +81,7 @@ def scrape_hud_reo() -> list[dict]:
         log.error(f"HUD REO parse failed: {e}")
         return properties
 
-    log.info(f"HUD REO: {len(properties)} VA properties")
+    log.info(f"HUD REO: {len(properties)} VA/MD properties")
     return properties
 
 
@@ -109,7 +108,7 @@ def _build_property(row: tuple, idx: dict) -> dict | None:
 
     address   = g_str("Address")
     city      = g_str("City")
-    state     = "VA"
+    state     = g_str("State").upper() or "VA"
     zip_code  = g_str("Zip Code")
     county_raw = g_str("County")
     case_no   = g_str("Property Case")
@@ -218,7 +217,7 @@ def _build_property(row: tuple, idx: dict) -> dict | None:
         "grade":                   grade,
     }
 
-    tags = ["VA Foreclosure", "HUD REO"]
+    tags = [f"{state} Foreclosure", "HUD REO"]
     if fha_status:
         tags.append(f"FHA: {fha_status}")
 
