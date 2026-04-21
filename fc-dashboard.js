@@ -83,10 +83,183 @@
       const d = await r.json();
       window.__fcData = d;
       renderKPIs(d);
+      renderPriorityQueue(d);
+      renderSignals(d);
       updateSubline(d);
     } catch (e) {
       console.warn('[FC Dash] data load failed:', e);
     }
+  }
+
+  // ─── Priority queue — top N scored properties ──────────────────────────
+  function renderPriorityQueue(d) {
+    const body = document.getElementById('fc-priority-body');
+    const countPill = document.getElementById('fc-pq-count');
+    if (!body) return;
+
+    const filterBtns = document.querySelectorAll('.fc-pq-filter');
+    filterBtns.forEach((btn) => {
+      btn.onclick = () => {
+        filterBtns.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderPriorityTable(d, btn.getAttribute('data-filter'));
+      };
+    });
+    renderPriorityTable(d, 'all');
+    const total = (d.foreclosures || []).length;
+    if (countPill) countPill.textContent = `${total} tracked`;
+  }
+
+  function renderPriorityTable(d, filter) {
+    const body = document.getElementById('fc-priority-body');
+    if (!body) return;
+    let props = (d.foreclosures || []).slice();
+    if (filter === 'hud') {
+      props = props.filter(p => p.source === 'HUD HomeStore');
+    } else if (filter === 'trustee') {
+      props = props.filter(p => p.source !== 'HUD HomeStore');
+    }
+    // Sort by score descending, break ties by days_to_sale ascending (soonest first)
+    props.sort((a, b) => {
+      const sa = (a.score || 0), sb = (b.score || 0);
+      if (sa !== sb) return sb - sa;
+      const da = a.days_to_sale == null ? 9999 : a.days_to_sale;
+      const db = b.days_to_sale == null ? 9999 : b.days_to_sale;
+      return da - db;
+    });
+    const top = props.slice(0, 8);
+    if (top.length === 0) {
+      body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">No properties match.</td></tr>`;
+      return;
+    }
+    body.innerHTML = top.map(p => {
+      const conf = (p.pricing && p.pricing.confidence) || '';
+      const confTier = conf.split('—')[0].trim();
+      const confClass = confTier === 'HIGH' ? 'gold' : confTier === 'MEDIUM' ? 'sky' : '';
+      const sourceTag = p.source === 'HUD HomeStore' ? 'HUD' : (p.source || '').split(' ')[0] || 'VA';
+      const days = p.days_to_sale;
+      const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
+      const saleUrgent = days != null && days >= 0 && days <= 3;
+      const initials = (p.city || p.address || '??').slice(0, 2).toUpperCase();
+      const scoreColor = (p.score || 0) >= 75 ? 'var(--sage)' : (p.score || 0) >= 60 ? 'var(--gold-ink)' : 'var(--muted)';
+      return `
+        <tr>
+          <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
+          <td>
+            <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
+            <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(sourceTag)}</div>
+          </td>
+          <td><span class="fc-pill ink">${escapeHtml((p.status || 'Active').slice(0, 14))}</span></td>
+          <td>${confClass ? `<span class="fc-pill ${confClass}">${escapeHtml(confTier)}</span>` : `<span class="fc-pill">${escapeHtml(confTier || '—')}</span>`}</td>
+          <td style="text-align:right"><span class="fc-mono" style="color:${scoreColor};font-weight:600">${p.score || 0}</span></td>
+          <td style="text-align:right">
+            <div class="fc-mono" style="color:${saleUrgent ? 'var(--coral)' : 'var(--ink)'}">${saleLabel}</div>
+            <div class="fc-mono" style="font-size:10px;color:var(--muted)">${escapeHtml(p.sale_date || '')}</div>
+          </td>
+          <td><button class="fc-btn fc-btn-sm">Open</button></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ─── Signals feed — derive from live data (sources, recency, status) ────
+  function renderSignals(d) {
+    const el = document.getElementById('fc-signals');
+    if (!el) return;
+    const props = d.foreclosures || [];
+    const m = d.metadata || {};
+
+    const signals = [];
+
+    // Upcoming sales this week
+    const soonSales = props.filter(p => p.days_to_sale != null && p.days_to_sale >= 0 && p.days_to_sale <= 7);
+    if (soonSales.length) {
+      signals.push({
+        type: 'coral', tag: 'URGENT',
+        who: `${soonSales.length} sales`,
+        what: `scheduled this week, earliest ${soonSales[0].days_to_sale === 0 ? 'today' : 'in ' + soonSales[0].days_to_sale + 'd'}.`,
+        ctx: `${soonSales.slice(0, 3).map(p => p.city).join(' · ')}…`,
+        time: soonSales[0].days_to_sale === 0 ? 'Now' : `${soonSales[0].days_to_sale}d`,
+      });
+    }
+
+    // HUD price-reduced properties (actionable for flippers)
+    const priceReduced = props.filter(p => (p.status || '').toLowerCase().includes('reduced'));
+    if (priceReduced.length) {
+      signals.push({
+        type: 'gold', tag: 'PRICE CUT',
+        who: `${priceReduced.length} HUD homes`,
+        what: `marked Price Reduced — lender cutting losses.`,
+        ctx: `Avg new list $${Math.round(priceReduced.reduce((s,p) => s + (p.price||0), 0) / priceReduced.length / 1000)}K.`,
+        time: 'Active',
+      });
+    }
+
+    // RentCast enrichment coverage
+    const enrichment = m.enrichment || {};
+    if (enrichment.market_rent_used) {
+      signals.push({
+        type: 'sage', tag: 'MARKET DATA',
+        who: `${enrichment.market_rent_used} properties`,
+        what: `have RentCast market rent estimates feeding cash flow and cap rate.`,
+        ctx: `Up from ${enrichment.rentcast_enriched - enrichment.market_rent_used} with heuristic-only rent.`,
+        time: '1w',
+      });
+    }
+
+    // HUD REO additions
+    const hudProps = props.filter(p => p.source === 'HUD HomeStore');
+    if (hudProps.length) {
+      signals.push({
+        type: '', tag: 'HUD INTEL',
+        who: `${hudProps.length} HUD homes`,
+        what: `active in VA — FHA financing available on ${hudProps.filter(p => (p.hud_fha || '').startsWith('IN')).length} of them.`,
+        ctx: `List price median $${Math.round(median(hudProps.map(p => p.price || 0).filter(v => v > 0)) / 1000)}K.`,
+        time: 'Weekly',
+      });
+    }
+
+    // Top county concentration
+    const counties = {};
+    props.forEach(p => { counties[p.county] = (counties[p.county] || 0) + 1; });
+    const top = Object.entries(counties).sort((a,b) => b[1] - a[1]).slice(0, 1)[0];
+    if (top) {
+      signals.push({
+        type: 'sky', tag: 'CONCENTRATION',
+        who: top[0],
+        what: `has the highest foreclosure volume — ${top[1]} active listings.`,
+        ctx: `${Math.round(top[1] / props.length * 100)}% of all VA activity this week.`,
+        time: 'Now',
+      });
+    }
+
+    if (signals.length === 0) {
+      el.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">No signals this cycle.</div>`;
+      return;
+    }
+
+    el.innerHTML = signals.map(s => `
+      <div class="fc-signal">
+        <div class="fc-signal-head">
+          <span class="fc-pill ${s.type}">${escapeHtml(s.tag)}</span>
+          <span class="fc-mono fc-signal-time">${escapeHtml(s.time)}</span>
+        </div>
+        <div class="fc-signal-body"><strong>${escapeHtml(s.who)}</strong> ${escapeHtml(s.what)}</div>
+        <div class="fc-signal-ctx">${escapeHtml(s.ctx)}</div>
+      </div>
+    `).join('');
+  }
+
+  function median(arr) {
+    if (!arr.length) return 0;
+    const s = arr.slice().sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function updateSubline(d) {
@@ -331,11 +504,43 @@
             </div>
           </div>
 
-          <div class="fc-stage-placeholder" style="margin-top:24px">
-            <div class="fc-eyebrow">Stage 2</div>
-            <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;margin-top:6px;margin-bottom:4px">KPI grid live.</div>
-            <div style="font-size:13px;color:var(--muted)">
-              Next: Priority queue (top-scoring properties) + live signals feed.
+          <div class="fc-two-col" style="margin-top:24px">
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Top-scoring properties</div>
+                <span class="fc-pill" id="fc-pq-count">—</span>
+                <div style="margin-left:auto;display:flex;gap:4px">
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter active" data-filter="all">All</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="hud">HUD</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-pq-filter" data-filter="trustee">Trustee</button>
+                </div>
+              </div>
+              <table class="fc-table" id="fc-priority-table">
+                <thead>
+                  <tr>
+                    <th style="width:28px"></th>
+                    <th>Property / source</th>
+                    <th>Status</th>
+                    <th>Confidence</th>
+                    <th style="text-align:right">Score</th>
+                    <th style="text-align:right">Sale</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="fc-priority-body">
+                  <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Live signals</div>
+                <span class="fc-pill sage"><span class="fc-dot"></span> Weekly refresh</span>
+              </div>
+              <div id="fc-signals">
+                <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Loading…</div>
+              </div>
             </div>
           </div>
         </div>
@@ -579,6 +784,105 @@
     border-radius: 6px;
     padding: 24px 28px;
     color: var(--ink);
+  }
+
+  /* ─── Two-column grid ─── */
+  .fc-two-col {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+  }
+
+  /* ─── Card ─── */
+  .fc-card {
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .fc-card-hd {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .fc-card-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .fc-btn.fc-btn-sm { height: 24px; padding: 0 8px; font-size: 11px; border-radius: 3px; }
+  .fc-btn.fc-btn-ghost { border-color: transparent; background: transparent; }
+  .fc-btn.fc-btn-ghost:hover { background: var(--paper-2); }
+  .fc-btn.fc-btn-ghost.active { background: var(--paper-2); color: var(--ink); }
+
+  /* ─── Table ─── */
+  .fc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .fc-table th {
+    text-align: left;
+    font-family: var(--f-mono);
+    font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--muted);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--hair);
+    background: var(--paper-2);
+  }
+  .fc-table td {
+    padding: 10px 12px;
+    color: var(--ink-2);
+    border-bottom: 1px solid var(--hair);
+    vertical-align: middle;
+  }
+  .fc-table tr:last-child td { border-bottom: none; }
+  .fc-table tr:hover td { background: var(--paper-2); }
+
+  .fc-prop-init {
+    width: 28px; height: 28px;
+    background: var(--paper-3); color: var(--ink);
+    display: grid; place-items: center;
+    border-radius: 4px;
+    font-family: var(--f-serif);
+    font-size: 11px; font-weight: 600;
+  }
+  .fc-prop-addr {
+    font-weight: 500; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 240px;
+  }
+  .fc-prop-meta {
+    font-size: 11px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 240px;
+  }
+
+  /* ─── Signals feed ─── */
+  .fc-signal {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .fc-signal:last-child { border-bottom: none; }
+  .fc-signal-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  }
+  .fc-signal-time {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .fc-signal-body {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .fc-signal-ctx {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
   }
 
   /* ─── KPI grid ─── */
