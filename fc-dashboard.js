@@ -239,7 +239,7 @@
       const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
       const saleUrgent = days != null && days >= 0 && days <= 3;
       return `
-        <tr>
+        <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
           <td>
             <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
@@ -260,6 +260,9 @@
         </tr>
       `;
     }).join('');
+    body.querySelectorAll('tr[data-prop-id]').forEach(tr => {
+      tr.onclick = () => openPropertyDrawer(tr.getAttribute('data-prop-id'));
+    });
   }
 
   // ─── Hot counties — ranked by volume with score signal + ring ──────────
@@ -417,7 +420,7 @@
       const saleUrgent = days != null && days >= 0 && days <= 3;
       const initials = (p.city || p.address || '??').slice(0, 2).toUpperCase();
       return `
-        <tr>
+        <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
           <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
           <td>
             <div class="fc-prop-addr">${escapeHtml(p.address || '—')}</div>
@@ -430,10 +433,14 @@
             <div class="fc-mono" style="color:${saleUrgent ? 'var(--coral)' : 'var(--ink)'}">${saleLabel}</div>
             <div class="fc-mono" style="font-size:10px;color:var(--muted)">${escapeHtml(p.sale_date || '')}</div>
           </td>
-          <td><button class="fc-btn fc-btn-sm">Open</button></td>
+          <td><button class="fc-btn fc-btn-sm fc-open-btn">Open →</button></td>
         </tr>
       `;
     }).join('');
+    // Wire row clicks → open drawer
+    body.querySelectorAll('tr[data-prop-id]').forEach(tr => {
+      tr.onclick = () => openPropertyDrawer(tr.getAttribute('data-prop-id'));
+    });
   }
 
   // ─── Signals feed — derive from live data (sources, recency, status) ────
@@ -534,6 +541,220 @@
   function escapeHtml(s) {
     if (s == null) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ─── Property drawer — full profile slide-over ─────────────────────────
+  function openPropertyDrawer(propId) {
+    const data = window.__fcData;
+    if (!data) return;
+    const p = (data.foreclosures || []).find(x => x.id === propId);
+    if (!p) return;
+
+    // Create or reuse drawer container
+    let drawer = document.getElementById('fc-drawer');
+    let backdrop = document.getElementById('fc-drawer-backdrop');
+    if (!drawer) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'fc-drawer-backdrop';
+      backdrop.className = 'fc-drawer-backdrop';
+      backdrop.onclick = closePropertyDrawer;
+      document.body.appendChild(backdrop);
+
+      drawer = document.createElement('aside');
+      drawer.id = 'fc-drawer';
+      drawer.className = 'fc-drawer';
+      document.body.appendChild(drawer);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closePropertyDrawer();
+      });
+    }
+
+    drawer.innerHTML = renderDrawerContent(p);
+    // Wire close button
+    const closeBtn = drawer.querySelector('#fc-drawer-close');
+    if (closeBtn) closeBtn.onclick = closePropertyDrawer;
+
+    // Animate in
+    requestAnimationFrame(() => {
+      backdrop.classList.add('open');
+      drawer.classList.add('open');
+    });
+  }
+
+  function closePropertyDrawer() {
+    const drawer = document.getElementById('fc-drawer');
+    const backdrop = document.getElementById('fc-drawer-backdrop');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+
+  function renderDrawerContent(p) {
+    const pr = p.pricing || {};
+    const conf = pr.confidence || '';
+    const confTier = conf.split('—')[0].trim();
+    const confSource = conf.split('—')[1] ? conf.split('—')[1].trim() : '';
+
+    const rehabEstimate = p.rehabEstimate || Math.round((pr.arv || 0) * 0.08);
+    const passes70 = pr.passes_70_rule;
+    const gap = (p.price || 0) - (pr.mao_70 || 0);
+
+    // Source-specific closing playbook
+    const isHUD = p.source === 'HUD HomeStore';
+    const playbook = isHUD ? {
+      title: 'HUD REO Purchase',
+      icon: 'H',
+      steps: [
+        'Get mortgage preapproval or proof of funds',
+        'Submit sealed bid via HUDHomeStore.gov (investor period after 15-day owner-occupant window)',
+        'If accepted: sales docs within 48 hours',
+        'Close on HUD-contracted settlement date (typically 30-45 days)',
+      ],
+      notes: 'Property sold as-is. FHA financing may apply (see FHA status below). Earnest deposit is forfeited if investor walks.',
+    } : {
+      title: 'VA Trustee Sale',
+      icon: 'T',
+      steps: [
+        'Research: title search + drive-by + ARV comps (30-45 days pre-sale)',
+        'Sale day: certified funds for 10% deposit; cash-only auction on courthouse steps',
+        'Winning bid: pay remaining balance in full within 24 hours',
+        'Trustee\'s Deed recorded 3-14 days later',
+        'Eviction (if occupied): 5-day notice + unlawful detainer',
+      ],
+      notes: 'Cash-only purchase. Property as-is with occupants (if any). Quiet title action strongly recommended post-purchase ($1.5-5K, 60-120 days).',
+    };
+
+    return `
+      <div class="fc-drawer-head">
+        <button id="fc-drawer-close" class="fc-drawer-close" aria-label="Close">×</button>
+        <div class="fc-drawer-hero">
+          <div class="fc-drawer-hero-left">
+            ${gradeBadgeLarge(p.grade)}
+          </div>
+          <div class="fc-drawer-hero-body">
+            <div class="fc-drawer-address">${escapeHtml(p.address || '—')}</div>
+            <div class="fc-drawer-subaddr">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(p.county || '')}</div>
+            <div class="fc-drawer-tags">
+              <span class="fc-pill ink">${escapeHtml(p.source || '')}</span>
+              ${confTier ? `<span class="fc-pill ${confTier === 'HIGH' ? 'gold' : confTier === 'MEDIUM' ? 'sky' : ''}">${escapeHtml(confTier)} conf</span>` : ''}
+              ${rule70Pill(p)}
+              ${p.days_to_sale != null ? `<span class="fc-pill ${p.days_to_sale <= 7 ? 'coral' : ''}">${p.days_to_sale <= 0 ? 'Sale today' : p.days_to_sale + 'd to sale'}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fc-drawer-body">
+        ${section('Deal summary', `
+          ${kvRow('Purchase Price', '$' + (p.price || 0).toLocaleString())}
+          ${kvRow('After Repair Value (ARV)', '$' + (p.arv || 0).toLocaleString())}
+          ${kvRow('Rehab Estimate (8% ARV)', '$' + rehabEstimate.toLocaleString())}
+          ${kvRow('MAO — 70% Rule', '$' + (pr.mao_70 || 0).toLocaleString())}
+          ${kvRow('Gap to MAO', (gap <= 0 ? '−' : '+') + '$' + Math.abs(gap).toLocaleString(),
+                  gap <= 0 ? 'sage' : 'coral', gap <= 0 ? '✓ clears 70% rule' : '⚠ above max offer')}
+          ${kvRow('Discount to ARV', (pr.discount_to_arv || 0).toFixed(1) + '%', (pr.discount_to_arv || 0) >= 25 ? 'sage' : 'muted')}
+        `)}
+
+        ${section('Rental financials', `
+          ${kvRow('Monthly Rent', '$' + (p.monthlyRent || 0).toLocaleString(), 'ink', pr.rent_source === 'RentCast' ? 'RentCast market data' : 'Heuristic (0.7% of ARV)')}
+          ${kvRow('Cash Flow', '$' + (p.cashFlow || 0).toLocaleString() + '/mo', (p.cashFlow || 0) > 0 ? 'sage' : 'coral')}
+          ${kvRow('Cap Rate', (p.capRate || 0) + '%')}
+          ${kvRow('DSCR', (pr.dscr || 0).toFixed(2),
+                  (pr.dscr || 0) >= 1.25 ? 'sage' : (pr.dscr || 0) >= 1.0 ? 'muted' : 'coral',
+                  (pr.dscr || 0) >= 1.25 ? 'BRRRR-ready' : (pr.dscr || 0) >= 1.0 ? 'Covers mortgage' : 'Negative leverage')}
+          ${kvRow('Investment Score', (p.score || 0) + ' / 100')}
+        `)}
+
+        ${section('Property details', `
+          ${kvRow('Beds / Baths', `${p.beds || 0}bd / ${p.baths || 0}ba`)}
+          ${kvRow('Square Footage', (p.sqft || 0).toLocaleString() + ' sf')}
+          ${kvRow('Year Built', p.yearBuilt || p.year_built || '—')}
+          ${kvRow('Property Type', p.property_type || '—')}
+          ${p.lot_size ? kvRow('Lot Size', (p.lot_size || 0).toLocaleString() + ' sf') : ''}
+        `)}
+
+        ${section('Sale', `
+          ${kvRow('Sale Date', p.sale_date || p.sale_date_raw || '—')}
+          ${kvRow('Sale Time', p.sale_time || '—')}
+          ${kvRow('Location', p.sale_location || '—')}
+          ${kvRow('Status', p.status || 'Active')}
+          ${p.days_to_sale != null ? kvRow('Days to Sale', p.days_to_sale <= 0 ? 'Today / past' : p.days_to_sale + ' days',
+                                          p.days_to_sale <= 7 && p.days_to_sale >= 0 ? 'coral' : 'ink') : ''}
+        `)}
+
+        ${isHUD ? section('HUD details', `
+          ${p.hud_fha ? kvRow('FHA Financing', escapeHtml(p.hud_fha),
+                              (p.hud_fha || '').startsWith('IN') ? 'sage' : 'muted') : ''}
+          ${p.hud_list_date ? kvRow('Listed', escapeHtml(p.hud_list_date)) : ''}
+          ${p.hud_bid_open ? kvRow('Bid Opens', escapeHtml(p.hud_bid_open)) : ''}
+          ${p.hud_deadline ? kvRow('Period Deadline', escapeHtml(p.hud_deadline)) : ''}
+        `) : ''}
+
+        ${section('Source', `
+          ${kvRow('Trustee / Firm', p.source || '—')}
+          ${p.firm_file_number ? kvRow('File Number', p.firm_file_number) : ''}
+          ${p.source_url ? `<div class="fc-kv"><a href="${escapeAttr(p.source_url)}" target="_blank" rel="noopener" style="color:var(--gold-ink);font-size:12px;font-weight:500">View on source →</a></div>` : ''}
+        `)}
+
+        ${section(`Closing playbook — ${playbook.title}`, `
+          <ol class="fc-playbook">
+            ${playbook.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+          </ol>
+          <div class="fc-playbook-note">${escapeHtml(playbook.notes)}</div>
+        `)}
+
+        <div class="fc-drawer-actions">
+          <button class="fc-btn fc-btn-dark" style="flex:1">Add to Watchlist</button>
+          <button class="fc-btn" style="flex:1">Open Calculator</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function section(title, bodyHtml) {
+    return `
+      <div class="fc-drawer-section">
+        <div class="fc-drawer-section-hd">${escapeHtml(title)}</div>
+        <div class="fc-drawer-section-body">${bodyHtml}</div>
+      </div>
+    `;
+  }
+
+  function kvRow(label, value, valueClass, caption) {
+    const colorMap = {
+      sage:  'color:var(--sage)',
+      coral: 'color:var(--coral)',
+      gold:  'color:var(--gold-ink)',
+      muted: 'color:var(--muted)',
+      ink:   'color:var(--ink)',
+    };
+    const style = colorMap[valueClass] || 'color:var(--ink)';
+    return `
+      <div class="fc-kv">
+        <div class="fc-kv-label">${escapeHtml(label)}</div>
+        <div class="fc-kv-value" style="${style}">
+          ${String(value)}
+          ${caption ? `<span class="fc-kv-caption">${escapeHtml(caption)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  function gradeBadgeLarge(grade) {
+    const g = grade || 'D';
+    const colors = {
+      'A+': { bg: 'var(--sage-soft)',  fg: 'var(--sage)' },
+      'A':  { bg: 'var(--sage-soft)',  fg: 'var(--sage)' },
+      'B':  { bg: 'var(--gold-soft)',  fg: 'var(--gold-ink)' },
+      'C':  { bg: 'var(--paper-2)',   fg: 'var(--ink-3)' },
+      'D':  { bg: 'var(--coral-soft)', fg: 'var(--coral)' },
+    };
+    const c = colors[g] || colors.D;
+    return `<div class="fc-grade-large" style="background:${c.bg};color:${c.fg}">${escapeHtml(g)}</div>`;
   }
 
   // ─── Deal-quality badge helpers ─────────────────────────────────────────
@@ -1260,6 +1481,165 @@
     font-size: 11px; color: var(--muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 240px;
+  }
+
+  /* ─── Row click affordance ─── */
+  .fc-row-clickable { cursor: pointer; }
+  .fc-row-clickable:hover .fc-open-btn {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* ─── Property drawer ─── */
+  .fc-drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(14, 23, 40, 0);
+    z-index: 90;
+    pointer-events: none;
+    transition: background 0.2s ease;
+  }
+  .fc-drawer-backdrop.open {
+    background: rgba(14, 23, 40, 0.28);
+    pointer-events: auto;
+  }
+  .fc-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 520px; max-width: calc(100vw - 40px);
+    background: var(--paper);
+    border-left: 1px solid var(--hair);
+    box-shadow: -4px 0 24px rgba(14, 23, 40, 0.08);
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(.4,.0,.2,1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fc-drawer.open { transform: translateX(0); }
+
+  .fc-drawer-head {
+    position: relative;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--hair);
+    background: var(--paper);
+    flex-shrink: 0;
+  }
+  .fc-drawer-close {
+    position: absolute; top: 14px; right: 16px;
+    width: 28px; height: 28px;
+    border-radius: 4px; border: 1px solid var(--hair);
+    background: var(--white); color: var(--ink-3);
+    font-size: 18px; line-height: 1;
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .fc-drawer-close:hover { background: var(--paper-2); }
+
+  .fc-drawer-hero {
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .fc-drawer-hero-body { flex: 1; min-width: 0; padding-right: 32px; }
+  .fc-drawer-address {
+    font-family: var(--f-serif);
+    font-size: 20px; font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .fc-drawer-subaddr {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .fc-drawer-tags {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .fc-grade-large {
+    display: grid; place-items: center;
+    width: 56px; height: 56px;
+    border-radius: 6px;
+    font-family: var(--f-serif);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+  }
+
+  .fc-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0 24px;
+  }
+  .fc-drawer-body::-webkit-scrollbar { width: 8px; }
+  .fc-drawer-body::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 8px; }
+  .fc-drawer-body::-webkit-scrollbar-track { background: var(--paper); }
+
+  .fc-drawer-section {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .fc-drawer-section:last-child { border-bottom: none; }
+  .fc-drawer-section-hd {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .fc-drawer-section-body { display: flex; flex-direction: column; gap: 6px; }
+
+  .fc-kv {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px;
+    padding: 4px 0;
+  }
+  .fc-kv-label {
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .fc-kv-value {
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .fc-kv-caption {
+    display: block;
+    font-family: var(--f-ui);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0;
+    margin-top: 2px;
+  }
+
+  .fc-playbook {
+    padding-left: 20px;
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .fc-playbook li { margin-bottom: 5px; }
+  .fc-playbook-note {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 10px 12px;
+    background: var(--paper-2);
+    border-radius: 4px;
+    border-left: 3px solid var(--gold);
+    line-height: 1.5;
+  }
+
+  .fc-drawer-actions {
+    display: flex; gap: 8px;
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--hair);
+    background: var(--paper);
+    position: sticky; bottom: 0;
+    margin-top: auto;
   }
 
   /* ─── Letter grade badge ─── */
