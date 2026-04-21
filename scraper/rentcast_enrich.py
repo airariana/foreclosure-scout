@@ -252,6 +252,14 @@ def enrich_properties(properties: list[dict], api_key: str) -> dict:
     }
 
     for p in properties:
+        # Sources like DC Vacant set _skip_rentcast=True because they're
+        # distress leads, not listings — users don't need beds/baths/rent
+        # to decide whether to pursue owner outreach. Saves ~3 API calls
+        # per record and keeps the monthly quota predictable.
+        if p.get("_skip_rentcast"):
+            stats["skipped"] += 1
+            continue
+
         key = _normalize_key(
             p.get("address") or "",
             p.get("city") or "",
