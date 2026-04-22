@@ -339,6 +339,27 @@
           <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--f-mono)">${f.hint}</div>
         </div>
       `).join('')}
+
+      <!-- Zillow backup section -->
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--hair)">
+        <div class="fc-eyebrow" style="margin-bottom:6px">Zillow data backup</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+          Export your saved Zestimate + rent values as a JSON file. Useful before switching domains, clearing browser data, or moving to a new device.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="fc-btn" id="fc-zillow-export" type="button">⬇︎ Export JSON</button>
+          <label class="fc-btn" style="cursor:pointer;position:relative">
+            <span>⬆︎ Import JSON…</span>
+            <input type="file" id="fc-zillow-import" accept="application/json,.json"
+              style="position:absolute;inset:0;opacity:0;cursor:pointer">
+          </label>
+          <span id="fc-zillow-backup-status" style="font-family:var(--f-mono);font-size:11px;color:var(--sage);margin-left:auto"></span>
+        </div>
+        <div style="font-size:10px;color:var(--muted2);margin-top:8px;font-family:var(--f-mono)">
+          Current domain: <strong id="fc-zillow-origin">${window.location.origin}</strong>
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:24px">
         <button class="fc-btn" id="fc-keys-cancel">Cancel</button>
         <button class="fc-btn fc-btn-dark" id="fc-keys-save">Save</button>
@@ -358,6 +379,46 @@
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.getElementById('fc-keys-close').onclick = close;
     document.getElementById('fc-keys-cancel').onclick = close;
+
+    // Wire Zillow export/import
+    const statusEl = document.getElementById('fc-zillow-backup-status');
+    const flash = (msg, color) => {
+      if (!statusEl) return;
+      statusEl.style.color = color || 'var(--sage)';
+      statusEl.textContent = msg;
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+    };
+    const exportBtn = document.getElementById('fc-zillow-export');
+    if (exportBtn) {
+      exportBtn.onclick = () => {
+        const count = exportZillowData();
+        flash(count === 0 ? '⚠ No entries to export' : `✓ Exported ${count} entries`,
+              count === 0 ? 'var(--coral)' : 'var(--sage)');
+      };
+    }
+    const importInput = document.getElementById('fc-zillow-import');
+    if (importInput) {
+      importInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const { imported, skipped } = importZillowData(text);
+          flash(`✓ Imported ${imported}${skipped ? ' (skipped ' + skipped + ' non-Zillow keys)' : ''}`, 'var(--sage)');
+          // Apply overrides + re-render so the newly-imported entries take effect.
+          if (window.__fcData) {
+            applyAllZillowOverrides(window.__fcData);
+            renderKPIs(window.__fcData);
+            renderPriorityQueue(window.__fcData);
+            renderListings(window.__fcData);
+          }
+        } catch (err) {
+          flash(`⚠ ${err.message}`, 'var(--coral)');
+        } finally {
+          importInput.value = ''; // allow re-selecting the same file
+        }
+      };
+    }
 
     document.getElementById('fc-keys-save').onclick = () => {
       for (const f of fields) {
@@ -410,19 +471,88 @@
     } catch (e) { return null; }
   }
 
-  function setZillowValues(propId, values) {
+  function setZillowValues(propId, values, property) {
     if (!propId) return;
     if (values && (values.zestimate || values.rent || values.notes)) {
+      // Include property metadata so the entry can be recovered if the
+      // property ID changes (e.g., sale_date postponed → new hash → new ID).
+      const meta = property ? {
+        _address: property.address || '',
+        _city:    property.city    || '',
+        _state:   property.state   || '',
+        _zip:     property.zip     || property.zip_code || '',
+      } : {};
       localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify({
         zestimate: values.zestimate ? Number(values.zestimate) : null,
         rent:      values.rent      ? Number(values.rent)      : null,
         notes:     values.notes || '',
         updatedAt: new Date().toISOString(),
+        ...meta,
       }));
     } else {
       localStorage.removeItem(ZILLOW_LS_PREFIX + propId);
     }
   }
+
+  // ── Zillow backup helpers ──────────────────────────────────────────────
+  // Export all Zillow entries as a single JSON blob and trigger a download.
+  // Safe to run anytime as a local backup. The exported file is plain JSON
+  // so it can be hand-edited or committed to a private repo for safekeeping.
+  function exportZillowData() {
+    const entries = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(ZILLOW_LS_PREFIX)) {
+        try { entries[k] = JSON.parse(localStorage.getItem(k)); }
+        catch (e) { entries[k] = localStorage.getItem(k); }
+      }
+    }
+    const payload = {
+      app:        'Nestscoop',
+      exportedAt: new Date().toISOString(),
+      count:      Object.keys(entries).length,
+      entries,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nestscoop-zillow-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return payload.count;
+  }
+
+  // Parse an import JSON blob and write entries back to localStorage. Accepts
+  // either the wrapped export format OR a flat {key: value} dictionary (for
+  // pasted clipboard content from the one-liner recovery script).
+  function importZillowData(jsonString) {
+    let parsed;
+    try { parsed = JSON.parse(jsonString); }
+    catch (e) { throw new Error('Invalid JSON: ' + e.message); }
+
+    const entries = parsed.entries && typeof parsed.entries === 'object'
+      ? parsed.entries
+      : parsed;
+
+    let imported = 0;
+    let skipped = 0;
+    for (const [key, value] of Object.entries(entries)) {
+      if (!key.startsWith(ZILLOW_LS_PREFIX)) {
+        skipped += 1;
+        continue;
+      }
+      const raw = typeof value === 'string' ? value : JSON.stringify(value);
+      localStorage.setItem(key, raw);
+      imported += 1;
+    }
+    return { imported, skipped };
+  }
+
+  window.fcExportZillowData = exportZillowData;
+  window.fcImportZillowData = importZillowData;
 
   // County tiers for scoring. Mirrors TIER_1_COUNTIES / TIER_2_COUNTIES in
   // scraper/va_foreclosure_scraper.py — keep in sync when either list changes.
@@ -507,12 +637,13 @@
     const zEl = document.getElementById(`fc-z-arv-${sanitizedId}`);
     const rEl = document.getElementById(`fc-z-rent-${sanitizedId}`);
     const nEl = document.getElementById(`fc-z-notes-${sanitizedId}`);
+    const d = window.__fcData;
+    const property = d ? (d.foreclosures || []).find(x => x.id === propId) : null;
     setZillowValues(propId, {
       zestimate: zEl ? zEl.value : '',
       rent:      rEl ? rEl.value : '',
       notes:     nEl ? nEl.value : '',
-    });
-    const d = window.__fcData;
+    }, property);
     if (d) {
       applyAllZillowOverrides(d);
       renderKPIs(d);
@@ -1101,7 +1232,7 @@
         advanceQueue(1);
         return;
       }
-      setZillowValues(p.id, { zestimate: arv, rent, notes });
+      setZillowValues(p.id, { zestimate: arv, rent, notes }, p);
       applyAllZillowOverrides(window.__fcData);
       // Re-render other views silently so they reflect the new data.
       renderKPIs(window.__fcData);
