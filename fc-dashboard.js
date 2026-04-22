@@ -1886,20 +1886,68 @@ Return ONLY the 2-sentence analysis.`,
           const subject = encodeURIComponent(s.subject);
           const body    = encodeURIComponent(s.body);
           const smsBody = encodeURIComponent(s.smsBody);
-          // sms: syntax differs subtly between iOS and Android. "?&body=" is
-          // the broadly-compatible form (iOS is strict, Android accepts both).
           const emailHref = `mailto:?subject=${subject}&body=${body}`;
           const smsHref   = `sms:?&body=${smsBody}`;
-          return section('Share', `
-            <div class="fc-kv-caption" style="color:var(--muted);font-size:11px;margin-bottom:10px">
-              Sends a summary with key metrics + a direct link back to this property.
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <a class="fc-btn fc-btn-sm" href="${escapeAttr(emailHref)}">📧 Email</a>
-              <a class="fc-btn fc-btn-sm" href="${escapeAttr(smsHref)}">💬 Text</a>
-              <button class="fc-btn fc-btn-sm" id="fc-share-copy-${sanitizedId}">🔗 Copy link</button>
-              <button class="fc-btn fc-btn-sm fc-btn-ghost" id="fc-share-native-${sanitizedId}" style="display:none">📱 More…</button>
-              <span class="fc-kv-caption" id="fc-share-feedback-${sanitizedId}" style="align-self:center;color:var(--sage);font-size:11px"></span>
+          const shortUrl = s.url.replace(/^https?:\/\//, '');
+          const typeBadge = typePill(p.listingType);
+          const priceStr = '$' + (p.price || 0).toLocaleString();
+          const arvStr   = '$' + (p.arv || 0).toLocaleString();
+          const discountStr = (p.discount || 0) + '%';
+          return section('Share this property', `
+            <div class="fc-share-card">
+              <!-- Preview card (what recipient sees) -->
+              <div class="fc-share-preview">
+                <div class="fc-share-preview-head">
+                  ${gradeBadge(p.grade)}
+                  <div style="flex:1;min-width:0">
+                    <div class="fc-share-preview-addr" title="${escapeAttr(p.address || '')}">${escapeHtml(p.address || '—')}</div>
+                    <div class="fc-share-preview-sub">
+                      ${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')}
+                    </div>
+                  </div>
+                  ${typeBadge}
+                </div>
+                <div class="fc-share-preview-stats">
+                  <div class="fc-share-stat">
+                    <div class="fc-share-stat-val">${priceStr}</div>
+                    <div class="fc-share-stat-key">Price</div>
+                  </div>
+                  <div class="fc-share-stat">
+                    <div class="fc-share-stat-val">${arvStr}</div>
+                    <div class="fc-share-stat-key">ARV</div>
+                  </div>
+                  <div class="fc-share-stat">
+                    <div class="fc-share-stat-val sage">${discountStr}</div>
+                    <div class="fc-share-stat-key">Below ARV</div>
+                  </div>
+                </div>
+                <div class="fc-share-preview-url" id="fc-share-url-${sanitizedId}">
+                  <span class="fc-share-url-icon">🔗</span>
+                  <span class="fc-share-url-text">${escapeHtml(shortUrl)}</span>
+                </div>
+              </div>
+
+              <!-- Action tiles -->
+              <div class="fc-share-actions">
+                <a class="fc-share-tile" href="${escapeAttr(emailHref)}">
+                  <div class="fc-share-tile-icon">📧</div>
+                  <div class="fc-share-tile-label">Email</div>
+                </a>
+                <a class="fc-share-tile" href="${escapeAttr(smsHref)}">
+                  <div class="fc-share-tile-icon">💬</div>
+                  <div class="fc-share-tile-label">Text</div>
+                </a>
+                <button class="fc-share-tile" id="fc-share-copy-${sanitizedId}" type="button">
+                  <div class="fc-share-tile-icon">🔗</div>
+                  <div class="fc-share-tile-label">Copy link</div>
+                </button>
+                <button class="fc-share-tile" id="fc-share-native-${sanitizedId}" type="button" style="display:none">
+                  <div class="fc-share-tile-icon">📱</div>
+                  <div class="fc-share-tile-label">More…</div>
+                </button>
+              </div>
+
+              <div class="fc-share-feedback" id="fc-share-feedback-${sanitizedId}"></div>
             </div>
           `);
         })()}
@@ -3182,6 +3230,121 @@ Return ONLY the 2-sentence analysis.`,
     margin-bottom: 10px;
   }
   .fc-drawer-section-body { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── Share card ──────────────────────────────────────────────────── */
+  .fc-share-card {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .fc-share-preview {
+    background: linear-gradient(135deg, var(--paper-2) 0%, var(--paper-3) 100%);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .fc-share-preview::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at top right, var(--gold-soft) 0%, transparent 40%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .fc-share-preview-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .fc-share-preview-addr {
+    font-family: var(--f-serif);
+    font-size: 16px; font-weight: 600; color: var(--ink);
+    line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .fc-share-preview-sub {
+    font-family: var(--f-mono); font-size: 10px; color: var(--muted);
+    margin-top: 2px;
+  }
+  .fc-share-preview-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 12px;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .fc-share-stat {
+    text-align: center;
+  }
+  .fc-share-stat-val {
+    font-family: var(--f-mono); font-size: 14px; font-weight: 600;
+    color: var(--ink); line-height: 1.2;
+  }
+  .fc-share-stat-val.sage { color: var(--sage); }
+  .fc-share-stat-key {
+    font-family: var(--f-mono); font-size: 9px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin-top: 3px;
+  }
+  .fc-share-preview-url {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px;
+    background: var(--white);
+    border: 1px dashed var(--hair-2);
+    border-radius: 5px;
+    font-family: var(--f-mono); font-size: 10px;
+    color: var(--muted);
+    position: relative;
+  }
+  .fc-share-url-icon { opacity: 0.6; }
+  .fc-share-url-text {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--ink-3);
+  }
+
+  .fc-share-actions {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .fc-share-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 12px 8px;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--f-ui);
+    transition: transform 120ms, border-color 120ms, box-shadow 120ms, background 120ms;
+  }
+  .fc-share-tile:hover {
+    border-color: var(--gold-deep);
+    background: var(--gold-soft);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(14, 23, 40, 0.08);
+  }
+  .fc-share-tile:active { transform: translateY(0); }
+  .fc-share-tile-icon { font-size: 20px; line-height: 1; }
+  .fc-share-tile-label {
+    font-size: 11px; font-weight: 500; color: var(--ink-2);
+  }
+
+  .fc-share-feedback {
+    min-height: 14px;
+    font-family: var(--f-mono); font-size: 11px;
+    color: var(--sage);
+    text-align: center;
+    transition: opacity 200ms;
+  }
+
+  @media (max-width: 540px) {
+    .fc-share-actions { grid-template-columns: repeat(2, 1fr); }
+  }
 
   .fc-kv {
     display: flex; justify-content: space-between; align-items: baseline;
