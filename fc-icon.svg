@@ -1,28 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <!-- Rounded square dark tile -->
+  <!-- Rounded navy tile -->
   <rect width="192" height="192" rx="28" fill="#0E1728"/>
 
-  <!-- Magnifying glass: lens circle + handle -->
-  <!-- Gold-accent ring outside -->
-  <circle cx="82" cy="82" r="58" fill="none" stroke="#D4A93A" stroke-width="6"/>
+  <!-- Roof peak (home/property hint) -->
+  <path d="M 64 66 L 96 40 L 128 66"
+        stroke="#D4A93A" stroke-width="8" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Lens interior: warm paper tone so house reads cleanly -->
-  <circle cx="82" cy="82" r="52" fill="#FAF8F3"/>
+  <!-- Nest cradle (U-curve below, the "scoop") -->
+  <path d="M 44 96 Q 44 156 96 156 Q 148 156 148 96"
+        stroke="#D4A93A" stroke-width="10" fill="none"
+        stroke-linecap="round"/>
 
-  <!-- Inside the lens: minimalist house -->
-  <g transform="translate(82, 82)">
-    <!-- Roof (triangle) -->
-    <polygon points="-28,-2 0,-28 28,-2" fill="#0E1728"/>
-    <!-- House body -->
-    <rect x="-24" y="-2" width="48" height="32" fill="#0E1728"/>
-    <!-- Door (gold accent, echoes the ring) -->
-    <rect x="-6" y="10" width="12" height="20" fill="#D4A93A"/>
-    <!-- Windows -->
-    <rect x="-19" y="4" width="9" height="9" fill="#FAF8F3"/>
-    <rect x="10" y="4" width="9" height="9" fill="#FAF8F3"/>
-  </g>
-
-  <!-- Magnifying glass handle -->
-  <rect x="128" y="128" width="14" height="48" rx="6" fill="#D4A93A"
-        transform="rotate(45, 135, 152)"/>
+  <!-- Egg inside the nest (the "find") -->
+  <ellipse cx="96" cy="112" rx="22" ry="28" fill="#D4A93A"/>
 </svg>
