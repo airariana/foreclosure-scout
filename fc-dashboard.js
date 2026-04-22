@@ -929,8 +929,14 @@
       renderAICoach(d);
       updateSubline(d);
       updateSidebarCounts(d);
-      // Re-render listings if that's the active view
-      if ((location.hash || '').replace('#', '') === 'listings') renderListings(d);
+      // Lazy views (Zillow Queue, 203(k), Listings) only render when their
+      // setView runs with __fcData present. If the user lands directly on
+      // one of those hashes, __fcData is still null at first setView call,
+      // so we need to re-render here once data is in.
+      const currentView = (location.hash || '').replace('#', '');
+      if (currentView === 'listings')        renderListings(d);
+      if (currentView === 'zillow-queue')    renderZillowQueue(d);
+      if (currentView === 'financing-203k')  render203k(d);
       // Deep-link: ?p=<propId> auto-opens that property's drawer after load.
       handleShareDeepLink();
     } catch (e) {
