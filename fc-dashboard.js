@@ -47,6 +47,111 @@
     document.head.appendChild(s);
   }
 
+  // ─── Auth (client-side passphrase gate) ─────────────────────────────────
+  // SECURITY NOTE: This is "keep casual visitors out" not real security.
+  // Anyone who opens DevTools can bypass it. Use Cloudflare Access or a
+  // proper backend-enforced auth when the data actually needs protecting.
+  //
+  // Two roles:
+  //   admin  → full access (watchlist, Zillow Queue, Data Keys, edit flows)
+  //   viewer → read-only (dashboard, listings, map, 203(k) browse)
+  //
+  // Passwords are stored as SHA-256 hashes below, not plaintext. To change,
+  // run this one-liner in the browser console with your new password:
+  //   (async p => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(p)))].map(b=>b.toString(16).padStart(2,'0')).join(''))('YOUR_PASSWORD')
+  // then paste the output into the corresponding hash below and commit.
+  const AUTH_LS_KEY = 'fc_auth_role';
+  const PASS_HASHES = {
+    // Default plaintext: 'nestscoop-admin'
+    admin:  'fb31cf9bde459561ba24b7bbe36b635bad2c585f04ccecab65f8ff9bd75210eb',
+    // Default plaintext: 'nestscoop-view'
+    viewer: '7e07ddc56c51284c66ad29006a7f7170880ca472bcc172eecddcf7f35a1ed15e',
+  };
+
+  async function hashPassphrase(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  function getRole()   { return localStorage.getItem(AUTH_LS_KEY); }
+  function setRole(r)  { localStorage.setItem(AUTH_LS_KEY, r); }
+  function clearRole() { localStorage.removeItem(AUTH_LS_KEY); }
+  function isAdmin()   { return getRole() === 'admin'; }
+  function isViewer()  { return getRole() === 'viewer'; }
+  function isAuthed()  { return getRole() === 'admin' || getRole() === 'viewer'; }
+  window.fcSignOut = () => { clearRole(); location.reload(); };
+
+  // Apply role to <body> so CSS can hide/show elements. Also hide the
+  // mobile-frame entirely until authed so nothing leaks through the gate.
+  function applyRoleToDom() {
+    document.body.classList.toggle('fc-role-admin',  isAdmin());
+    document.body.classList.toggle('fc-role-viewer', isViewer());
+  }
+
+  // Show a full-screen login overlay. Blocks the rest of init() until the
+  // user's passphrase matches one of the two known hashes.
+  function showAuthGate() {
+    return new Promise((resolve) => {
+      // Hide any legacy mobile-frame content peeking through.
+      const mobileFrame = document.querySelector('.mobile-frame');
+      if (mobileFrame) mobileFrame.style.visibility = 'hidden';
+
+      const overlay = document.createElement('div');
+      overlay.id = 'fc-auth-overlay';
+      overlay.innerHTML = `
+        <div class="fc-auth-card">
+          <div class="fc-auth-brand">
+            <img src="fc-icon.svg?v=3" width="40" height="40" alt="Nestscoop"/>
+            <div class="fc-auth-title">Nestscoop</div>
+          </div>
+          <div class="fc-auth-sub">DC · MD · VA Foreclosure Intelligence</div>
+          <form class="fc-auth-form" id="fc-auth-form" autocomplete="off">
+            <label class="fc-auth-label" for="fc-auth-input">Access passphrase</label>
+            <input id="fc-auth-input" type="password" autocomplete="off"
+                   spellcheck="false" autocapitalize="off" autocorrect="off"
+                   placeholder="Enter your passphrase"
+                   class="fc-auth-input" required>
+            <div id="fc-auth-error" class="fc-auth-error"></div>
+            <button type="submit" class="fc-auth-submit">Unlock</button>
+            <div class="fc-auth-foot">
+              Two access levels: admin (full) and viewer (read-only).
+              Ask the owner for your passphrase.
+            </div>
+          </form>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const form   = overlay.querySelector('#fc-auth-form');
+      const input  = overlay.querySelector('#fc-auth-input');
+      const errEl  = overlay.querySelector('#fc-auth-error');
+      input.focus();
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.textContent = '';
+        const candidate = (input.value || '').trim();
+        if (!candidate) return;
+        const hash = await hashPassphrase(candidate);
+        let matchedRole = null;
+        for (const [role, h] of Object.entries(PASS_HASHES)) {
+          if (h && hash === h) { matchedRole = role; break; }
+        }
+        if (!matchedRole) {
+          errEl.textContent = 'Passphrase not recognized.';
+          input.value = '';
+          input.focus();
+          return;
+        }
+        setRole(matchedRole);
+        overlay.remove();
+        if (mobileFrame) mobileFrame.style.visibility = '';
+        resolve(matchedRole);
+      });
+    });
+  }
+
   // ─── Build the desktop layout (called only when isDesktop()) ────────────
   function buildShell() {
     if (document.getElementById('fc-dash-root')) return;
@@ -130,6 +235,20 @@
     wireTopbarSearch(root);
     wireTopbarWatchlist(root);
     wireSidebarDrawer(root);
+    wireRoleChip(root);
+  }
+
+  // Role chip: shows current role, click to sign out (clears role +
+  // reloads so the gate reappears).
+  function wireRoleChip(root) {
+    const btn = root.querySelector('#fc-tb-role');
+    if (!btn) return;
+    const role = getRole() || 'guest';
+    const label = role === 'admin' ? '● Admin' : role === 'viewer' ? '○ Viewer' : '? Guest';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      if (confirm('Sign out of Nestscoop?')) window.fcSignOut();
+    });
   }
 
   // ─── Topbar search ──────────────────────────────────────────────────────
@@ -3643,9 +3762,14 @@ Return ONLY the 2-sentence analysis.`,
   // Builds the dashboard shell on all viewports now. Mobile adaptations
   // happen via responsive CSS (sidebar becomes an off-canvas drawer,
   // condensed topbar, single-column layouts).
-  function init() {
+  async function init() {
     loadFonts();
     injectCSS();
+    // Auth gate — if no role stored yet, block until user enters passphrase.
+    if (!isAuthed()) {
+      await showAuthGate();
+    }
+    applyRoleToDom();
     buildShell();
     loadData();
   }
@@ -3710,7 +3834,8 @@ Return ONLY the 2-sentence analysis.`,
         <button class="fc-tb-btn" title="Notifications">${ICO.bell}</button>
         <button class="fc-tb-btn" id="fc-tb-keys" title="Data Keys">${ICO.gear}</button>
         <button class="fc-tb-btn fc-primary" id="fc-tb-watchlist" title="View watchlisted properties">${ICO.plus} Watchlist <span id="fc-tb-watchlist-count" class="fc-state-count" style="margin-left:4px">0</span></button>
-        <div class="fc-avatar">AJ</div>
+        <!-- Role indicator + sign out: click to log out. -->
+        <button class="fc-tb-btn fc-role-chip" id="fc-tb-role" title="Sign out"></button>
       </div>
     </div>
 
@@ -5113,6 +5238,108 @@ Return ONLY the 2-sentence analysis.`,
     width: 64px; height: 32px;
     opacity: 0.8;
   }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Auth gate overlay + role-based visibility
+     ─────────────────────────────────────────────────────────────────── */
+  #fc-auth-overlay {
+    position: fixed; inset: 0; z-index: 100000;
+    background: linear-gradient(180deg, #0E1728 0%, #1B2640 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    font-family: "Inter Tight", "Inter", system-ui, -apple-system, sans-serif;
+    animation: fc-auth-in 240ms ease-out;
+  }
+  @keyframes fc-auth-in { from { opacity: 0 } to { opacity: 1 } }
+  .fc-auth-card {
+    width: min(440px, 100%);
+    background: #FAF8F3;
+    border-radius: 10px;
+    padding: 36px 32px 28px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+  }
+  .fc-auth-brand {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 4px;
+  }
+  .fc-auth-title {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 26px; font-weight: 600; letter-spacing: -0.01em;
+    color: #0E1728;
+  }
+  .fc-auth-sub {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #6B6658; margin-bottom: 26px;
+  }
+  .fc-auth-form {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .fc-auth-label {
+    font-size: 12px; font-weight: 600; color: #0E1728;
+  }
+  .fc-auth-input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1.5px solid #D6CFBF;
+    border-radius: 5px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px; color: #0E1728;
+    background: #FFFFFF;
+    outline: none; box-sizing: border-box;
+    transition: border-color 140ms;
+  }
+  .fc-auth-input:focus { border-color: oklch(0.56 0.12 78); }
+  .fc-auth-error {
+    min-height: 18px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px; color: oklch(0.58 0.17 30);
+  }
+  .fc-auth-submit {
+    width: 100%;
+    padding: 11px 14px;
+    background: #0E1728; color: #FAF8F3;
+    border: 0; border-radius: 5px;
+    font-family: "Inter Tight", "Inter", system-ui, sans-serif;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: opacity 120ms;
+  }
+  .fc-auth-submit:hover { opacity: 0.92; }
+  .fc-auth-foot {
+    margin-top: 14px;
+    font-size: 11px; color: #6B6658; line-height: 1.5;
+    text-align: center;
+  }
+
+  /* Topbar role chip */
+  .fc-role-chip {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--paper-2);
+    border: 1px solid var(--hair);
+    color: var(--ink);
+    padding: 0 8px;
+  }
+  .fc-role-chip:hover { background: var(--hair); }
+  body.fc-role-admin  .fc-role-chip { color: var(--gold-ink); border-color: var(--gold-deep); }
+  body.fc-role-viewer .fc-role-chip { color: var(--sky); border-color: var(--sky); }
+
+  /* Viewer hides: keep the app clean + enforce read-only at the UI layer.
+     (Bypassable in DevTools — client-side gate is intentional, not secure.) */
+  body.fc-role-viewer .fc-side-item[data-view="zillow-queue"],
+  body.fc-role-viewer #fc-tb-keys,
+  body.fc-role-viewer #fc-tb-watchlist,
+  body.fc-role-viewer .fc-203k-watch-btn,
+  body.fc-role-viewer .fc-203k-chip[data-status="WATCH"],
+  body.fc-role-viewer #fc-zq-watch,
+  body.fc-role-viewer #fc-coach-pin {
+    display: none !important;
+  }
+  /* Viewer — map-view relocates the mobile-frame. Hide the legacy mobile
+     "Open watchlist" if any similar admin buttons exist in the drawer. */
 
   /* ───────────────────────────────────────────────────────────────────────
      Mobile adaptations (≤768px)
