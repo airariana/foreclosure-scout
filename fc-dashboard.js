@@ -289,6 +289,18 @@
     }
   }
 
+  // County tiers for scoring. Mirrors TIER_1_COUNTIES / TIER_2_COUNTIES in
+  // scraper/va_foreclosure_scraper.py — keep in sync when either list changes.
+  const TIER_1_COUNTIES = new Set([
+    'Fairfax County', 'Arlington County', 'Loudoun County',
+    'Prince William County', 'Alexandria City',
+  ]);
+  const TIER_2_COUNTIES = new Set([
+    'Stafford County', 'Spotsylvania County', 'Fredericksburg City',
+    'Henrico County', 'Chesterfield County', 'Virginia Beach City',
+    'Chesapeake City',
+  ]);
+
   function applyZillowOverrides(p) {
     if (!p || !p.id) return;
     const z = getZillowValues(p.id);
@@ -297,8 +309,8 @@
     if (z.zestimate) p.arv = z.zestimate;
     if (z.rent)      p.monthlyRent = z.rent;
 
-    // Downstream recompute — matches Python build_pricing's math except for
-    // the score/grade pipeline, which is left at the scraper's original value.
+    // Downstream recompute — mirrors Python build_pricing()'s math so the
+    // drawer, listings table, and priority queue all reflect the Zillow data.
     if (p.arv > 0 && p.price > 0) {
       p.discount = Math.round((1 - p.price / p.arv) * 100);
     }
@@ -318,6 +330,30 @@
       p.capRate = p.price > 0 ? Number(((noi / p.price) * 100).toFixed(1)) : 0;
       p.dscr = pi > 0 ? Number((p.monthlyRent / pi).toFixed(2)) : 0;
     }
+
+    // ── Investment score (0-100) — matches build_pricing() in Python ──
+    // Zillow-validated data counts as HIGH confidence (real market value
+    // vs. county averages), so it earns the HIGH confidence bonus.
+    let score = 0;
+    score += Math.min(30, Math.max(0, (p.discount || 0) * 1.2));
+    score += Math.min(25, Math.max(0, (p.capRate || 0) * 3));
+    score += Math.min(20, Math.max(0, (p.cashFlow || 0) / 50));
+    if      (TIER_1_COUNTIES.has(p.county)) score += 15;
+    else if (TIER_2_COUNTIES.has(p.county)) score += 10;
+    else                                     score += 5;
+    score += 10; // HIGH-confidence bonus (Zillow is real market data)
+    if (p.passes70)             score += 5;
+    if ((p.dscr || 0) >= 1.25)  score += 5;
+    else if (p.dscr > 0 && p.dscr < 1.0) score -= 5;
+    if (!p.sqft)                score -= 5;
+    p.score = Math.max(0, Math.min(100, Math.round(score)));
+
+    // Letter grade — matches FlipperForce / Rehab Valuator convention.
+    if      (p.score >= 90) p.grade = 'A+';
+    else if (p.score >= 80) p.grade = 'A';
+    else if (p.score >= 70) p.grade = 'B';
+    else if (p.score >= 60) p.grade = 'C';
+    else                    p.grade = 'D';
 
     p._zillowValidated = true;
     p._zillowNotes = z.notes;
