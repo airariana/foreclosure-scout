@@ -1132,13 +1132,15 @@
             </div>
           </div>
 
-          <!-- Open Zillow -->
-          <a href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener"
+          <!-- Open Zillow in a separate popup window (not a tab) so users
+               can park it on a secondary monitor for side-by-side validation. -->
+          <button type="button"
              id="fc-zq-open"
+             data-zillow-url="${escapeAttr(zillowUrl)}"
              class="fc-btn fc-btn-dark"
              style="width:100%;justify-content:center;margin-bottom:20px;height:40px;font-size:14px">
-             Open on Zillow ↗
-          </a>
+             Open on Zillow ↗ <span style="opacity:0.6;font-size:11px;margin-left:6px">(new window)</span>
+          </button>
 
           <!-- Input fields -->
           <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
@@ -1201,11 +1203,8 @@
 
     // Auto-open Zillow for this property if the toggle is on.
     if (autoOpen) {
-      // Small delay so the user sees the property card first, then the tab.
-      setTimeout(() => {
-        const link = document.getElementById('fc-zq-open');
-        if (link) window.open(link.href, '_blank', 'noopener');
-      }, 200);
+      // Small delay so the user sees the property card first, then the window.
+      setTimeout(() => openZillowWindow(zillowUrl), 200);
     }
 
     // Focus Zestimate field for immediate pasting.
@@ -1213,6 +1212,27 @@
       const el = document.getElementById('fc-zq-arv');
       if (el) el.focus();
     }, 250);
+  }
+
+  // Open Zillow in a SEPARATE POPUP WINDOW (not a tab). Explicit size
+  // features force browsers to treat this as a window.open popup instead of
+  // routing to tabs. The fixed window name 'nestscoop-zillow' means every
+  // call reuses the same window — the user drags it to a secondary monitor
+  // once and it updates in place as they advance through the queue.
+  //
+  // If the browser's popup blocker kicks in (e.g., on auto-open without a
+  // click event), we fall back to a new tab.
+  function openZillowWindow(url) {
+    if (!url) return null;
+    const features = 'popup=yes,width=1280,height=900,resizable=yes,scrollbars=yes,noopener,noreferrer';
+    const win = window.open(url, 'nestscoop-zillow', features);
+    if (!win) {
+      // Popup blocked — fall back to a tab so users don't get stuck.
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return null;
+    }
+    try { win.focus(); } catch (e) { /* cross-origin, ignore */ }
+    return win;
   }
 
   function wireZillowQueue(queue) {
@@ -1253,6 +1273,7 @@
     const prevBtn = document.getElementById('fc-zq-prev');
     const drawerBtn = document.getElementById('fc-zq-drawer');
     const autoToggle = document.getElementById('fc-zq-autoopen');
+    const openBtn = document.getElementById('fc-zq-open');
 
     if (saveBtn) saveBtn.onclick = saveAndAdvance;
     if (skipBtn) skipBtn.onclick = () => advanceQueue(1);
@@ -1262,6 +1283,9 @@
         const p = queue[__zqueueIndex];
         if (p && p.id) openPropertyDrawer(p.id);
       };
+    }
+    if (openBtn) {
+      openBtn.onclick = () => openZillowWindow(openBtn.dataset.zillowUrl);
     }
     if (autoToggle) {
       autoToggle.onchange = (e) => {
