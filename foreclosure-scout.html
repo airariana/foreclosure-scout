@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Foreclosure Scout — DC/MD/VA</title>
+<title>Nestscoop — DC/MD/VA Foreclosures</title>
 
   <!-- Cache Control - Force Refresh -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -14,9 +14,9 @@
   <meta name="theme-color" content="#c84b2f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="FC Scout">
+  <meta name="apple-mobile-web-app-title" content="Nestscoop">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="application-name" content="Foreclosure Scout">
+  <meta name="application-name" content="Nestscoop">
   <link rel="manifest" href="manifest.json?v=3">
   <!-- Favicon: SVG for modern browsers (scales perfectly), PNG for Apple,
        ICO for legacy. Cache-busted after v2.1 redesign. -->
@@ -1127,7 +1127,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=22"></script>
+<script src="fc-dashboard.js?v=23"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1144,8 +1144,8 @@ header,
 
 <header>
   <div class="logo-block">
-    <img src="fc-icon.svg?v=2" alt="Foreclosure Scout" class="logo-img" width="36" height="36" />
-    <div><div class="logo-mark">FORECLOSURE SCOUT</div><div class="logo-sub">DC · MD · VA · v2.1</div></div>
+    <img src="fc-icon.svg?v=2" alt="Nestscoop" class="logo-img" width="36" height="36" />
+    <div><div class="logo-mark">NESTSCOOP</div><div class="logo-sub">DC · MD · VA · v2.1</div></div>
   </div>
   <nav class="header-nav">
     <div class="nav-item active" onclick="filterByType(null,this)">All</div>
@@ -4052,7 +4052,7 @@ function showInstallBanner(){
     white-space:nowrap;max-width:90vw;
   `;
   banner.innerHTML = `
-    <span>🏚 Add Foreclosure Scout to home screen</span>
+    <span>🏚 Add Nestscoop to home screen</span>
     <button onclick="triggerInstall()" style="background:var(--accent);color:white;border:none;border-radius:3px;padding:6px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;font-weight:600">Install</button>
     <button onclick="dismissInstall()" style="background:transparent;color:rgba(244,241,235,0.5);border:none;font-size:16px;cursor:pointer;padding:0 4px">×</button>
   `;
@@ -4066,7 +4066,7 @@ async function triggerInstall(){
   deferredInstallPrompt.prompt();
   const result = await deferredInstallPrompt.userChoice;
   if(result.outcome === 'accepted'){
-    showToast('Foreclosure Scout installed! 🏚', 'green');
+    showToast('Nestscoop installed! 🏚', 'green');
   }
   deferredInstallPrompt = null;
   dismissInstall();
@@ -4078,7 +4078,7 @@ function dismissInstall(){
 
 // Handle successful install
 window.addEventListener('appinstalled', () => {
-  showToast('Foreclosure Scout added to home screen ✓', 'green');
+  showToast('Nestscoop added to home screen ✓', 'green');
   deferredInstallPrompt = null;
   dismissInstall();
 });

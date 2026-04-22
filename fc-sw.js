@@ -1,7 +1,7 @@
-// Foreclosure Scout — Service Worker
+// Nestscoop — Service Worker
 // Caches the app shell for offline use and fast loads
 
-const CACHE_NAME = 'fc-scout-v1';
+const CACHE_NAME = 'nestscoop-v1';
 const APP_SHELL = [
   './foreclosure-scout.html',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap'

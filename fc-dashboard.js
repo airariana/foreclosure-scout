@@ -1,5 +1,5 @@
 /**
- * Foreclosure Scout — Desktop Dashboard Rebuild
+ * Nestscoop — Desktop Dashboard
  *
  * Stage 1: Topbar + sidebar + empty main shell (Mercantile precision).
  *
@@ -609,7 +609,7 @@
 
     // Update page title + eyebrow per view
     const titles = {
-      dashboard: 'Foreclosure Command Center',
+      dashboard: 'Command Center',
       listings:  'All Listings',
       map:       'Property Map',
       alerts:    'Alerts',
@@ -746,7 +746,7 @@
     const saleStr  = p.sale_date || (p.days_to_sale != null ? `in ${p.days_to_sale}d` : 'TBD');
     const url      = buildShareUrl(p.id || '');
 
-    const subject = `Foreclosure lead: ${addr}`;
+    const subject = `Nestscoop lead: ${addr}`;
     const body = [
       addr,
       '',
@@ -2291,8 +2291,8 @@ Return ONLY the 2-sentence analysis.`,
   const SHELL_HTML = `
     <div class="fc-topbar">
       <div class="fc-brand">
-        <div class="fc-brand-mark">FS</div>
-        <span>Foreclosure Scout</span>
+        <div class="fc-brand-mark">NS</div>
+        <span>Nestscoop</span>
       </div>
       <div class="fc-topbar-sep"></div>
       <div class="fc-workspace">
@@ -2347,7 +2347,7 @@ Return ONLY the 2-sentence analysis.`,
           <div class="fc-page-head">
             <div>
               <div class="fc-eyebrow" style="margin-bottom:8px" id="fc-date-eyebrow">Loading…</div>
-              <h1 class="fc-page-title">Foreclosure Command Center</h1>
+              <h1 class="fc-page-title">Command Center</h1>
               <div class="fc-page-sub">
                 <span class="fc-pill sage" style="margin-right:8px"><span class="fc-dot"></span> Live data</span>
                 <span id="fc-subline">Pipeline warming up.</span>
