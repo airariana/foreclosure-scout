@@ -691,7 +691,7 @@
   }
 
   function setView(view) {
-    const valid = ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'rehab', 'market', 'brrrr', 'settings'];
+    const valid = ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
     if (!valid.includes(view)) view = 'dashboard';
     if (location.hash !== '#' + view) {
       history.replaceState(null, '', '#' + view);
@@ -707,7 +707,7 @@
     const mobileFrame = document.querySelector('#fc-view-map .mobile-frame');
     const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
 
-    ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+    ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
       const el = document.getElementById(`fc-view-${v}`);
       if (el) el.style.display = (v === view) ? '' : 'none';
     });
@@ -749,6 +749,7 @@
       brrrr:     'BRRRR Calculator',
       settings:  'Settings',
       'zillow-queue': 'Zillow Queue',
+      'financing-203k': 'FHA 203(k) Financing',
     };
     const titleEl = document.querySelector('#fc-dash-root .fc-page-title');
     if (titleEl && titles[view]) titleEl.textContent = titles[view];
@@ -756,6 +757,7 @@
     // Lazily render listings when shown
     if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
     if (view === 'zillow-queue' && window.__fcData) renderZillowQueue(window.__fcData);
+    if (view === 'financing-203k' && window.__fcData) render203k(window.__fcData);
   }
 
   // ─── State filter ───────────────────────────────────────────────────────
@@ -1325,6 +1327,404 @@
         }
       });
     });
+  }
+
+  // ─── FHA 203(k) Financing view ──────────────────────────────────────────
+  // HUD homes are natural candidates for FHA 203(k) rehabilitation loans:
+  // the property + the repair budget get financed in a single FHA-backed
+  // mortgage. This view filters to HUD HomeStore listings, surfaces FHA
+  // insurability flag, calculates the 203(k) loan math per property, and
+  // deep-links to top 203(k) lender applications.
+
+  let __203kFilter = 'ALL'; // ALL | IN | IE | UI
+
+  // FHA status codes on HUD HomeStore listings:
+  //   IN = Insured         → 203(b) standard FHA + eligible for 203(k)
+  //   IE = Insured Escrow  → Eligible for 203(k) with escrow for repairs
+  //   UI = Uninsured       → Needs repairs before FHA insurability; 203(k) can finance them
+  //   null = unknown / not coded
+  function fhaStatusCode(p) {
+    const s = (p.hud_fha || '').toUpperCase();
+    if (s.startsWith('IN')) return 'IN';
+    if (s.startsWith('IE')) return 'IE';
+    if (s.startsWith('UI')) return 'UI';
+    return null;
+  }
+
+  function render203k(d) {
+    const container = document.getElementById('fc-view-financing-203k');
+    if (!container) return;
+
+    const hudProps = (filterByState(d).foreclosures || [])
+      .filter(p => p.source === 'HUD HomeStore');
+
+    // Sidebar count: number of HUD homes eligible (IN or IE)
+    const eligibleCount = hudProps.filter(p => ['IN', 'IE'].includes(fhaStatusCode(p))).length;
+    const sidebarCount = document.getElementById('fc-sc-203k');
+    if (sidebarCount) sidebarCount.textContent = eligibleCount;
+
+    if (hudProps.length === 0) {
+      container.innerHTML = `
+        <div class="fc-card" style="padding:48px;text-align:center">
+          <div class="fc-eyebrow" style="margin-bottom:12px">No HUD listings</div>
+          <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;color:var(--ink);margin-bottom:8px">
+            No HUD HomeStore properties in scope.
+          </div>
+          <div style="color:var(--muted);font-size:13px">
+            Adjust the state filter above (All / VA / MD / DC) or wait for the next weekly scrape.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // Filter by FHA status chip
+    const filtered = __203kFilter === 'ALL'
+      ? hudProps
+      : hudProps.filter(p => fhaStatusCode(p) === __203kFilter);
+
+    // Counts by status for the filter chips
+    const counts = {
+      ALL: hudProps.length,
+      IN:  hudProps.filter(p => fhaStatusCode(p) === 'IN').length,
+      IE:  hudProps.filter(p => fhaStatusCode(p) === 'IE').length,
+      UI:  hudProps.filter(p => fhaStatusCode(p) === 'UI').length,
+    };
+
+    // Compute fit scores once, sort by them descending (best approval fit first).
+    const filteredWithFit = filtered
+      .map(p => ({ p, fit: compute203kFit(p) }))
+      .sort((a, b) => b.fit.score - a.fit.score);
+
+    const propertyRows = filteredWithFit.map(({ p, fit }) => render203kRow(p, fit)).join('');
+
+    container.innerHTML = `
+      <div class="fc-card" style="padding:0;overflow:hidden">
+        <!-- Intro + FHA status chips -->
+        <div style="padding:24px;border-bottom:1px solid var(--hair)">
+          <div class="fc-eyebrow" style="margin-bottom:8px">Financing · HUD homes</div>
+          <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;color:var(--ink);margin-bottom:6px">
+            FHA 203(k) Rehabilitation Loans
+          </div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6;max-width:720px">
+            203(k) loans let you finance the purchase + repairs of a HUD home in a single FHA mortgage.
+            3.5% down, up to $35K rehab (Limited) or larger (Standard), 30-year fixed. All HUD HomeStore
+            homes below are candidates — IN and IE status are most straightforward; UI requires 203(k)
+            specifically (repairs are needed for FHA insurability).
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px">
+            ${['ALL', 'IN', 'IE', 'UI'].map(k => `
+              <button class="fc-btn fc-btn-sm fc-203k-chip ${__203kFilter === k ? 'active' : ''}"
+                      data-status="${k}">
+                ${k === 'ALL' ? 'All' : k} <span class="fc-state-count">${counts[k]}</span>
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Property rows -->
+        <div>${propertyRows || `
+          <div style="padding:48px;text-align:center;color:var(--muted);font-size:13px">
+            No HUD homes with status ${__203kFilter}.
+          </div>`}</div>
+
+        <!-- Resources footer -->
+        <div style="padding:20px 24px;background:var(--paper-2);border-top:1px solid var(--hair)">
+          <div class="fc-eyebrow" style="margin-bottom:10px">203(k) Resources</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a class="fc-btn fc-btn-sm" href="https://www.hud.gov/program_offices/housing/sfh/203k" target="_blank" rel="noopener">📘 HUD 203(k) Overview</a>
+            <a class="fc-btn fc-btn-sm" href="https://entp.hud.gov/idapp/html/hicostlook.cfm" target="_blank" rel="noopener">📊 FHA Loan Limits (by county)</a>
+            <a class="fc-btn fc-btn-sm" href="https://www.hud.gov/program_offices/housing/sfh/203k/203k--df" target="_blank" rel="noopener">🏗️ 203(k) Consultant Roster</a>
+            <a class="fc-btn fc-btn-sm" href="https://entp.hud.gov/idapp/html/f17lender.cfm" target="_blank" rel="noopener">🏦 Find FHA-approved Lenders</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Wire filter chips
+    container.querySelectorAll('.fc-203k-chip').forEach(btn => {
+      btn.onclick = () => {
+        __203kFilter = btn.getAttribute('data-status') || 'ALL';
+        render203k(window.__fcData);
+      };
+    });
+  }
+
+  // 2026 FHA single-unit loan limits for DC/MD/VA counties we cover. Sourced
+  // from HUD's loan-limit lookup (entp.hud.gov/idapp/html/hicostlook.cfm).
+  // High-cost metros (DC metro, Baltimore corridor) get the ceiling; rural
+  // counties get the floor. Used to check loan-limit headroom per property.
+  const FHA_LOAN_LIMITS_2026 = {
+    // DC metro (high-cost ceiling)
+    'DC:District of Columbia': 977500,
+    'VA:Fairfax County':       977500,
+    'VA:Arlington County':     977500,
+    'VA:Loudoun County':       977500,
+    'VA:Prince William County':977500,
+    'VA:Alexandria City':      977500,
+    'VA:Falls Church City':    977500,
+    'VA:Manassas City':        977500,
+    'VA:Manassas Park City':   977500,
+    'VA:Stafford County':      977500,
+    'VA:Spotsylvania County':  977500,
+    'VA:Fredericksburg City':  977500,
+    'MD:Montgomery County':    977500,
+    "MD:Prince George's County": 977500,
+    'MD:Charles County':       977500,
+    'MD:Calvert County':       977500,
+    // Baltimore corridor (mid-high)
+    'MD:Anne Arundel County':  660000,
+    'MD:Baltimore County':     660000,
+    'MD:Baltimore City':       660000,
+    'MD:Howard County':        660000,
+    'MD:Carroll County':       660000,
+    'MD:Harford County':       660000,
+    'MD:Frederick County':     660000,
+    // Richmond metro
+    'VA:Henrico County':       524225,
+    'VA:Chesterfield County':  524225,
+    'VA:Richmond City':        524225,
+    'VA:Hanover County':       524225,
+    // Hampton Roads
+    'VA:Virginia Beach City':  524225,
+    'VA:Norfolk City':         524225,
+    'VA:Chesapeake City':      524225,
+    'VA:Newport News City':    524225,
+    'VA:Hampton City':         524225,
+    'VA:Suffolk City':         524225,
+    'VA:Portsmouth City':      524225,
+    // Shenandoah Valley + rural (floor)
+    'VA:Frederick County':     524225,
+    'VA:Winchester City':      524225,
+    'VA:Rockingham County':    524225,
+    'VA:Augusta County':       524225,
+    // Default floor
+    'DEFAULT':                 524225,
+  };
+
+  function fhaLoanLimit(p) {
+    const key = `${(p.state || 'VA').toUpperCase()}:${p.county || ''}`;
+    return FHA_LOAN_LIMITS_2026[key] || FHA_LOAN_LIMITS_2026.DEFAULT;
+  }
+
+  // Compute a 0-100 FHA 203(k) approval-fit score. Higher = easier deal for
+  // an underwriter to approve. Breakdown is returned alongside the score so
+  // the UI can explain why a property ranks where it does.
+  function compute203kFit(p) {
+    const reasons = [];
+    let score = 0;
+
+    // 1) FHA insurability status (max 30)
+    const fhaCode = fhaStatusCode(p);
+    if (fhaCode === 'IN') { score += 30; reasons.push({k:'FHA status', v:'IN Insured', pts:30, tone:'sage'}); }
+    else if (fhaCode === 'IE') { score += 22; reasons.push({k:'FHA status', v:'IE Escrow', pts:22, tone:'sky'}); }
+    else if (fhaCode === 'UI') { score += 12; reasons.push({k:'FHA status', v:'UI Uninsured', pts:12, tone:'coral'}); }
+    else                       { score += 0;  reasons.push({k:'FHA status', v:'Unknown',    pts:0,  tone:'muted'}); }
+
+    // 2) Post-rehab LTV / equity cushion (max 25)
+    // Total loan basis = purchase + rehab. ARV = post-rehab value.
+    // Cushion ratio = ARV / loan_basis. >1.25 is excellent.
+    const purchasePrice = p.price || 0;
+    const rehab = p.rehabEstimate || Math.round((p.arv || 0) * 0.08);
+    const loanBasis = purchasePrice + rehab;
+    const arv = p.arv || 0;
+    const cushion = loanBasis > 0 ? arv / loanBasis : 0;
+    if (cushion >= 1.25)      { score += 25; reasons.push({k:'Equity cushion', v:`${cushion.toFixed(2)}× (strong)`, pts:25, tone:'sage'}); }
+    else if (cushion >= 1.10) { score += 18; reasons.push({k:'Equity cushion', v:`${cushion.toFixed(2)}× (ok)`, pts:18, tone:'sky'}); }
+    else if (cushion >= 1.00) { score += 10; reasons.push({k:'Equity cushion', v:`${cushion.toFixed(2)}× (thin)`, pts:10, tone:'muted'}); }
+    else if (cushion > 0)     { score += 0;  reasons.push({k:'Equity cushion', v:`${cushion.toFixed(2)}× (underwater)`, pts:0, tone:'coral'}); }
+    else                      { score += 0;  reasons.push({k:'Equity cushion', v:'No ARV data', pts:0, tone:'muted'}); }
+
+    // 3) Rehab complexity (max 15)
+    const rehabPct = loanBasis > 0 ? rehab / loanBasis : 0;
+    if (rehabPct < 0.15)      { score += 15; reasons.push({k:'Rehab complexity', v:'Qualifies for Limited 203(k)', pts:15, tone:'sage'}); }
+    else if (rehabPct < 0.25) { score += 10; reasons.push({k:'Rehab complexity', v:'Limited 203(k) likely', pts:10, tone:'sky'}); }
+    else                      { score += 5;  reasons.push({k:'Rehab complexity', v:'Standard 203(k) (complex)', pts:5,  tone:'muted'}); }
+
+    // 4) FHA loan limit headroom (max 15)
+    const limit = fhaLoanLimit(p);
+    const usage = limit > 0 ? loanBasis / limit : 1;
+    if (usage < 0.80)      { score += 15; reasons.push({k:'Loan-limit headroom', v:`${Math.round(usage*100)}% of FHA limit`, pts:15, tone:'sage'}); }
+    else if (usage < 1.00) { score += 8;  reasons.push({k:'Loan-limit headroom', v:`${Math.round(usage*100)}% (tight)`, pts:8, tone:'sky'}); }
+    else                   { score -= 10; reasons.push({k:'Loan-limit headroom', v:`${Math.round(usage*100)}% (OVER LIMIT)`, pts:-10, tone:'coral'}); }
+
+    // 5) Property type (max 10)
+    const pt = (p.property_type || '').toLowerCase();
+    if (pt.includes('single'))          { score += 10; reasons.push({k:'Property type', v:'Single-family (simplest)', pts:10, tone:'sage'}); }
+    else if (pt.includes('townhouse'))  { score += 8;  reasons.push({k:'Property type', v:'Townhouse', pts:8, tone:'sky'}); }
+    else if (pt.includes('condo'))      { score += 4;  reasons.push({k:'Property type', v:'Condo (needs approved HOA)', pts:4, tone:'muted'}); }
+    else if (pt.includes('multi'))      { score += 3;  reasons.push({k:'Property type', v:'Multi-unit (complex)', pts:3, tone:'muted'}); }
+    else                                { score += 5;  reasons.push({k:'Property type', v:p.property_type || 'Unknown', pts:5, tone:'muted'}); }
+
+    // 6) Market tier bonus (max 5) — comps density matters for appraisal
+    if (TIER_1_COUNTIES.has(p.county))      { score += 5; reasons.push({k:'Market tier', v:'Tier 1 (high liquidity)', pts:5, tone:'sage'}); }
+    else if (TIER_2_COUNTIES.has(p.county)) { score += 3; reasons.push({k:'Market tier', v:'Tier 2 (stable)', pts:3, tone:'sky'}); }
+    else                                    { score += 1; reasons.push({k:'Market tier', v:'Rural / thin comps', pts:1, tone:'muted'}); }
+
+    // Clamp to 0-100
+    score = Math.max(0, Math.min(100, Math.round(score)));
+
+    // Grade
+    let tier;
+    if (score >= 75)      tier = { label: 'Strong Fit', color: 'sage' };
+    else if (score >= 55) tier = { label: 'Good Fit',   color: 'sky'  };
+    else if (score >= 35) tier = { label: 'Possible',   color: 'muted'};
+    else                  tier = { label: 'Difficult',  color: 'coral'};
+
+    return { score, tier, reasons, loanBasis, rehabPct, cushion, fhaLimit: limit };
+  }
+
+  // Top FHA 203(k) lenders with online application flows. Ranked by market
+  // presence in DC/MD/VA + 203(k) volume. Links go to each lender's online
+  // pre-application / interest form — user adds property details on the
+  // lender side (most forms don't support URL-prefilled property fields).
+  const FHA_203K_LENDERS = [
+    {
+      name:  'Rocket Mortgage',
+      url:   'https://www.rocketmortgage.com/purchase',
+      note:  'Online application, 203(k) through their network',
+    },
+    {
+      name:  'loanDepot',
+      url:   'https://www.loandepot.com/loans/fha-loans/203k-loan',
+      note:  '203(k) specialist team',
+    },
+    {
+      name:  'AnnieMac Home Mortgage',
+      url:   'https://anniemac.com/203k-loan/',
+      note:  'Mid-Atlantic 203(k) presence',
+    },
+    {
+      name:  'Movement Mortgage',
+      url:   'https://movement.com/',
+      note:  'DC/MD/VA licensed, FHA-approved',
+    },
+    {
+      name:  'Chase',
+      url:   'https://www.chase.com/personal/mortgage',
+      note:  'Major bank, FHA 203(k) available',
+    },
+  ];
+
+  function render203kRow(p, fit) {
+    const status = fhaStatusCode(p);
+    const statusLabel = {
+      IN: 'IN · Insured',
+      IE: 'IE · Insured Escrow',
+      UI: 'UI · Uninsured',
+    }[status] || '—';
+    const statusColor = {
+      IN: 'sage',
+      IE: 'sky',
+      UI: 'coral',
+    }[status] || 'muted';
+
+    // 203(k) loan math
+    const purchasePrice = p.price || 0;
+    const rehabEstimate = p.rehabEstimate || Math.round((p.arv || 0) * 0.08);
+    const totalLoanNeeded = purchasePrice + rehabEstimate;
+    const downPayment = Math.round(totalLoanNeeded * 0.035);
+    const loanAmount = totalLoanNeeded - downPayment;
+    // Monthly P&I at 7% fixed, 30 years (current FHA typical).
+    const monthlyRate = 0.07 / 12;
+    const piPayment = loanAmount * monthlyRate / (1 - Math.pow(1 + monthlyRate, -360));
+    // Add FHA MIP (~0.55% annually) + property tax + insurance
+    const mip = (loanAmount * 0.0055) / 12;
+    const estTax = (p.arv || totalLoanNeeded) * 0.01 / 12;
+    const estIns = (p.arv || totalLoanNeeded) * 0.005 / 12;
+    const totalPITI = piPayment + mip + estTax + estIns;
+
+    const lenderButtons = FHA_203K_LENDERS.slice(0, 3).map(l => `
+      <a class="fc-btn fc-btn-sm fc-btn-ghost" href="${escapeAttr(l.url)}" target="_blank" rel="noopener"
+         title="${escapeAttr(l.note)}">
+        ${escapeHtml(l.name)} ↗
+      </a>`).join('');
+
+    // Fit score reason tooltip
+    const reasonLines = fit.reasons
+      .map(r => `${r.k}: ${r.v} (${r.pts >= 0 ? '+' : ''}${r.pts})`)
+      .join(' · ');
+
+    return `
+      <div class="fc-203k-row">
+        <!-- Left: property ID + fit score -->
+        <div class="fc-203k-prop">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div class="fc-203k-fit fc-203k-fit-${fit.tier.color}"
+                 title="${escapeAttr(reasonLines)}">
+              <div class="fc-203k-fit-score">${fit.score}</div>
+              <div class="fc-203k-fit-label">${fit.tier.label}</div>
+            </div>
+            <div>
+              ${gradeBadge(p.grade)}
+              <div style="margin-top:4px">
+                <span class="fc-pill ${statusColor}">${escapeHtml(statusLabel)}</span>
+              </div>
+            </div>
+          </div>
+          <div style="font-family:var(--f-serif);font-size:15px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:3px">
+            ${escapeHtml(p.address || '—')}
+          </div>
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--muted)">
+            ${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · Case #${escapeHtml(p.firm_file_number || '—')}
+          </div>
+          <button class="fc-btn fc-btn-sm" style="margin-top:10px"
+                  onclick="openPropertyDrawer('${escapeAttr(p.id || '')}')">
+            View full drawer →
+          </button>
+        </div>
+
+        <!-- Middle: 203(k) loan math -->
+        <div class="fc-203k-math">
+          <div class="fc-203k-math-row">
+            <span class="fc-203k-key">Purchase</span>
+            <span class="fc-203k-val">$${purchasePrice.toLocaleString()}</span>
+          </div>
+          <div class="fc-203k-math-row">
+            <span class="fc-203k-key">+ Rehab (est. 8%)</span>
+            <span class="fc-203k-val">$${rehabEstimate.toLocaleString()}</span>
+          </div>
+          <div class="fc-203k-math-row fc-203k-total">
+            <span class="fc-203k-key">Total loan basis</span>
+            <span class="fc-203k-val">$${totalLoanNeeded.toLocaleString()}</span>
+          </div>
+          <div class="fc-203k-math-row">
+            <span class="fc-203k-key">Down (3.5%)</span>
+            <span class="fc-203k-val sage">$${downPayment.toLocaleString()}</span>
+          </div>
+          <div class="fc-203k-math-row">
+            <span class="fc-203k-key">Financed</span>
+            <span class="fc-203k-val">$${loanAmount.toLocaleString()}</span>
+          </div>
+          <div class="fc-203k-math-row fc-203k-piti">
+            <span class="fc-203k-key">Est. monthly PITI*</span>
+            <span class="fc-203k-val">$${Math.round(totalPITI).toLocaleString()}/mo</span>
+          </div>
+          <div class="fc-203k-math-row" style="color:var(--muted);font-size:10px">
+            <span class="fc-203k-key">FHA county limit</span>
+            <span class="fc-203k-val">$${fit.fhaLimit.toLocaleString()}</span>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:6px;font-family:var(--f-mono);line-height:1.4">
+            *P&I @ 7% / 30yr + MIP + est. tax & insurance.
+            Actual rate + fees vary by lender.
+          </div>
+        </div>
+
+        <!-- Right: apply actions + fit breakdown -->
+        <div class="fc-203k-actions">
+          <div class="fc-eyebrow" style="margin-bottom:6px">Approval factors</div>
+          <div class="fc-203k-reasons">
+            ${fit.reasons.map(r => `
+              <div class="fc-203k-reason fc-203k-reason-${r.tone}">
+                <span class="fc-203k-reason-k">${escapeHtml(r.k)}</span>
+                <span class="fc-203k-reason-v">${escapeHtml(r.v)}</span>
+              </div>`).join('')}
+          </div>
+          <div class="fc-eyebrow" style="margin-top:14px;margin-bottom:6px">Launch application</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${lenderButtons}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // ─── Hot counties — ranked by volume with score signal + ring ──────────
@@ -2898,6 +3298,7 @@ Return ONLY the 2-sentence analysis.`,
         <div class="fc-side-section">
           <div class="fc-side-label">Tools</div>
           <div class="fc-side-item" data-view="zillow-queue">${ICO.plus}<span>Zillow Queue</span><span class="fc-side-count" id="fc-sc-zqueue">—</span></div>
+          <div class="fc-side-item" data-view="financing-203k">${ICO.book}<span>203(k) Financing</span><span class="fc-side-count" id="fc-sc-203k">—</span></div>
           <div class="fc-side-item" data-view="rehab">${ICO.calc}<span>Rehab Calculator</span></div>
           <div class="fc-side-item" data-view="market">${ICO.chart}<span>Market Analysis</span></div>
           <div class="fc-side-item" data-view="brrrr">${ICO.book}<span>BRRRR Calculator</span></div>
@@ -3056,6 +3457,9 @@ Return ONLY the 2-sentence analysis.`,
 
           <!-- Zillow Queue view — rapid manual lookup workflow -->
           <div id="fc-view-zillow-queue" style="display:none"></div>
+
+          <!-- FHA 203(k) Financing view — HUD homes with rehab loan calc -->
+          <div id="fc-view-financing-203k" style="display:none"></div>
 
           <!-- Placeholder views -->
           ${['alerts', 'rehab', 'market', 'brrrr', 'settings'].map(v => `
@@ -3868,6 +4272,105 @@ Return ONLY the 2-sentence analysis.`,
   @media (max-width: 540px) {
     .fc-share-actions { grid-template-columns: repeat(2, 1fr); }
     .fc-nbhd-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── 203(k) Financing view ──────────────────────────────────────── */
+  .fc-203k-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .fc-203k-chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .fc-203k-chip.active .fc-state-count {
+    color: var(--gold);
+  }
+  .fc-203k-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1.2fr;
+    gap: 20px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .fc-203k-row:last-of-type { border-bottom: 0; }
+  .fc-203k-prop {
+    display: flex; flex-direction: column;
+  }
+  /* Fit score badge */
+  .fc-203k-fit {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    min-width: 70px;
+    border: 1.5px solid;
+    font-family: var(--f-mono);
+    cursor: help;
+  }
+  .fc-203k-fit-score {
+    font-size: 22px; font-weight: 700; line-height: 1;
+  }
+  .fc-203k-fit-label {
+    font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+    margin-top: 3px; font-weight: 600;
+  }
+  .fc-203k-fit-sage  { background: var(--sage-soft);  border-color: var(--sage);       color: var(--sage); }
+  .fc-203k-fit-sky   { background: var(--sky-soft);   border-color: var(--sky);        color: var(--sky); }
+  .fc-203k-fit-muted { background: var(--paper-2);    border-color: var(--hair-2);     color: var(--muted); }
+  .fc-203k-fit-coral { background: var(--coral-soft); border-color: var(--coral);      color: var(--coral); }
+
+  .fc-203k-math {
+    background: var(--paper-2);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .fc-203k-math-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--f-mono); font-size: 12px;
+  }
+  .fc-203k-math-row.fc-203k-total {
+    padding-top: 6px; margin-top: 2px;
+    border-top: 1px dashed var(--hair-2);
+    font-weight: 600; color: var(--ink);
+  }
+  .fc-203k-math-row.fc-203k-piti {
+    padding-top: 6px; margin-top: 2px;
+    border-top: 1px solid var(--hair);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .fc-203k-key { color: var(--muted); }
+  .fc-203k-val { color: var(--ink); font-weight: 500; }
+  .fc-203k-val.sage { color: var(--sage); font-weight: 600; }
+
+  .fc-203k-actions {
+    display: flex; flex-direction: column;
+  }
+  .fc-203k-reasons {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .fc-203k-reason {
+    display: flex; justify-content: space-between;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1.3;
+    border-left: 2px solid transparent;
+  }
+  .fc-203k-reason-sage  { background: var(--sage-soft);  border-left-color: var(--sage); }
+  .fc-203k-reason-sky   { background: var(--sky-soft);   border-left-color: var(--sky); }
+  .fc-203k-reason-muted { background: var(--paper-2);    border-left-color: var(--hair-2); }
+  .fc-203k-reason-coral { background: var(--coral-soft); border-left-color: var(--coral); }
+  .fc-203k-reason-k { color: var(--muted); font-family: var(--f-mono); font-size: 10px; }
+  .fc-203k-reason-v { color: var(--ink-2); font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .fc-203k-row {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* ── Neighborhood tile grid (POI shortcuts) ─────────────────────── */
