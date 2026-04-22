@@ -128,6 +128,7 @@
     wireNav(root);
     wireDataKeysButton(root);
     wireTopbarSearch(root);
+    wireTopbarWatchlist(root);
   }
 
   // ─── Topbar search ──────────────────────────────────────────────────────
@@ -271,6 +272,40 @@
   function wireDataKeysButton(root) {
     const btn = root.querySelector('#fc-tb-keys');
     if (btn) btn.addEventListener('click', openDataKeysModal);
+  }
+
+  // ─── Topbar Watchlist button ────────────────────────────────────────────
+  // Click: navigate to Listings filtered to watchlisted properties only.
+  // Badge auto-refreshes when items are added/removed via updateTopbarWatchlistBadge().
+  function wireTopbarWatchlist(root) {
+    const btn = root.querySelector('#fc-tb-watchlist');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const list = getWatchlist();
+      if (list.length === 0) {
+        // Nothing to show — nudge user toward the Zillow Queue where the
+        // primary add-flow lives.
+        alert('No properties in your watchlist yet.\n\nTag interesting listings from the Zillow Queue or any property drawer.');
+        return;
+      }
+      const ids = new Set(list.map(e => e.id));
+      __listingsFilter = {
+        label: `Watchlist (${list.length})`,
+        predicate: (p) => ids.has(p.id),
+        sortBy: 'score',
+      };
+      location.hash = 'listings';
+      if (window.__fcData) renderListings(window.__fcData);
+    });
+    updateTopbarWatchlistBadge();
+  }
+
+  function updateTopbarWatchlistBadge() {
+    const el = document.getElementById('fc-tb-watchlist-count');
+    if (!el) return;
+    const n = getWatchlist().length;
+    el.textContent = n;
+    el.style.display = n > 0 ? '' : 'none';
   }
 
   function openDataKeysModal() {
@@ -493,6 +528,58 @@
       localStorage.removeItem(ZILLOW_LS_PREFIX + propId);
     }
   }
+
+  // ── Watchlist ──────────────────────────────────────────────────────────
+  // Lightweight flag-based watchlist. Single localStorage key holds an array
+  // of { id, address, city, state, zip, addedAt } entries. Persisted client-
+  // side only (no backend) — same pattern as Zillow overrides.
+  const WATCHLIST_LS_KEY = 'fs_watchlist';
+
+  function getWatchlist() {
+    try {
+      const raw = localStorage.getItem(WATCHLIST_LS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveWatchlist(arr) {
+    try { localStorage.setItem(WATCHLIST_LS_KEY, JSON.stringify(arr || [])); }
+    catch (e) { /* quota or disabled */ }
+  }
+  function isWatchlisted(propId) {
+    if (!propId) return false;
+    return getWatchlist().some(e => e.id === propId);
+  }
+  function addToWatchlist(p) {
+    if (!p || !p.id) return false;
+    const list = getWatchlist();
+    if (list.some(e => e.id === p.id)) return false;
+    list.push({
+      id:      p.id,
+      address: p.address || '',
+      city:    p.city    || '',
+      state:   p.state   || '',
+      zip:     p.zip || p.zip_code || '',
+      addedAt: new Date().toISOString(),
+    });
+    saveWatchlist(list);
+    return true;
+  }
+  function removeFromWatchlist(propId) {
+    if (!propId) return false;
+    const list = getWatchlist().filter(e => e.id !== propId);
+    saveWatchlist(list);
+    return true;
+  }
+  function toggleWatchlist(p) {
+    if (!p || !p.id) return false;
+    if (isWatchlisted(p.id)) { removeFromWatchlist(p.id); return false; }
+    addToWatchlist(p); return true;
+  }
+  // Expose for inline handlers + cross-module use (drawer, AI coach, etc.).
+  window.fcToggleWatchlist = toggleWatchlist;
+  window.fcIsWatchlisted   = isWatchlisted;
+  window.fcGetWatchlist    = getWatchlist;
 
   // ── Zillow backup helpers ──────────────────────────────────────────────
   // Export all Zillow entries as a single JSON blob and trigger a download.
@@ -1187,6 +1274,15 @@
             <button class="fc-btn fc-btn-ghost" id="fc-zq-drawer">Open full drawer</button>
           </div>
 
+          <!-- Watchlist tag: lets user flag interesting properties without
+               leaving the queue. Toggles on/off, persisted to localStorage. -->
+          <button class="fc-btn" id="fc-zq-watch"
+                  style="width:100%;margin-top:10px;justify-content:center;height:38px;font-size:13px">
+            ${isWatchlisted(p.id)
+              ? '★ Saved to watchlist · click to remove'
+              : '☆ Add to watchlist'}
+          </button>
+
           <!-- Auto-open toggle -->
           <label style="display:flex;align-items:center;gap:6px;margin-top:16px;font-size:11px;color:var(--muted);cursor:pointer">
             <input type="checkbox" id="fc-zq-autoopen" ${autoOpen ? 'checked' : ''}>
@@ -1294,6 +1390,7 @@
     const drawerBtn = document.getElementById('fc-zq-drawer');
     const autoToggle = document.getElementById('fc-zq-autoopen');
     const openBtn = document.getElementById('fc-zq-open');
+    const watchBtn = document.getElementById('fc-zq-watch');
 
     if (saveBtn) saveBtn.onclick = saveAndAdvance;
     if (skipBtn) skipBtn.onclick = () => advanceQueue(1);
@@ -1306,6 +1403,17 @@
     }
     if (openBtn) {
       openBtn.onclick = () => openZillowWindow(openBtn.dataset.zillowUrl);
+    }
+    if (watchBtn) {
+      watchBtn.onclick = () => {
+        const p = queue[__zqueueIndex];
+        if (!p) return;
+        const nowOn = toggleWatchlist(p);
+        watchBtn.textContent = nowOn
+          ? '★ Saved to watchlist · click to remove'
+          : '☆ Add to watchlist';
+        updateTopbarWatchlistBadge();
+      };
     }
     if (autoToggle) {
       autoToggle.onchange = (e) => {
@@ -1572,37 +1680,77 @@
     return { score, tier, reasons, loanBasis, rehabPct, cushion, fhaLimit: limit };
   }
 
-  // Top FHA 203(k) lenders with online application flows. Ranked by market
-  // presence in DC/MD/VA + 203(k) volume. Links go to each lender's online
-  // pre-application / interest form — user adds property details on the
-  // lender side (most forms don't support URL-prefilled property fields).
+  // Top FHA 203(k) lenders. `specialist: true` means this lender has a
+  // dedicated 203(k) team — pushed to the top for Standard deals where the
+  // coordination complexity matters. Generalists still handle Limited fine.
   const FHA_203K_LENDERS = [
-    {
-      name:  'Rocket Mortgage',
-      url:   'https://www.rocketmortgage.com/purchase',
-      note:  'Online application, 203(k) through their network',
-    },
     {
       name:  'loanDepot',
       url:   'https://www.loandepot.com/loans/fha-loans/203k-loan',
       note:  '203(k) specialist team',
+      specialist: true,
     },
     {
       name:  'AnnieMac Home Mortgage',
       url:   'https://anniemac.com/203k-loan/',
       note:  'Mid-Atlantic 203(k) presence',
+      specialist: true,
+    },
+    {
+      name:  'Rocket Mortgage',
+      url:   'https://www.rocketmortgage.com/purchase',
+      note:  'Online application, 203(k) through their network',
+      specialist: false,
     },
     {
       name:  'Movement Mortgage',
       url:   'https://movement.com/',
       note:  'DC/MD/VA licensed, FHA-approved',
+      specialist: false,
     },
     {
       name:  'Chase',
       url:   'https://www.chase.com/personal/mortgage',
       note:  'Major bank, FHA 203(k) available',
+      specialist: false,
     },
   ];
+
+  // Program type classifier. Based on HUD rules: rehab budget ≤ $35K =
+  // Limited 203(k) (streamline, no consultant, cosmetic/non-structural only).
+  // > $35K = Standard 203(k) (full program, HUD-approved consultant required,
+  // structural repairs allowed).
+  const LIMITED_203K_CAP = 35000;
+  function program203k(rehab) {
+    if ((rehab || 0) <= LIMITED_203K_CAP) {
+      return {
+        type: 'LIMITED',
+        label: 'Limited 203(k)',
+        pillClass: 'sage',
+        consultant: false,
+        consultantNote: 'No consultant required',
+        blurb: 'Streamline · cosmetic/non-structural only · up to $35K rehab',
+      };
+    }
+    return {
+      type: 'STANDARD',
+      label: 'Standard 203(k)',
+      pillClass: 'sky',
+      consultant: true,
+      consultantNote: 'HUD-approved consultant required',
+      blurb: 'Full program · structural repairs allowed · > $35K rehab',
+    };
+  }
+
+  // HUD forms for consultant + FHA-approved lender lookups are POST-only, so
+  // we can't URL-prefill the state. But we can route to the right form + show
+  // the state in the button label so the user types one field and hits go.
+  function hudConsultantSearchUrl() {
+    return 'https://entp.hud.gov/idapp/html/f17cnslt.cfm';
+  }
+  function hudLenderSearchUrl() {
+    return 'https://entp.hud.gov/idapp/html/f17lender.cfm';
+  }
 
   function render203kRow(p, fit) {
     const status = fhaStatusCode(p);
@@ -1819,11 +1967,26 @@
       ['Avg score ≥75', highScore.length.toString()],
     ];
 
+    // Pick the property the coach is actually talking about — highest-score
+    // property in the top county when that branch fires, otherwise the
+    // biggest-discount property. Used by the Pin button.
+    let pinTarget = null;
+    if (hiConf.length && soon.length && topCounty) {
+      pinTarget = highScore.filter(p => p.county === topCounty)
+                           .sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;
+    } else if (biggestDiscount && biggestDiscount.arv && biggestDiscount.price) {
+      pinTarget = biggestDiscount;
+    }
+    const pinLabel = pinTarget && isWatchlisted(pinTarget.id)
+      ? '★ On watchlist'
+      : 'Pin to watchlist';
+    const pinDisabled = pinTarget ? '' : 'disabled';
+
     el.innerHTML = `
       <div class="fc-coach-quote">"${insight}"</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
-        <button class="fc-btn fc-btn-gold" id="fc-coach-pin">Pin to watchlist</button>
-        <button class="fc-btn">Dismiss</button>
+        <button class="fc-btn fc-btn-gold" id="fc-coach-pin" ${pinDisabled}>${pinLabel}</button>
+        <button class="fc-btn" id="fc-coach-dismiss">Dismiss</button>
       </div>
       <div class="fc-coach-stats">
         ${followUps.map(([l, v]) => `
@@ -1834,6 +1997,19 @@
         `).join('')}
       </div>
     `;
+
+    const pinBtn = document.getElementById('fc-coach-pin');
+    if (pinBtn && pinTarget) {
+      pinBtn.onclick = () => {
+        const nowOn = toggleWatchlist(pinTarget);
+        pinBtn.textContent = nowOn ? '★ On watchlist' : 'Pin to watchlist';
+        updateTopbarWatchlistBadge();
+      };
+    }
+    const dismissBtn = document.getElementById('fc-coach-dismiss');
+    if (dismissBtn) {
+      dismissBtn.onclick = () => { el.style.display = 'none'; };
+    }
   }
 
   // ─── Priority queue — top N scored properties ──────────────────────────
@@ -3281,7 +3457,7 @@ Return ONLY the 2-sentence analysis.`,
       <div class="fc-tb-right">
         <button class="fc-tb-btn" title="Notifications">${ICO.bell}</button>
         <button class="fc-tb-btn" id="fc-tb-keys" title="Data Keys">${ICO.gear}</button>
-        <button class="fc-tb-btn fc-primary">${ICO.plus} Watchlist</button>
+        <button class="fc-tb-btn fc-primary" id="fc-tb-watchlist" title="View watchlisted properties">${ICO.plus} Watchlist <span id="fc-tb-watchlist-count" class="fc-state-count" style="margin-left:4px">0</span></button>
         <div class="fc-avatar">AJ</div>
       </div>
     </div>
@@ -3298,10 +3474,13 @@ Return ONLY the 2-sentence analysis.`,
         <div class="fc-side-section">
           <div class="fc-side-label">Tools</div>
           <div class="fc-side-item" data-view="zillow-queue">${ICO.plus}<span>Zillow Queue</span><span class="fc-side-count" id="fc-sc-zqueue">—</span></div>
-          <div class="fc-side-item" data-view="financing-203k">${ICO.book}<span>203(k) Financing</span><span class="fc-side-count" id="fc-sc-203k">—</span></div>
           <div class="fc-side-item" data-view="rehab">${ICO.calc}<span>Rehab Calculator</span></div>
           <div class="fc-side-item" data-view="market">${ICO.chart}<span>Market Analysis</span></div>
           <div class="fc-side-item" data-view="brrrr">${ICO.book}<span>BRRRR Calculator</span></div>
+        </div>
+        <div class="fc-side-section">
+          <div class="fc-side-label">Financing</div>
+          <div class="fc-side-item" data-view="financing-203k">${ICO.book}<span>203(k) HUD Homes</span><span class="fc-side-count" id="fc-sc-203k">—</span></div>
         </div>
         <div class="fc-side-section">
           <div class="fc-side-label">Workspace</div>
