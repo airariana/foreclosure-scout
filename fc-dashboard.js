@@ -376,6 +376,27 @@
         </div>
       `).join('')}
 
+      <!-- Keys backup section — export ALL keys at once, for moving to
+           a new device or onboarding a trusted teammate. Treat the file
+           like a password (sensitive tokens). -->
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--hair)">
+        <div class="fc-eyebrow" style="margin-bottom:6px">Keys backup (all four)</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+          Export your API keys as a single JSON file so you can load them on a new device without
+          retyping. <strong style="color:var(--coral)">Contains sensitive tokens — treat like a password.</strong>
+          Don't email, don't commit to git.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="fc-btn" id="fc-keys-export" type="button">⬇︎ Export keys JSON</button>
+          <label class="fc-btn" style="cursor:pointer;position:relative">
+            <span>⬆︎ Import keys JSON…</span>
+            <input type="file" id="fc-keys-import" accept="application/json,.json"
+              style="position:absolute;inset:0;opacity:0;cursor:pointer">
+          </label>
+          <span id="fc-keys-backup-status" style="font-family:var(--f-mono);font-size:11px;color:var(--sage);margin-left:auto"></span>
+        </div>
+      </div>
+
       <!-- Zillow backup section -->
       <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--hair)">
         <div class="fc-eyebrow" style="margin-bottom:6px">Zillow data backup</div>
@@ -452,6 +473,54 @@
           flash(`⚠ ${err.message}`, 'var(--coral)');
         } finally {
           importInput.value = ''; // allow re-selecting the same file
+        }
+      };
+    }
+
+    // Wire API keys export / import. Status uses a separate element from
+    // the Zillow backup so both sections can flash independently.
+    const keysStatusEl = document.getElementById('fc-keys-backup-status');
+    const flashKeys = (msg, color) => {
+      if (!keysStatusEl) return;
+      keysStatusEl.style.color = color || 'var(--sage)';
+      keysStatusEl.textContent = msg;
+      setTimeout(() => { if (keysStatusEl) keysStatusEl.textContent = ''; }, 3500);
+    };
+    const keysExportBtn = document.getElementById('fc-keys-export');
+    if (keysExportBtn) {
+      keysExportBtn.onclick = () => {
+        const count = exportDataKeys();
+        flashKeys(count === 0 ? '⚠ No keys to export — set at least one first' : `✓ Exported ${count} key${count === 1 ? '' : 's'}`,
+                  count === 0 ? 'var(--coral)' : 'var(--sage)');
+      };
+    }
+    const keysImportInput = document.getElementById('fc-keys-import');
+    if (keysImportInput) {
+      keysImportInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const { imported, skipped } = importDataKeys(text);
+          flashKeys(`✓ Imported ${imported} key${imported === 1 ? '' : 's'}${skipped ? ' (skipped ' + skipped + ')' : ''}`, 'var(--sage)');
+          // Repopulate the input fields so user sees what loaded.
+          for (const f of fields) {
+            const el = document.getElementById(f.id);
+            if (el) el.value = localStorage.getItem(f.ls) || '';
+          }
+          // Notify legacy page globals so status dots refresh.
+          try {
+            if (window.KEYS) {
+              window.KEYS.court   = localStorage.getItem('fs_key_court')   || '';
+              window.KEYS.hud     = localStorage.getItem('fs_key_hud')     || '';
+              window.KEYS.estated = localStorage.getItem('fs_key_estated') || '';
+            }
+            if (typeof window.refreshGeminiStatus === 'function') window.refreshGeminiStatus();
+          } catch (err) { /* best-effort */ }
+        } catch (err) {
+          flashKeys(`⚠ ${err.message}`, 'var(--coral)');
+        } finally {
+          keysImportInput.value = '';
         }
       };
     }
@@ -641,6 +710,60 @@
 
   window.fcExportZillowData = exportZillowData;
   window.fcImportZillowData = importZillowData;
+
+  // ── Data keys export / import ──────────────────────────────────────────
+  // Lets users onboard a new device in seconds: export a JSON blob on the
+  // device that has keys set, paste/import on a fresh device. All four
+  // API keys (Gemini, CourtListener, HUD, Estated) are bundled together.
+  // NOTE: contains sensitive tokens — file should be treated like a
+  // password. Same localStorage pattern as Zillow backup.
+  const KEY_LS_NAMES = ['fs_gemini_key', 'fs_key_court', 'fs_key_hud', 'fs_key_estated'];
+
+  function exportDataKeys() {
+    const entries = {};
+    KEY_LS_NAMES.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) entries[k] = v;
+    });
+    const payload = {
+      app:        'Nestscoop',
+      kind:       'data-keys',
+      exportedAt: new Date().toISOString(),
+      count:      Object.keys(entries).length,
+      entries,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nestscoop-keys-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return payload.count;
+  }
+
+  function importDataKeys(jsonString) {
+    let parsed;
+    try { parsed = JSON.parse(jsonString); }
+    catch (e) { throw new Error('Invalid JSON: ' + e.message); }
+    const entries = parsed.entries && typeof parsed.entries === 'object'
+      ? parsed.entries
+      : parsed;
+    let imported = 0;
+    let skipped = 0;
+    for (const [key, value] of Object.entries(entries)) {
+      if (!KEY_LS_NAMES.includes(key)) { skipped += 1; continue; }
+      if (typeof value !== 'string' || !value.trim()) { skipped += 1; continue; }
+      localStorage.setItem(key, value.trim());
+      imported += 1;
+    }
+    return { imported, skipped };
+  }
+
+  window.fcExportDataKeys = exportDataKeys;
+  window.fcImportDataKeys = importDataKeys;
 
   // County tiers for scoring. Mirrors TIER_1_COUNTIES / TIER_2_COUNTIES in
   // scraper/va_foreclosure_scraper.py — keep in sync when either list changes.
@@ -5025,8 +5148,8 @@ Return ONLY the 2-sentence analysis.`,
     /* Condense topbar right side */
     .fc-tb-right { gap: 2px; }
     .fc-tb-btn { padding: 0 6px; font-size: 11px; height: 26px; }
-    .fc-tb-btn[title="Notifications"],
-    .fc-tb-btn#fc-tb-keys { display: none; } /* trim to Watchlist only */
+    .fc-tb-btn[title="Notifications"] { display: none; } /* trim — notifications aren't wired yet */
+    /* Keep Data Keys button on mobile — new devices need it to enter/import keys */
 
     /* Sidebar becomes off-canvas drawer */
     .fc-sidebar {
