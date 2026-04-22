@@ -1135,7 +1135,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=43"></script>
+<script src="fc-dashboard.js?v=44"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1785,6 +1785,11 @@ KEYS.estated   = localStorage.getItem('fs_key_estated')   || '';
 
 let allProperties=[], filteredProperties=[], markers=[], map, infoWindow;
 let selectedId=null, activeTypeFilter=null, enrichedCount=0;
+// Expose read-only accessors to the desktop dashboard (fc-dashboard.js runs
+// in a separate IIFE and can't see module-scoped `let` bindings). Used by
+// fitMapWhenReady() to fit the viewport once markers land.
+window.__fcGetMarkers = () => markers;
+window.__fcGetMap     = () => map;
 let ALERTS   = JSON.parse(localStorage.getItem('fs_alerts')||'[]');
 let SEEN_IDS = new Set(JSON.parse(localStorage.getItem('fs_seen')||'[]'));
 

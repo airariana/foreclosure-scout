@@ -1055,15 +1055,20 @@
   // Robustly fit the Google Map viewport to the loaded markers, with
   // polling to handle the two common races: (a) the map container just
   // resized, (b) the data fetch that populates markers is still in flight.
+  // The legacy script's `map` and `markers` are module-scoped `let`s, so
+  // we access them via window.__fcGetMap / window.__fcGetMarkers accessors
+  // exposed from foreclosure-scout.html.
   function fitMapWhenReady(attempt) {
     attempt = attempt || 0;
-    const MAX_ATTEMPTS = 8;
+    const MAX_ATTEMPTS = 12;
     const DELAY_MS = 400;
     try {
       const g = window.google;
-      if (g && g.maps && window.map) {
-        g.maps.event.trigger(window.map, 'resize');
-        const haveMarkers = Array.isArray(window.markers) && window.markers.length > 0;
+      const mapRef = typeof window.__fcGetMap === 'function' ? window.__fcGetMap() : null;
+      const markersRef = typeof window.__fcGetMarkers === 'function' ? window.__fcGetMarkers() : null;
+      if (g && g.maps && mapRef) {
+        g.maps.event.trigger(mapRef, 'resize');
+        const haveMarkers = Array.isArray(markersRef) && markersRef.length > 0;
         if (haveMarkers && typeof window.fitAll === 'function') {
           window.fitAll();
           return;
