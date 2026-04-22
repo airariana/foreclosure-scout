@@ -60,7 +60,7 @@
   // run this one-liner in the browser console with your new password:
   //   (async p => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(p)))].map(b=>b.toString(16).padStart(2,'0')).join(''))('YOUR_PASSWORD')
   // then paste the output into the corresponding hash below and commit.
-  const AUTH_LS_KEY = 'fc_auth_role';
+  const AUTH_LS_KEY = 'fc_auth_role'; // legacy — still cleared on load so stale sessions invalidate
   const PASS_HASHES = {
     admin:  'd49ef9f8dcaa1367b1a666285e36c960ddffa3fa45fa36c78bf12adc61ca0a50',
     viewer: '14a234b37c07c9e2c4153768c3d0722f00af65b5270f2cbc6d326edbdfb8cdcd',
@@ -73,12 +73,19 @@
       .join('');
   }
 
-  function getRole()   { return localStorage.getItem(AUTH_LS_KEY); }
-  function setRole(r)  { localStorage.setItem(AUTH_LS_KEY, r); }
-  function clearRole() { localStorage.removeItem(AUTH_LS_KEY); }
-  function isAdmin()   { return getRole() === 'admin'; }
-  function isViewer()  { return getRole() === 'viewer'; }
-  function isAuthed()  { return getRole() === 'admin' || getRole() === 'viewer'; }
+  // Role is kept in-memory only — no localStorage persistence. Every page
+  // load starts at the auth gate. Reloads, tab close/reopen, and sign-out
+  // all invalidate the session. Scrub the legacy localStorage key on boot
+  // so users who authed before this change are also logged out.
+  let __currentRole = null;
+  try { localStorage.removeItem(AUTH_LS_KEY); } catch (e) { /* private mode */ }
+
+  function getRole()   { return __currentRole; }
+  function setRole(r)  { __currentRole = r; }
+  function clearRole() { __currentRole = null; }
+  function isAdmin()   { return __currentRole === 'admin'; }
+  function isViewer()  { return __currentRole === 'viewer'; }
+  function isAuthed()  { return __currentRole === 'admin' || __currentRole === 'viewer'; }
   window.fcSignOut = () => { clearRole(); location.reload(); };
 
   // Apply role to <body> so CSS can hide/show elements. Also hide the
