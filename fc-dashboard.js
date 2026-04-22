@@ -2099,6 +2099,8 @@ Return ONLY the 2-sentence analysis.`,
 
         ${ownershipSection(p)}
 
+        ${neighborhoodSection(p)}
+
         ${(() => {
           const s = buildShareContent(p);
           const subject = encodeURIComponent(s.subject);
@@ -2399,6 +2401,79 @@ Return ONLY the 2-sentence analysis.`,
     ` : '';
 
     return section('Ownership & public records', ownerRows + portalRow);
+  }
+
+  // ── Neighborhood / nearby points of interest ─────────────────────────────
+  // Each category button opens a Google Maps search centered on the property's
+  // coordinates (falls back to the full address if no coords). Zero API cost.
+  //
+  // For HOA / community amenities / planned development — genuinely gated by
+  // MLS data, so we direct users to Zillow (usually has prior listing data)
+  // and a Google search for HOA management company by address.
+
+  const NEIGHBORHOOD_CATEGORIES = [
+    { icon: '🚆', label: 'Transit',     query: 'public transportation' },
+    { icon: '🛒', label: 'Grocery',     query: 'grocery stores' },
+    { icon: '🏬', label: 'Shopping',    query: 'shopping malls' },
+    { icon: '🏥', label: 'Hospitals',   query: 'hospitals' },
+    { icon: '🏫', label: 'Schools',     query: 'schools' },
+    { icon: '🌳', label: 'Parks',       query: 'parks' },
+    { icon: '🍽️', label: 'Restaurants', query: 'restaurants' },
+    { icon: '💪', label: 'Gyms',        query: 'gyms' },
+  ];
+
+  function neighborhoodSection(p) {
+    const fullAddress = [p.address, p.city, p.state, p.zip]
+      .filter(Boolean).join(', ');
+    if (!fullAddress && !(p.lat && p.lng)) return '';
+
+    // Google Maps search URL that centers on the property
+    const center = (p.lat && p.lng)
+      ? `/@${p.lat},${p.lng},14z`
+      : '';
+
+    const categoryTiles = NEIGHBORHOOD_CATEGORIES.map(c => {
+      const q = encodeURIComponent(`${c.query} near ${fullAddress}`);
+      const href = `https://www.google.com/maps/search/${q}${center}`;
+      return `
+        <a class="fc-nbhd-tile" href="${escapeAttr(href)}" target="_blank" rel="noopener"
+           title="${escapeAttr(c.query)} near ${escapeAttr(fullAddress || '')}">
+          <span class="fc-nbhd-tile-icon">${c.icon}</span>
+          <span class="fc-nbhd-tile-label">${escapeHtml(c.label)}</span>
+        </a>`;
+    }).join('');
+
+    // HOA / community-info deep-links. Zillow has community + HOA for any
+    // property that was listed retail in the last 5-10 years. Google search
+    // finds HOA management companies + neighborhood websites.
+    const zillowAddrSlug = (p.address || '').replace(/\s+/g, '-');
+    const zillowCitySlug = (p.city || '').replace(/\s+/g, '-');
+    const zillowUrl  = `https://www.zillow.com/homes/${zillowAddrSlug},-${zillowCitySlug},-${p.state || 'VA'}-${p.zip || ''}_rb/`;
+    const hoaSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(fullAddress + ' HOA OR homeowners association OR subdivision')}`;
+
+    const verifyRow = `
+      <div class="fc-eyebrow" style="margin-top:16px;margin-bottom:6px">HOA · Community · Amenities</div>
+      <div class="fc-kv-caption" style="color:var(--muted);font-size:11px;margin-bottom:8px;line-height:1.5">
+        Amenities (gym, pool, clubhouse), HOA dues, and planned-development status aren't in public data.
+        These links surface what's known elsewhere:
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="fc-btn fc-btn-sm" href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener">
+          🏠 Zillow listing (HOA / amenities)
+        </a>
+        <a class="fc-btn fc-btn-sm" href="${escapeAttr(hoaSearchUrl)}" target="_blank" rel="noopener">
+          🔍 Google: HOA / Subdivision
+        </a>
+      </div>
+    `;
+
+    return section('Neighborhood & nearby', `
+      <div class="fc-kv-caption" style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        Click any category to open a Google Maps search centered on this property.
+      </div>
+      <div class="fc-nbhd-grid">${categoryTiles}</div>
+      ${verifyRow}
+    `);
   }
 
   function section(title, bodyHtml) {
@@ -3750,6 +3825,35 @@ Return ONLY the 2-sentence analysis.`,
 
   @media (max-width: 540px) {
     .fc-share-actions { grid-template-columns: repeat(2, 1fr); }
+    .fc-nbhd-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Neighborhood tile grid (POI shortcuts) ─────────────────────── */
+  .fc-nbhd-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .fc-nbhd-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 6px;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--f-ui);
+    transition: transform 120ms, border-color 120ms, background 120ms;
+  }
+  .fc-nbhd-tile:hover {
+    border-color: var(--gold-deep);
+    background: var(--gold-soft);
+    transform: translateY(-1px);
+  }
+  .fc-nbhd-tile:active { transform: translateY(0); }
+  .fc-nbhd-tile-icon { font-size: 18px; line-height: 1; }
+  .fc-nbhd-tile-label {
+    font-size: 11px; font-weight: 500; color: var(--ink-2);
   }
 
   .fc-kv {
