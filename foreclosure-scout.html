@@ -266,9 +266,17 @@ header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-i
 .list-view-btn:hover{background:#b03d22;transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,75,47,0.4);}
 .list-view-btn::before{content:'☰';font-size:16px;}
 .source-legend{position:absolute;bottom:12px;left:12px;background:white;border:1px solid var(--border);border-radius:3px;padding:10px 12px;box-shadow:var(--shadow);z-index:10;font-family:'IBM Plex Mono',monospace;font-size:10px;}
+.legend-hd{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .legend-item{display:flex;align-items:center;gap:6px;margin-bottom:4px;color:var(--ink2);}
 .legend-item:last-child{margin-bottom:0;}
 .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.legend-toggle{cursor:pointer;padding:3px 6px;margin:0 -6px 2px;border-radius:3px;transition:background 120ms,opacity 120ms;user-select:none;}
+.legend-toggle:hover{background:rgba(0,0,0,0.04);}
+.legend-toggle:focus-visible{outline:2px solid var(--accent,#b8860b);outline-offset:-1px;}
+.legend-toggle.inactive{opacity:0.35;}
+.legend-toggle.inactive span{text-decoration:line-through;}
+.legend-reset{margin-top:8px;width:100%;padding:4px 8px;background:var(--accent,#b8860b);color:white;border:none;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:0.5px;text-transform:uppercase;}
+.legend-reset:hover{opacity:0.9;}
 
 /* Property Detail Modal */
 .detail-drawer{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);background:var(--surface);border:2px solid var(--accent);border-radius:6px;width:90vw;max-width:1000px;max-height:85vh;overflow-y:auto;z-index:250;box-shadow:0 20px 60px rgba(26,26,24,0.3);opacity:0;pointer-events:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);}
@@ -1241,12 +1249,14 @@ header,
     </div>
     <button class="list-view-btn" onclick="openListView()">View All Properties</button>
     <div class="source-legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#2a6496"></div>HUD / HomePath</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#c84b2f"></div>REO / Bank-Owned</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#b8860b"></div>Auction</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#2d6a4f"></div>Pre-Foreclosure</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#6644aa"></div>Short Sale</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div>Distressed</div>
+      <div class="legend-hd">Filter by type — click to toggle</div>
+      <div class="legend-item legend-toggle" data-types="HUD Home,HomePath" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#2a6496"></div><span>HUD / HomePath</span></div>
+      <div class="legend-item legend-toggle" data-types="REO/Bank-Owned" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#c84b2f"></div><span>REO / Bank-Owned</span></div>
+      <div class="legend-item legend-toggle" data-types="Auction" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#b8860b"></div><span>Auction</span></div>
+      <div class="legend-item legend-toggle" data-types="Pre-Foreclosure" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#2d6a4f"></div><span>Pre-Foreclosure</span></div>
+      <div class="legend-item legend-toggle" data-types="Short Sale" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#6644aa"></div><span>Short Sale</span></div>
+      <div class="legend-item legend-toggle" data-types="Distressed" role="button" tabindex="0" onclick="toggleMapTypeFilter(this)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMapTypeFilter(this)"><div class="legend-dot" style="background:#e67e22"></div><span>Distressed</span></div>
+      <button class="legend-reset" onclick="resetMapTypeFilter()" title="Reset to show all types" style="display:none">Show all</button>
     </div>
   </div>
 </div>
@@ -2337,6 +2347,39 @@ function renderMarkers(){
     m.addListener('click',()=>selectProperty(p.id)); markers.push(m);
   });
   if(markers.length) setTimeout(fitAll,400);
+}
+
+// ── Legend toggle: filter map pins by listing type ──────────────────────────
+// Each legend-toggle row is a clickable toggle. Clicking dims the row and
+// hides those pins from the map. filterState.types already exists — we sync
+// to it and call applyFilters() so the existing pipeline rebuilds markers.
+function toggleMapTypeFilter(el){
+  if(!el) return;
+  el.classList.toggle('inactive');
+  syncLegendToFilterState();
+}
+function resetMapTypeFilter(){
+  document.querySelectorAll('.legend-toggle').forEach(el => el.classList.remove('inactive'));
+  syncLegendToFilterState();
+}
+function syncLegendToFilterState(){
+  const allRows = Array.from(document.querySelectorAll('.legend-toggle'));
+  const anyInactive = allRows.some(el => el.classList.contains('inactive'));
+  // Show/hide the Reset button
+  const resetBtn = document.querySelector('.legend-reset');
+  if(resetBtn) resetBtn.style.display = anyInactive ? '' : 'none';
+  // Rebuild filterState.types: empty when all active, populated when some hidden.
+  filterState.types.clear();
+  if(anyInactive){
+    // Only include visible rows' types. Each row can declare multiple types
+    // via comma-separated data-types (e.g., "HUD Home,HomePath").
+    for(const el of allRows){
+      if(el.classList.contains('inactive')) continue;
+      const types = (el.dataset.types || '').split(',').map(s => s.trim()).filter(Boolean);
+      for(const t of types) filterState.types.add(t);
+    }
+  }
+  applyFilters();
 }
 
 // ── Gemini API (official SDK — session key, never hardcoded) ─────────────────
