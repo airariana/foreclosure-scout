@@ -1055,6 +1055,29 @@
     document.body.classList.remove('fc-sidebar-locked');
   }
 
+  // Robustly fit the Google Map viewport to the loaded markers, with
+  // polling to handle the two common races: (a) the map container just
+  // resized, (b) the data fetch that populates markers is still in flight.
+  function fitMapWhenReady(attempt) {
+    attempt = attempt || 0;
+    const MAX_ATTEMPTS = 8;
+    const DELAY_MS = 400;
+    try {
+      const g = window.google;
+      if (g && g.maps && window.map) {
+        g.maps.event.trigger(window.map, 'resize');
+        const haveMarkers = Array.isArray(window.markers) && window.markers.length > 0;
+        if (haveMarkers && typeof window.fitAll === 'function') {
+          window.fitAll();
+          return;
+        }
+      }
+    } catch (e) { /* retry below */ }
+    if (attempt < MAX_ATTEMPTS) {
+      setTimeout(() => fitMapWhenReady(attempt + 1), DELAY_MS);
+    }
+  }
+
   function setView(view) {
     const valid = ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
     if (!valid.includes(view)) view = 'dashboard';
@@ -1091,16 +1114,14 @@
       ].join('; ') + ';';
 
       // Tell Google Maps the container resized and auto-fit markers so the
-      // viewport is centered on the actual properties instead of a default
-      // US-wide bounds. Slight delay for layout to settle, then fit.
-      setTimeout(() => {
-        try {
-          if (window.map && window.google && window.google.maps) {
-            window.google.maps.event.trigger(window.map, 'resize');
-            if (typeof window.fitAll === 'function') window.fitAll();
-          }
-        } catch (e) { /* map not ready yet */ }
-      }, 300);
+      // viewport is centered on the actual properties instead of the
+      // default US-wide / Great Lakes bounds. On mobile the Google Map
+      // initialized into a 0-height container (it was display:none until
+      // the Map view opened) AND markers may still be loading from the
+      // legacy data fetch — so fitAll() fails silently when markers.length
+      // is 0. Retry every 400ms (up to 8 attempts ≈ 3.2s) until markers
+      // are actually populated, then fit.
+      fitMapWhenReady();
     }
 
     // Update page title + eyebrow per view
@@ -1215,6 +1236,9 @@
       if (currentView === 'listings')        renderListings(d);
       if (currentView === 'zillow-queue')    renderZillowQueue(d);
       if (currentView === 'financing-203k')  render203k(d);
+      // Map: if the user landed on #map, setView's initial fit may have
+      // fired before markers existed. Retry once data is in.
+      if (currentView === 'map')             fitMapWhenReady();
       // Deep-link: ?p=<propId> auto-opens that property's drawer after load.
       handleShareDeepLink();
     } catch (e) {
