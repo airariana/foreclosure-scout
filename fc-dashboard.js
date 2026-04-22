@@ -1491,17 +1491,24 @@
       return;
     }
 
-    // Filter by FHA status chip
-    const filtered = __203kFilter === 'ALL'
-      ? hudProps
-      : hudProps.filter(p => fhaStatusCode(p) === __203kFilter);
+    // Filter by FHA status chip, or the special WATCH chip (watchlist ∩ HUD)
+    let filtered;
+    if (__203kFilter === 'WATCH') {
+      filtered = hudProps.filter(p => isWatchlisted(p.id));
+    } else if (__203kFilter === 'ALL') {
+      filtered = hudProps;
+    } else {
+      filtered = hudProps.filter(p => fhaStatusCode(p) === __203kFilter);
+    }
 
-    // Counts by status for the filter chips
+    // Counts by status for the filter chips, plus watchlist intersection
+    const watchCount = hudProps.filter(p => isWatchlisted(p.id)).length;
     const counts = {
-      ALL: hudProps.length,
-      IN:  hudProps.filter(p => fhaStatusCode(p) === 'IN').length,
-      IE:  hudProps.filter(p => fhaStatusCode(p) === 'IE').length,
-      UI:  hudProps.filter(p => fhaStatusCode(p) === 'UI').length,
+      ALL:   hudProps.length,
+      IN:    hudProps.filter(p => fhaStatusCode(p) === 'IN').length,
+      IE:    hudProps.filter(p => fhaStatusCode(p) === 'IE').length,
+      UI:    hudProps.filter(p => fhaStatusCode(p) === 'UI').length,
+      WATCH: watchCount,
     };
 
     // Compute fit scores once, sort by them descending (best approval fit first).
@@ -1525,12 +1532,18 @@
             homes below are candidates — IN and IE status are most straightforward; UI requires 203(k)
             specifically (repairs are needed for FHA insurability).
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px;align-items:center">
             ${['ALL', 'IN', 'IE', 'UI'].map(k => `
               <button class="fc-btn fc-btn-sm fc-203k-chip ${__203kFilter === k ? 'active' : ''}"
                       data-status="${k}">
                 ${k === 'ALL' ? 'All' : k} <span class="fc-state-count">${counts[k]}</span>
               </button>`).join('')}
+            <span style="width:1px;height:20px;background:var(--hair-2);margin:0 4px"></span>
+            <button class="fc-btn fc-btn-sm fc-203k-chip ${__203kFilter === 'WATCH' ? 'active' : ''}"
+                    data-status="WATCH"
+                    title="HUD homes you've tagged to your watchlist">
+              ★ Watchlist <span class="fc-state-count">${counts.WATCH}</span>
+            </button>
           </div>
         </div>
 
@@ -1557,6 +1570,20 @@
     container.querySelectorAll('.fc-203k-chip').forEach(btn => {
       btn.onclick = () => {
         __203kFilter = btn.getAttribute('data-status') || 'ALL';
+        render203k(window.__fcData);
+      };
+    });
+
+    // Wire per-row watchlist toggle buttons. Re-renders the whole view so
+    // the star badge, button state, and WATCH chip count all update in sync.
+    container.querySelectorAll('.fc-203k-watch-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const propId = btn.getAttribute('data-prop-id');
+        const prop = (filterByState(d).foreclosures || []).find(x => x.id === propId);
+        if (!prop) return;
+        toggleWatchlist(prop);
+        updateTopbarWatchlistBadge();
         render203k(window.__fcData);
       };
     });
@@ -1759,6 +1786,7 @@
   }
 
   function render203kRow(p, fit) {
+    const watched = isWatchlisted(p.id);
     const status = fhaStatusCode(p);
     const statusLabel = {
       IN: 'IN · Insured',
@@ -1829,16 +1857,24 @@
               </div>
             </div>
           </div>
-          <div style="font-family:var(--f-serif);font-size:15px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:3px">
-            ${escapeHtml(p.address || '—')}
+          <div style="font-family:var(--f-serif);font-size:15px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:3px;display:flex;align-items:center;gap:6px">
+            ${watched ? '<span class="fc-203k-star" title="On your watchlist">★</span>' : ''}
+            <span>${escapeHtml(p.address || '—')}</span>
           </div>
           <div style="font-family:var(--f-mono);font-size:11px;color:var(--muted)">
             ${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · Case #${escapeHtml(p.firm_file_number || '—')}
           </div>
-          <button class="fc-btn fc-btn-sm" style="margin-top:10px"
-                  onclick="openPropertyDrawer('${escapeAttr(p.id || '')}')">
-            View full drawer →
-          </button>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+            <button class="fc-btn fc-btn-sm"
+                    onclick="openPropertyDrawer('${escapeAttr(p.id || '')}')">
+              View full drawer →
+            </button>
+            <button class="fc-btn fc-btn-sm fc-203k-watch-btn ${watched ? 'watched' : ''}"
+                    data-prop-id="${escapeAttr(p.id || '')}"
+                    title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">
+              ${watched ? '★ Watchlisted' : '☆ Watchlist'}
+            </button>
+          </div>
         </div>
 
         <!-- Middle: 203(k) loan math -->
@@ -4599,6 +4635,20 @@ Return ONLY the 2-sentence analysis.`,
   .fc-203k-reason-coral { background: var(--coral-soft); border-left-color: var(--coral); }
   .fc-203k-reason-k { color: var(--muted); font-family: var(--f-mono); font-size: 10px; }
   .fc-203k-reason-v { color: var(--ink-2); font-weight: 500; }
+
+  /* Watchlist star + toggle on 203(k) rows */
+  .fc-203k-star {
+    color: var(--gold-deep);
+    font-size: 14px;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.05);
+  }
+  .fc-203k-watch-btn.watched {
+    background: var(--gold-soft, #FFF4D6);
+    border-color: var(--gold-deep);
+    color: var(--gold-deep);
+    font-weight: 600;
+  }
 
   /* Consultant requirement callout */
   .fc-203k-consult {
