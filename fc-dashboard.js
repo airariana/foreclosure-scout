@@ -1214,20 +1214,38 @@
     }, 250);
   }
 
-  // Open Zillow in a SEPARATE POPUP WINDOW (not a tab). Explicit size
-  // features force browsers to treat this as a window.open popup instead of
-  // routing to tabs. The fixed window name 'nestscoop-zillow' means every
-  // call reuses the same window — the user drags it to a secondary monitor
-  // once and it updates in place as they advance through the queue.
+  // Open Zillow in a SEPARATE POPUP WINDOW (not a tab). Modern Chrome/Edge
+  // ignore generic "popup=yes" and keep routing to tabs unless the feature
+  // string explicitly strips browser chrome (menubar, toolbar, location,
+  // status) AND includes dimensions. Once those two conditions are met,
+  // Chromium creates a true WindowType::POPUP.
   //
-  // If the browser's popup blocker kicks in (e.g., on auto-open without a
-  // click event), we fall back to a new tab.
+  // The fixed window name ('nestscoop-zillow') means every call reuses the
+  // same popup — user drags it to a secondary monitor once, subsequent
+  // advances update the URL in place (no accumulation of windows).
+  //
+  // Placed near screen top-left by default (left=60, top=60). User can
+  // reposition; the OS remembers window position across reopens.
   function openZillowWindow(url) {
     if (!url) return null;
-    const features = 'popup=yes,width=1280,height=900,resizable=yes,scrollbars=yes,noopener,noreferrer';
+    // Order matters in some Chrome versions. 'popup' first as an explicit
+    // hint, followed by dimensions + chrome-strip flags.
+    const features = [
+      'popup=1',
+      'width=1280',
+      'height=900',
+      'left=60',
+      'top=60',
+      'menubar=no',
+      'toolbar=no',
+      'location=no',
+      'status=no',
+      'scrollbars=yes',
+    ].join(',');
     const win = window.open(url, 'nestscoop-zillow', features);
     if (!win) {
-      // Popup blocked — fall back to a tab so users don't get stuck.
+      // Popup blocked (typically on auto-open without a user gesture).
+      // Fall back to a plain tab so users don't get stuck.
       window.open(url, '_blank', 'noopener,noreferrer');
       return null;
     }
