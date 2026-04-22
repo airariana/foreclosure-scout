@@ -2291,7 +2291,7 @@ Return ONLY the 2-sentence analysis.`,
   const SHELL_HTML = `
     <div class="fc-topbar">
       <div class="fc-brand">
-        <div class="fc-brand-mark">NS</div>
+        <img class="fc-brand-mark" src="fc-icon.svg?v=3" alt="Nestscoop" width="26" height="26">
         <span>Nestscoop</span>
       </div>
       <div class="fc-topbar-sep"></div>
@@ -2617,12 +2617,10 @@ Return ONLY the 2-sentence analysis.`,
     letter-spacing: -0.01em; color: var(--ink);
   }
   .fc-brand-mark {
-    width: 24px; height: 24px; border-radius: 3px;
-    background: var(--ink); color: var(--gold);
-    display: grid; place-items: center;
-    font-family: var(--f-serif); font-size: 10px; font-weight: 700;
-    font-style: italic;
-    letter-spacing: -0.01em;
+    width: 26px; height: 26px;
+    display: block;
+    object-fit: contain;
+    /* SVG already has its own rounded corners; no extra radius needed */
   }
   .fc-topbar-sep { width: 1px; height: 20px; background: var(--hair); }
   .fc-workspace {
