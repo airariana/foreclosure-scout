@@ -127,6 +127,141 @@
 
     wireNav(root);
     wireDataKeysButton(root);
+    wireTopbarSearch(root);
+  }
+
+  // ─── Topbar search ──────────────────────────────────────────────────────
+  // Filter by address, city, county, zip, or case number across all loaded
+  // properties. Click a result → opens that property's drawer.
+  let __searchSelectedIndex = 0;
+
+  function wireTopbarSearch(root) {
+    const wrap    = root.querySelector('#fc-tb-search-wrap');
+    const input   = root.querySelector('#fc-tb-search-input');
+    const results = root.querySelector('#fc-tb-search-results');
+    if (!input || !results) return;
+
+    const render = (matches, query) => {
+      if (!query) {
+        results.style.display = 'none';
+        results.innerHTML = '';
+        return;
+      }
+      if (!matches.length) {
+        results.innerHTML = `<div class="fc-tb-search-result-empty">No matches for "${escapeHtml(query)}"</div>`;
+        results.style.display = 'block';
+        return;
+      }
+      const q = query.toLowerCase();
+      const hl = (s) => {
+        if (!s) return '';
+        const safe = escapeHtml(String(s));
+        // Case-insensitive highlight
+        const idx = safe.toLowerCase().indexOf(q);
+        if (idx < 0) return safe;
+        return safe.slice(0, idx) + '<mark>' + safe.slice(idx, idx + q.length) + '</mark>' + safe.slice(idx + q.length);
+      };
+      results.innerHTML = matches.slice(0, 10).map((p, i) => `
+        <div class="fc-tb-search-result ${i === __searchSelectedIndex ? 'selected' : ''}" data-prop-id="${escapeAttr(p.id || '')}">
+          <div class="fc-tb-search-result-addr">${hl(p.address || '—')}</div>
+          <div class="fc-tb-search-result-meta">
+            ${hl(p.city || '')}, ${hl(p.state || 'VA')} ${hl(p.zip || '')} ·
+            ${hl(p.county || '')} ·
+            ${escapeHtml(p.source || '')}
+            ${p.firm_file_number ? ' · #' + hl(p.firm_file_number) : ''}
+          </div>
+        </div>
+      `).join('');
+      results.style.display = 'block';
+
+      // Wire result clicks
+      results.querySelectorAll('.fc-tb-search-result').forEach(el => {
+        el.onclick = () => {
+          const id = el.getAttribute('data-prop-id');
+          if (id) openPropertyDrawer(id);
+          input.value = '';
+          render([], '');
+        };
+      });
+    };
+
+    const runSearch = (q) => {
+      const d = window.__fcData;
+      if (!d || !q) return [];
+      const needle = q.toLowerCase();
+      const haystack = (d.foreclosures || []);
+      const matches = [];
+      for (const p of haystack) {
+        const fields = [
+          p.address, p.city, p.county, p.zip, p.state,
+          p.firm_file_number, p.source, p.id,
+        ].map(v => (v || '').toString().toLowerCase());
+        if (fields.some(f => f.includes(needle))) matches.push(p);
+        if (matches.length >= 50) break; // cap work
+      }
+      return matches;
+    };
+
+    let debounceTimer = null;
+    input.addEventListener('input', (e) => {
+      const q = (e.target.value || '').trim();
+      __searchSelectedIndex = 0;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        render(runSearch(q), q);
+      }, 80);
+    });
+
+    // Keyboard: arrows navigate, Enter opens selected, Escape clears
+    input.addEventListener('keydown', (e) => {
+      const items = results.querySelectorAll('.fc-tb-search-result');
+      if (e.key === 'ArrowDown' && items.length) {
+        e.preventDefault();
+        __searchSelectedIndex = Math.min(__searchSelectedIndex + 1, items.length - 1);
+        items.forEach((el, i) => el.classList.toggle('selected', i === __searchSelectedIndex));
+        items[__searchSelectedIndex].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp' && items.length) {
+        e.preventDefault();
+        __searchSelectedIndex = Math.max(__searchSelectedIndex - 1, 0);
+        items.forEach((el, i) => el.classList.toggle('selected', i === __searchSelectedIndex));
+        items[__searchSelectedIndex].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const selected = items[__searchSelectedIndex];
+        if (selected) {
+          const id = selected.getAttribute('data-prop-id');
+          if (id) openPropertyDrawer(id);
+          input.value = '';
+          render([], '');
+        }
+      } else if (e.key === 'Escape') {
+        input.value = '';
+        render([], '');
+        input.blur();
+      }
+    });
+
+    // Close results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) {
+        results.style.display = 'none';
+      }
+    });
+
+    // Re-open results when re-focusing an input with existing text
+    input.addEventListener('focus', () => {
+      const q = (input.value || '').trim();
+      if (q) render(runSearch(q), q);
+    });
+
+    // Global keyboard shortcut: Cmd+K / Ctrl+K focuses the search.
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
   }
 
   // ─── Data Keys modal ────────────────────────────────────────────────────
@@ -2039,10 +2174,13 @@ Return ONLY the 2-sentence analysis.`,
         ${ICO.chevR}
         <span>Command Center</span>
       </div>
-      <div class="fc-tb-search">
+      <div class="fc-tb-search" id="fc-tb-search-wrap">
         ${ICO.search}
-        <span>Search address, county, case #…</span>
-        <kbd>⌘K</kbd>
+        <input id="fc-tb-search-input" type="text"
+          placeholder="Search address, county, zip, case #…"
+          autocomplete="off" spellcheck="false">
+        <kbd id="fc-tb-search-kbd">⌘K</kbd>
+        <div id="fc-tb-search-results" class="fc-tb-search-results" style="display:none"></div>
       </div>
       <div class="fc-tb-right">
         <button class="fc-tb-btn" title="Notifications">${ICO.bell}</button>
@@ -2369,20 +2507,68 @@ Return ONLY the 2-sentence analysis.`,
   .fc-workspace svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.5; opacity: 0.5; }
 
   .fc-tb-search {
+    position: relative;
     flex: 1; max-width: 420px;
     display: flex; align-items: center; gap: 8px;
     padding: 6px 10px;
     border: 1px solid var(--hair); border-radius: 5px;
     background: var(--paper-2);
     font-size: 12px; color: var(--muted);
-    cursor: pointer;
+    transition: border-color 120ms;
+  }
+  .fc-tb-search:focus-within {
+    border-color: var(--gold-deep);
+    background: var(--white);
   }
   .fc-tb-search svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  .fc-tb-search input {
+    flex: 1; min-width: 0;
+    background: transparent; border: 0; outline: none;
+    font-family: var(--f-ui); font-size: 12px;
+    color: var(--ink);
+  }
+  .fc-tb-search input::placeholder { color: var(--muted); }
   .fc-tb-search kbd {
     font-family: var(--f-mono); font-size: 10px;
     padding: 1px 5px; border-radius: 3px;
     background: var(--paper); border: 1px solid var(--hair);
     color: var(--muted); margin-left: auto;
+  }
+  .fc-tb-search-results {
+    position: absolute;
+    top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 5px;
+    box-shadow: 0 8px 24px rgba(14, 23, 40, 0.12);
+    max-height: 380px;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  .fc-tb-search-result {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--hair);
+    transition: background 80ms;
+  }
+  .fc-tb-search-result:last-child { border-bottom: 0; }
+  .fc-tb-search-result:hover,
+  .fc-tb-search-result.selected {
+    background: var(--paper-2);
+  }
+  .fc-tb-search-result-addr {
+    font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px;
+  }
+  .fc-tb-search-result-meta {
+    font-family: var(--f-mono); font-size: 11px; color: var(--muted);
+  }
+  .fc-tb-search-result-empty {
+    padding: 20px; text-align: center;
+    font-family: var(--f-mono); font-size: 11px; color: var(--muted);
+  }
+  .fc-tb-search-result mark {
+    background: var(--gold-soft); color: var(--gold-ink);
+    padding: 0 2px; border-radius: 2px; font-weight: 600;
   }
 
   .fc-tb-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
