@@ -129,6 +129,7 @@
     wireDataKeysButton(root);
     wireTopbarSearch(root);
     wireTopbarWatchlist(root);
+    wireSidebarDrawer(root);
   }
 
   // ─── Topbar search ──────────────────────────────────────────────────────
@@ -766,6 +767,9 @@
         const view = el.getAttribute('data-view');
         if (!view) return;
         setView(view);
+        // On mobile, auto-close the sidebar drawer after selecting a view so
+        // the main content becomes immediately visible.
+        closeSidebarDrawer();
       });
     });
     // Restore view from URL hash
@@ -775,6 +779,33 @@
       const v = (location.hash || '#dashboard').replace('#', '');
       setView(v);
     });
+  }
+
+  // ─── Mobile sidebar drawer ──────────────────────────────────────────────
+  // On viewports ≤768px the sidebar becomes an off-canvas drawer. Hamburger
+  // button toggles it; backdrop click + view selection close it. Desktop is
+  // unaffected — CSS only activates the drawer styles at the mobile bp.
+  function wireSidebarDrawer(root) {
+    const hamburger = root.querySelector('#fc-tb-hamburger');
+    const backdrop  = root.querySelector('#fc-sidebar-backdrop');
+    const sidebar   = root.querySelector('#fc-sidebar');
+    if (hamburger && sidebar) {
+      hamburger.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+        if (backdrop) backdrop.classList.toggle('open');
+        document.body.classList.toggle('fc-sidebar-locked');
+      });
+    }
+    if (backdrop) {
+      backdrop.addEventListener('click', closeSidebarDrawer);
+    }
+  }
+  function closeSidebarDrawer() {
+    const sidebar  = document.getElementById('fc-sidebar');
+    const backdrop = document.getElementById('fc-sidebar-backdrop');
+    if (sidebar)  sidebar.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+    document.body.classList.remove('fc-sidebar-locked');
   }
 
   function setView(view) {
@@ -3486,13 +3517,14 @@ Return ONLY the 2-sentence analysis.`,
   }
 
   // ─── Initialize ─────────────────────────────────────────────────────────
+  // Builds the dashboard shell on all viewports now. Mobile adaptations
+  // happen via responsive CSS (sidebar becomes an off-canvas drawer,
+  // condensed topbar, single-column layouts).
   function init() {
     loadFonts();
     injectCSS();
-    if (isDesktop()) {
-      buildShell();
-      loadData();
-    }
+    buildShell();
+    loadData();
   }
 
   // Run after DOM is parsed so the mobile-frame exists to hide.
@@ -3503,9 +3535,10 @@ Return ONLY the 2-sentence analysis.`,
   }
 
   // Handle viewport changes (dev-tools device emulation, window resize).
+  // Shell builds once on init now; resize keeps it.
   window.addEventListener('resize', () => {
     const hasDash = !!document.getElementById('fc-dash-root');
-    if (isDesktop() && !hasDash) buildShell();
+    if (!hasDash) buildShell();
   });
 
   // ─── Icons as tiny inline SVGs (stroke-current) ─────────────────────────
@@ -3526,6 +3559,12 @@ Return ONLY the 2-sentence analysis.`,
   // ─── Shell HTML ─────────────────────────────────────────────────────────
   const SHELL_HTML = `
     <div class="fc-topbar">
+      <!-- Hamburger: visible only on mobile via CSS, toggles the sidebar drawer -->
+      <button class="fc-tb-hamburger" id="fc-tb-hamburger" aria-label="Open menu" title="Menu">
+        <svg viewBox="0 0 20 20" width="18" height="18" stroke="currentColor" fill="none" stroke-width="1.8">
+          <path d="M3 6h14M3 10h14M3 14h14"/>
+        </svg>
+      </button>
       <div class="fc-brand">
         <img class="fc-brand-mark" src="fc-icon.svg?v=3" alt="Nestscoop" width="26" height="26">
         <span>Nestscoop</span>
@@ -3552,8 +3591,11 @@ Return ONLY the 2-sentence analysis.`,
       </div>
     </div>
 
+    <!-- Mobile sidebar backdrop: visible only when drawer is open -->
+    <div class="fc-sidebar-backdrop" id="fc-sidebar-backdrop"></div>
+
     <div class="fc-body">
-      <div class="fc-sidebar">
+      <div class="fc-sidebar" id="fc-sidebar">
         <div class="fc-side-section">
           <div class="fc-side-label">Properties</div>
           <div class="fc-side-item active" data-view="dashboard">${ICO.home}<span>Dashboard</span></div>
@@ -3802,12 +3844,9 @@ Return ONLY the 2-sentence analysis.`,
   --f-serif: "Source Serif 4", Georgia, serif;
 }
 
-/* Only render dashboard on desktop */
-@media (max-width: 768px) {
-  #fc-dash-root { display: none !important; }
-}
-
-@media (min-width: 769px) {
+/* Dashboard renders on all viewports. Mobile adaptations (off-canvas sidebar,
+   condensed topbar, stacked grids) are in a dedicated @media block at the
+   very bottom of this stylesheet. */
   html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -4951,7 +4990,109 @@ Return ONLY the 2-sentence analysis.`,
     width: 64px; height: 32px;
     opacity: 0.8;
   }
-}
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Mobile adaptations (≤768px)
+     - Sidebar becomes off-canvas drawer, hamburger in topbar toggles it
+     - Topbar condenses: hide workspace breadcrumb + search bar
+     - Main content: full-width single column
+     - Grids (KPI, page-head actions) stack
+     - Hide duplicate mobile-frame chrome when Map view relocates it in
+     ─────────────────────────────────────────────────────────────────── */
+  .fc-tb-hamburger {
+    display: none; /* desktop default — shown in the mobile @media block */
+    background: transparent; border: 0; padding: 4px; border-radius: 4px;
+    color: var(--ink); cursor: pointer; align-items: center; justify-content: center;
+  }
+  .fc-tb-hamburger:hover { background: var(--paper-2); }
+  .fc-sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(14, 23, 40, 0.45);
+    z-index: 998;
+    backdrop-filter: blur(1px);
+  }
+  .fc-sidebar-backdrop.open { display: block; animation: fc-bd-in 180ms ease-out; }
+  @keyframes fc-bd-in { from { opacity: 0 } to { opacity: 1 } }
+
+  @media (max-width: 768px) {
+    .fc-tb-hamburger { display: inline-flex; }
+    .fc-topbar { padding: 0 10px; gap: 8px; }
+    /* Hide breadcrumb + search on mobile — too cramped */
+    .fc-topbar-sep,
+    .fc-workspace,
+    .fc-tb-search { display: none; }
+    /* Condense topbar right side */
+    .fc-tb-right { gap: 2px; }
+    .fc-tb-btn { padding: 0 6px; font-size: 11px; height: 26px; }
+    .fc-tb-btn[title="Notifications"],
+    .fc-tb-btn#fc-tb-keys { display: none; } /* trim to Watchlist only */
+
+    /* Sidebar becomes off-canvas drawer */
+    .fc-sidebar {
+      position: fixed;
+      top: 48px; left: 0;
+      height: calc(100% - 48px); height: calc(100dvh - 48px);
+      width: 260px;
+      transform: translateX(-100%);
+      transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 999;
+      box-shadow: 2px 0 24px rgba(14, 23, 40, 0.12);
+    }
+    .fc-sidebar.open { transform: translateX(0); }
+    body.fc-sidebar-locked { overflow: hidden; }
+
+    /* Main takes full viewport width */
+    .fc-body { display: block; }
+    .fc-main { width: 100%; }
+    .fc-main-inner { padding: 12px !important; }
+
+    /* Page head: stack title + state chips */
+    .fc-page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .fc-page-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+
+    /* KPI grid: 2 cols on mobile */
+    .fc-kpi-grid { grid-template-columns: 1fr 1fr; }
+    .fc-kpi { border-right: none; border-bottom: 1px solid var(--hair); }
+    .fc-kpi:nth-child(odd) { border-right: 1px solid var(--hair); }
+    .fc-kpi-spark { display: none; } /* sparks overflow on narrow cards */
+
+    /* Dashboard layout card splits: stack everything */
+    .fc-section-grid,
+    .fc-coach-stats,
+    .fc-share-actions,
+    .fc-nbhd-grid { grid-template-columns: 1fr !important; }
+
+    /* 203(k) rows are already @max-width:900px 1fr, good */
+
+    /* Mobile-frame (hosts Google Map) — when Map view is active, hide its
+       duplicate chrome on mobile too, not just desktop. */
+    .mobile-frame .ptr-progress,
+    .mobile-frame .ptr-indicator,
+    .mobile-frame header,
+    .mobile-frame .api-bar,
+    .mobile-frame .filter-bar,
+    .mobile-frame .stats-banner,
+    .mobile-frame .filter-sidebar,
+    .mobile-frame .mobile-bottom-bar,
+    .mobile-frame [class*="mobile-bottom"],
+    .mobile-frame .floating-calendar-btn {
+      display: none !important;
+    }
+    .mobile-frame #map {
+      height: calc(100dvh - 48px) !important;
+      min-height: calc(100dvh - 48px) !important;
+    }
+
+    /* Zillow Queue card — remove side padding buffer on tight screens */
+    #fc-view-zillow-queue .fc-card { margin: 0 !important; }
+  }
+
+  @media (max-width: 420px) {
+    .fc-kpi-grid { grid-template-columns: 1fr; }
+    .fc-kpi { border-right: none !important; }
+    .fc-kpi:nth-child(odd) { border-right: none !important; }
+  }
 `;
 
 })();
