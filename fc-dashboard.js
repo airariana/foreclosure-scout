@@ -801,6 +801,23 @@
 
     const filtered = filterByState(d);
     let props = (filtered.foreclosures || []).slice();
+
+    // Apply Live-Signal drill-down filter if one is active.
+    if (__listingsFilter && typeof __listingsFilter.predicate === 'function') {
+      const beforeCount = props.length;
+      props = props.filter(__listingsFilter.predicate);
+      renderSignalFilterChip(__listingsFilter.label, props.length, beforeCount);
+      // Respect the signal's preferred sort if the user hasn't picked one.
+      if (__listingsFilter.sortBy && __listingsSortKey === 'score') {
+        __listingsSortKey = __listingsFilter.sortBy;
+        document.querySelectorAll('.fc-list-sort').forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-sort') === __listingsSortKey);
+        });
+      }
+    } else {
+      renderSignalFilterChip(null);
+    }
+
     const sortFns = {
       score:    (a, b) => (b.score || 0) - (a.score || 0),
       days:     (a, b) => (a.days_to_sale == null ? 9999 : a.days_to_sale) - (b.days_to_sale == null ? 9999 : b.days_to_sale),
@@ -1327,6 +1344,45 @@
   }
 
   // ─── Signals feed — derive from live data (sources, recency, status) ────
+  // Active listings filter set by clicking a Live Signal. Null when no
+  // signal is applied. The full property is stashed in module scope so we
+  // can restore on view refresh + show a dismiss chip in Listings view.
+  let __listingsFilter = null;  // { label, predicate, sortBy? }
+  const __signalIndex = new Map(); // signal idx → filter spec (for click handler)
+
+  function renderSignalFilterChip(label, matchCount, totalBeforeFilter) {
+    const container = document.querySelector('#fc-listings-filter-chip');
+    if (!container) return;
+    if (!label) {
+      container.innerHTML = '';
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = '';
+    container.innerHTML = `
+      <div class="fc-filter-chip-active">
+        <span class="fc-filter-chip-icon">⚡</span>
+        <span class="fc-filter-chip-label">Filtered: <strong>${escapeHtml(label)}</strong></span>
+        <span class="fc-filter-chip-count">${matchCount} of ${totalBeforeFilter}</span>
+        <button class="fc-filter-chip-clear" onclick="fcClearListingsFilter()" title="Clear filter">✕</button>
+      </div>
+    `;
+  }
+
+  window.fcApplyListingsFilter = function (idx) {
+    const filter = __signalIndex.get(Number(idx));
+    if (!filter) return;
+    __listingsFilter = filter;
+    location.hash = 'listings';
+    // setView happens on hashchange; force render if we're already there.
+    if (window.__fcData) renderListings(window.__fcData);
+  };
+
+  window.fcClearListingsFilter = function () {
+    __listingsFilter = null;
+    if (window.__fcData) renderListings(window.__fcData);
+  };
+
   function renderSignals(d) {
     d = filterByState(d);
     const el = document.getElementById('fc-signals');
@@ -1335,6 +1391,7 @@
     const m = d.metadata || {};
 
     const signals = [];
+    __signalIndex.clear();
 
     // Upcoming sales this week
     const soonSales = props.filter(p => p.days_to_sale != null && p.days_to_sale >= 0 && p.days_to_sale <= 7);
@@ -1345,6 +1402,11 @@
         what: `scheduled this week, earliest ${soonSales[0].days_to_sale === 0 ? 'today' : 'in ' + soonSales[0].days_to_sale + 'd'}.`,
         ctx: `${soonSales.slice(0, 3).map(p => p.city).join(' · ')}…`,
         time: soonSales[0].days_to_sale === 0 ? 'Now' : `${soonSales[0].days_to_sale}d`,
+        filter: {
+          label: 'Sales within 7 days',
+          predicate: p => p.days_to_sale != null && p.days_to_sale >= 0 && p.days_to_sale <= 7,
+          sortBy: 'days',
+        },
       });
     }
 
@@ -1357,6 +1419,11 @@
         what: `marked Price Reduced — lender cutting losses.`,
         ctx: `Avg new list $${Math.round(priceReduced.reduce((s,p) => s + (p.price||0), 0) / priceReduced.length / 1000)}K.`,
         time: 'Active',
+        filter: {
+          label: 'Price Reduced listings',
+          predicate: p => (p.status || '').toLowerCase().includes('reduced'),
+          sortBy: 'score',
+        },
       });
     }
 
@@ -1372,6 +1439,11 @@
         what: `active in ${stateList} — FHA financing available on ${hudProps.filter(p => (p.hud_fha || '').startsWith('IN')).length} of them.`,
         ctx: `List price median $${Math.round(median(hudProps.map(p => p.price || 0).filter(v => v > 0)) / 1000)}K.`,
         time: 'Weekly',
+        filter: {
+          label: 'HUD HomeStore listings',
+          predicate: p => p.source === 'HUD HomeStore',
+          sortBy: 'score',
+        },
       });
     }
 
@@ -1383,12 +1455,18 @@
     const top = Object.entries(counties).sort((a,b) => b[1] - a[1]).slice(0, 1)[0];
     if (top) {
       const scopeLabel = __stateFilter === 'ALL' ? 'DC/MD/VA' : __stateFilter;
+      const topCounty = top[0];
       signals.push({
         type: 'sky', tag: 'CONCENTRATION',
-        who: top[0],
+        who: topCounty,
         what: `has the highest foreclosure volume — ${top[1]} active listings.`,
         ctx: `${Math.round(top[1] / props.length * 100)}% of all ${scopeLabel} activity this week.`,
         time: 'Now',
+        filter: {
+          label: topCounty,
+          predicate: p => p.county === topCounty,
+          sortBy: 'score',
+        },
       });
     }
 
@@ -1397,16 +1475,23 @@
       return;
     }
 
-    el.innerHTML = signals.map(s => `
-      <div class="fc-signal">
-        <div class="fc-signal-head">
-          <span class="fc-pill ${s.type}">${escapeHtml(s.tag)}</span>
-          <span class="fc-mono fc-signal-time">${escapeHtml(s.time)}</span>
+    el.innerHTML = signals.map((s, i) => {
+      __signalIndex.set(i, s.filter);
+      return `
+        <div class="fc-signal fc-signal-clickable" role="button" tabindex="0"
+             onclick="fcApplyListingsFilter(${i})"
+             onkeydown="if(event.key==='Enter'||event.key===' ')fcApplyListingsFilter(${i})"
+             title="Click to view ${escapeAttr(s.filter.label)} in Listings">
+          <div class="fc-signal-head">
+            <span class="fc-pill ${s.type}">${escapeHtml(s.tag)}</span>
+            <span class="fc-mono fc-signal-time">${escapeHtml(s.time)}</span>
+          </div>
+          <div class="fc-signal-body"><strong>${escapeHtml(s.who)}</strong> ${escapeHtml(s.what)}</div>
+          <div class="fc-signal-ctx">${escapeHtml(s.ctx)}</div>
+          <div class="fc-signal-cta">View ${escapeHtml(s.filter.label)} →</div>
         </div>
-        <div class="fc-signal-body"><strong>${escapeHtml(s.who)}</strong> ${escapeHtml(s.what)}</div>
-        <div class="fc-signal-ctx">${escapeHtml(s.ctx)}</div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   function median(arr) {
@@ -2503,6 +2588,7 @@ Return ONLY the 2-sentence analysis.`,
                   <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort" data-sort="discount">Discount</button>
                 </div>
               </div>
+              <div id="fc-listings-filter-chip" style="display:none"></div>
               <table class="fc-table" id="fc-listings-table">
                 <thead>
                   <tr>
@@ -3465,6 +3551,83 @@ Return ONLY the 2-sentence analysis.`,
     font-size: 11px;
     color: var(--muted);
     margin-top: 2px;
+  }
+
+  /* Clickable live-signal rows (drill-down into Listings) */
+  .fc-signal-clickable {
+    cursor: pointer;
+    transition: background 120ms, border-left-color 120ms;
+    border-left: 3px solid transparent;
+  }
+  .fc-signal-clickable:hover {
+    background: var(--paper-2);
+    border-left-color: var(--gold);
+  }
+  .fc-signal-clickable:hover .fc-signal-cta {
+    color: var(--gold-ink);
+    transform: translateX(2px);
+  }
+  .fc-signal-clickable:focus-visible {
+    outline: 2px solid var(--gold-deep);
+    outline-offset: -2px;
+  }
+  .fc-signal-cta {
+    margin-top: 8px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 120ms, transform 200ms;
+  }
+
+  /* Active-filter chip at top of Listings view */
+  #fc-listings-filter-chip { padding: 0 16px; }
+  .fc-filter-chip-active {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: linear-gradient(90deg, var(--gold-soft) 0%, var(--paper-2) 100%);
+    border: 1px solid var(--gold-deep);
+    border-left: 3px solid var(--gold-deep);
+    border-radius: 5px;
+    margin: 12px 0;
+    animation: fc-chip-in 220ms ease-out;
+  }
+  @keyframes fc-chip-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fc-filter-chip-icon { font-size: 14px; }
+  .fc-filter-chip-label {
+    flex: 1;
+    font-family: var(--f-ui);
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .fc-filter-chip-label strong { color: var(--gold-ink); }
+  .fc-filter-chip-count {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 2px 8px;
+    background: var(--white);
+    border-radius: 10px;
+    border: 1px solid var(--hair);
+  }
+  .fc-filter-chip-clear {
+    background: transparent;
+    border: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+    width: 22px; height: 22px;
+    border-radius: 3px;
+    transition: background 120ms, color 120ms;
+  }
+  .fc-filter-chip-clear:hover {
+    background: var(--hair);
+    color: var(--ink);
   }
 
   /* ─── KPI grid ─── */
