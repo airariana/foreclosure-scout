@@ -711,9 +711,64 @@
       updateSidebarCounts(d);
       // Re-render listings if that's the active view
       if ((location.hash || '').replace('#', '') === 'listings') renderListings(d);
+      // Deep-link: ?p=<propId> auto-opens that property's drawer after load.
+      handleShareDeepLink();
     } catch (e) {
       console.warn('[FC Dash] data load failed:', e);
     }
+  }
+
+  // ─── Share deep-links ───────────────────────────────────────────────────
+  // Format: ?p=<propId> — when present, auto-opens that property's drawer
+  // after the data finishes loading. Used by the Share section's generated
+  // links so recipients land directly on the shared property.
+  function handleShareDeepLink() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const propId = params.get('p');
+      if (!propId) return;
+      // Small delay so the drawer render has the updated DOM available.
+      setTimeout(() => openPropertyDrawer(propId), 250);
+    } catch (e) { /* no-op */ }
+  }
+
+  function buildShareUrl(propId) {
+    const base = window.location.origin + window.location.pathname;
+    return `${base}?p=${encodeURIComponent(propId)}`;
+  }
+
+  function buildShareContent(p) {
+    const addr = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+    const priceStr = p.price ? '$' + p.price.toLocaleString() : '—';
+    const arvStr   = p.arv   ? '$' + p.arv.toLocaleString()   : '—';
+    const rentStr  = p.monthlyRent ? '$' + p.monthlyRent.toLocaleString() + '/mo' : '—';
+    const cfStr    = p.cashFlow != null ? ((p.cashFlow >= 0 ? '+$' : '−$') + Math.abs(p.cashFlow).toLocaleString() + '/mo') : '—';
+    const saleStr  = p.sale_date || (p.days_to_sale != null ? `in ${p.days_to_sale}d` : 'TBD');
+    const url      = buildShareUrl(p.id || '');
+
+    const subject = `Foreclosure lead: ${addr}`;
+    const body = [
+      addr,
+      '',
+      `Price:       ${priceStr}`,
+      `ARV:         ${arvStr}`,
+      `Discount:    ${p.discount || 0}% below ARV`,
+      `Rent est.:   ${rentStr}`,
+      `Cash flow:   ${cfStr}`,
+      `Cap rate:    ${p.capRate || 0}%`,
+      `Grade:       ${p.grade || '—'} (score ${p.score || 0}/100)`,
+      `70% rule:    ${p.passes70 ? 'Passes' : 'Fails'} (MAO $${(p.mao70 || 0).toLocaleString()})`,
+      `Source:      ${p.source || '—'}`,
+      `Sale date:   ${saleStr}`,
+      '',
+      `Details: ${url}`,
+    ].join('\n');
+
+    // SMS body needs to be shorter — most carriers concatenate but links
+    // can break if the message is too long. Keep it tight.
+    const smsBody = `${addr}\nPrice ${priceStr} · ARV ${arvStr} · ${p.discount || 0}% below ARV · Grade ${p.grade || '—'}\n${url}`;
+
+    return { subject, body, smsBody, url };
   }
 
   function updateSidebarCounts(d) {
@@ -1416,6 +1471,54 @@
     // All three call global functions defined in foreclosure-scout.html's
     // main <script>; they fail gracefully if any API key is missing.
     initDrawerAsyncSections(p);
+
+    // Wire the Share section buttons (Copy link + native Share).
+    wireDrawerShareButtons(p);
+  }
+
+  function wireDrawerShareButtons(p) {
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const copyBtn = document.getElementById(`fc-share-copy-${sanitizedId}`);
+    const nativeBtn = document.getElementById(`fc-share-native-${sanitizedId}`);
+    const feedback  = document.getElementById(`fc-share-feedback-${sanitizedId}`);
+    const share = buildShareContent(p);
+
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(share.url);
+          if (feedback) {
+            feedback.textContent = '✓ Link copied';
+            setTimeout(() => { if (feedback) feedback.textContent = ''; }, 2000);
+          }
+        } catch (e) {
+          // Fallback for very old browsers: use execCommand.
+          const ta = document.createElement('textarea');
+          ta.value = share.url;
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (_) { /* no-op */ }
+          document.body.removeChild(ta);
+          if (feedback) feedback.textContent = '✓ Link copied';
+        }
+      };
+    }
+
+    // Reveal native share on browsers that support it (mostly mobile + some
+    // desktop Chrome/Safari). Gives access to WhatsApp, iMessage, Airdrop,
+    // and any other installed share target.
+    if (nativeBtn && typeof navigator.share === 'function') {
+      nativeBtn.style.display = '';
+      nativeBtn.onclick = async () => {
+        try {
+          await navigator.share({
+            title: share.subject,
+            text: share.smsBody,
+            url: share.url,
+          });
+        } catch (e) { /* user cancelled */ }
+      };
+    }
   }
 
   async function initDrawerAsyncSections(p) {
@@ -1777,6 +1880,29 @@ Return ONLY the 2-sentence analysis.`,
             </div>` : ''}
           ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">Search this case number directly at hudhomestore.gov to see photos, disclosures, and submit a bid.</div>' : ''}
         `)}
+
+        ${(() => {
+          const s = buildShareContent(p);
+          const subject = encodeURIComponent(s.subject);
+          const body    = encodeURIComponent(s.body);
+          const smsBody = encodeURIComponent(s.smsBody);
+          // sms: syntax differs subtly between iOS and Android. "?&body=" is
+          // the broadly-compatible form (iOS is strict, Android accepts both).
+          const emailHref = `mailto:?subject=${subject}&body=${body}`;
+          const smsHref   = `sms:?&body=${smsBody}`;
+          return section('Share', `
+            <div class="fc-kv-caption" style="color:var(--muted);font-size:11px;margin-bottom:10px">
+              Sends a summary with key metrics + a direct link back to this property.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a class="fc-btn fc-btn-sm" href="${escapeAttr(emailHref)}">📧 Email</a>
+              <a class="fc-btn fc-btn-sm" href="${escapeAttr(smsHref)}">💬 Text</a>
+              <button class="fc-btn fc-btn-sm" id="fc-share-copy-${sanitizedId}">🔗 Copy link</button>
+              <button class="fc-btn fc-btn-sm fc-btn-ghost" id="fc-share-native-${sanitizedId}" style="display:none">📱 More…</button>
+              <span class="fc-kv-caption" id="fc-share-feedback-${sanitizedId}" style="align-self:center;color:var(--sage);font-size:11px"></span>
+            </div>
+          `);
+        })()}
 
         ${section('Mortgage calculator', `
           <div class="calc-section">
