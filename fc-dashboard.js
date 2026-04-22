@@ -1786,10 +1786,25 @@
     const estIns = (p.arv || totalLoanNeeded) * 0.005 / 12;
     const totalPITI = piPayment + mip + estTax + estIns;
 
-    const lenderButtons = FHA_203K_LENDERS.slice(0, 3).map(l => `
+    // Program classification: Limited (≤$35K rehab, no consultant) vs
+    // Standard (>$35K, consultant required). Rehab amount drives which
+    // lender flow + what lookup deep-links to surface.
+    const program = program203k(rehabEstimate);
+    const stateCode = (p.state || 'VA').toUpperCase();
+
+    // Re-rank lenders by program type: Standard deals benefit from
+    // specialist teams (coordination-heavy). Limited is fine with
+    // generalists. Stable sort so same-category lenders keep original order.
+    const rankedLenders = FHA_203K_LENDERS.slice().sort((a, b) => {
+      if (program.type === 'STANDARD') {
+        return (b.specialist ? 1 : 0) - (a.specialist ? 1 : 0);
+      }
+      return 0;
+    });
+    const lenderButtons = rankedLenders.slice(0, 3).map(l => `
       <a class="fc-btn fc-btn-sm fc-btn-ghost" href="${escapeAttr(l.url)}" target="_blank" rel="noopener"
          title="${escapeAttr(l.note)}">
-        ${escapeHtml(l.name)} ↗
+        ${escapeHtml(l.name)}${l.specialist ? ' ★' : ''} ↗
       </a>`).join('');
 
     // Fit score reason tooltip
@@ -1828,6 +1843,15 @@
 
         <!-- Middle: 203(k) loan math -->
         <div class="fc-203k-math">
+          <!-- Program type pill: Limited (≤$35K) vs Standard (>$35K) -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--hair-2)">
+            <span class="fc-pill ${program.pillClass}" title="${escapeAttr(program.blurb)}">
+              ${escapeHtml(program.label)}
+            </span>
+            <span style="font-family:var(--f-mono);font-size:9px;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase">
+              ${program.type === 'LIMITED' ? 'Streamline' : 'Full program'}
+            </span>
+          </div>
           <div class="fc-203k-math-row">
             <span class="fc-203k-key">Purchase</span>
             <span class="fc-203k-val">$${purchasePrice.toLocaleString()}</span>
@@ -1864,7 +1888,24 @@
 
         <!-- Right: apply actions + fit breakdown -->
         <div class="fc-203k-actions">
-          <div class="fc-eyebrow" style="margin-bottom:6px">Approval factors</div>
+          <!-- Consultant requirement callout: Standard needs one, Limited doesn't -->
+          <div class="fc-203k-consult fc-203k-consult-${program.consultant ? 'req' : 'none'}">
+            <div class="fc-203k-consult-head">
+              <span class="fc-203k-consult-ico">${program.consultant ? '⚠' : '✓'}</span>
+              <span>${escapeHtml(program.consultantNote)}</span>
+            </div>
+            ${program.consultant ? `
+              <a class="fc-btn fc-btn-sm" href="${hudConsultantSearchUrl()}" target="_blank" rel="noopener"
+                 title="HUD consultant roster — pick ${escapeAttr(stateCode)} in the state field"
+                 style="margin-top:6px">
+                🏗️ Find consultant in ${escapeHtml(stateCode)} ↗
+              </a>` : `
+              <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4">
+                Cosmetic/non-structural repairs only. Max $35K rehab. No 1099 consultant fee.
+              </div>`}
+          </div>
+
+          <div class="fc-eyebrow" style="margin-top:14px;margin-bottom:6px">Approval factors</div>
           <div class="fc-203k-reasons">
             ${fit.reasons.map(r => `
               <div class="fc-203k-reason fc-203k-reason-${r.tone}">
@@ -1872,9 +1913,16 @@
                 <span class="fc-203k-reason-v">${escapeHtml(r.v)}</span>
               </div>`).join('')}
           </div>
-          <div class="fc-eyebrow" style="margin-top:14px;margin-bottom:6px">Launch application</div>
+          <div class="fc-eyebrow" style="margin-top:14px;margin-bottom:6px">
+            Launch application ${program.type === 'STANDARD' ? '· ★ = 203(k) specialist' : ''}
+          </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${lenderButtons}
+            <a class="fc-btn fc-btn-sm fc-btn-ghost" href="${hudLenderSearchUrl()}" target="_blank" rel="noopener"
+               title="HUD FHA-approved lender search — filter by state + ZIP on the form"
+               style="border-style:dashed">
+              🏦 Find FHA lenders in ${escapeHtml(stateCode)} ↗
+            </a>
           </div>
         </div>
       </div>
@@ -4551,6 +4599,34 @@ Return ONLY the 2-sentence analysis.`,
   .fc-203k-reason-coral { background: var(--coral-soft); border-left-color: var(--coral); }
   .fc-203k-reason-k { color: var(--muted); font-family: var(--f-mono); font-size: 10px; }
   .fc-203k-reason-v { color: var(--ink-2); font-weight: 500; }
+
+  /* Consultant requirement callout */
+  .fc-203k-consult {
+    padding: 10px 12px;
+    border-radius: 4px;
+    border-left: 3px solid;
+    font-size: 11px;
+  }
+  .fc-203k-consult-head {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .fc-203k-consult-ico {
+    font-size: 13px; line-height: 1;
+  }
+  .fc-203k-consult-req {
+    background: var(--sky-soft);
+    border-left-color: var(--sky);
+    color: var(--ink);
+  }
+  .fc-203k-consult-req .fc-203k-consult-ico { color: var(--sky); }
+  .fc-203k-consult-none {
+    background: var(--sage-soft);
+    border-left-color: var(--sage);
+    color: var(--ink);
+  }
+  .fc-203k-consult-none .fc-203k-consult-ico { color: var(--sage); }
 
   @media (max-width: 900px) {
     .fc-203k-row {
