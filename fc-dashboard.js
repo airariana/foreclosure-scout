@@ -62,10 +62,8 @@
   // then paste the output into the corresponding hash below and commit.
   const AUTH_LS_KEY = 'fc_auth_role';
   const PASS_HASHES = {
-    // Default plaintext: 'nestscoop-admin'
-    admin:  'fb31cf9bde459561ba24b7bbe36b635bad2c585f04ccecab65f8ff9bd75210eb',
-    // Default plaintext: 'nestscoop-view'
-    viewer: '7e07ddc56c51284c66ad29006a7f7170880ca472bcc172eecddcf7f35a1ed15e',
+    admin:  'd49ef9f8dcaa1367b1a666285e36c960ddffa3fa45fa36c78bf12adc61ca0a50',
+    viewer: '14a234b37c07c9e2c4153768c3d0722f00af65b5270f2cbc6d326edbdfb8cdcd',
   };
 
   async function hashPassphrase(str) {
