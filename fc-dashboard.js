@@ -425,7 +425,7 @@
   }
 
   function setView(view) {
-    const valid = ['dashboard', 'listings', 'map', 'alerts', 'rehab', 'market', 'brrrr', 'settings'];
+    const valid = ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'rehab', 'market', 'brrrr', 'settings'];
     if (!valid.includes(view)) view = 'dashboard';
     if (location.hash !== '#' + view) {
       history.replaceState(null, '', '#' + view);
@@ -441,7 +441,7 @@
     const mobileFrame = document.querySelector('#fc-view-map .mobile-frame');
     const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
 
-    ['dashboard', 'listings', 'map', 'alerts', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+    ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
       const el = document.getElementById(`fc-view-${v}`);
       if (el) el.style.display = (v === view) ? '' : 'none';
     });
@@ -482,12 +482,14 @@
       market:    'Market Analysis',
       brrrr:     'BRRRR Calculator',
       settings:  'Settings',
+      'zillow-queue': 'Zillow Queue',
     };
     const titleEl = document.querySelector('#fc-dash-root .fc-page-title');
     if (titleEl && titles[view]) titleEl.textContent = titles[view];
 
     // Lazily render listings when shown
     if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
+    if (view === 'zillow-queue' && window.__fcData) renderZillowQueue(window.__fcData);
   }
 
   // ─── State filter ───────────────────────────────────────────────────────
@@ -584,6 +586,7 @@
     const count = (filtered.foreclosures || []).length;
     const el = document.getElementById('fc-sc-listings');
     if (el) el.textContent = count;
+    updateZQueueSidebarCount(d);
   }
 
   // ─── Listings view — full sortable table ────────────────────────────────
@@ -658,6 +661,289 @@
     }).join('');
     body.querySelectorAll('tr[data-prop-id]').forEach(tr => {
       tr.onclick = () => openPropertyDrawer(tr.getAttribute('data-prop-id'));
+    });
+  }
+
+  // ─── Zillow Queue — rapid manual lookup workflow ────────────────────────
+  // One property at a time, focused input fields, keyboard shortcuts, auto-
+  // advance. Designed to take manual Zillow validation from ~2 min/property
+  // down to ~30 sec/property.
+  let __zqueueIndex = 0;
+  const ZQUEUE_AUTO_OPEN_KEY = 'fs_zqueue_auto_open';
+
+  function getZillowQueue(d) {
+    // Properties without Zillow data, prioritized by: auctions first (HUD +
+    // Trustee), then soonest auction date, then highest heuristic discount.
+    // Distressed (DC Vacant) entries are leads without an auction date so
+    // they queue last — still actionable but lower urgency.
+    const props = filterByState(d).foreclosures || [];
+    const unvalidated = props.filter(p => !getZillowValues(p.id));
+
+    const typeOrder = { 'Auction': 0, 'HUD Home': 1, 'Distressed': 2 };
+    unvalidated.sort((a, b) => {
+      const ta = typeOrder[a.listingType] ?? 9;
+      const tb = typeOrder[b.listingType] ?? 9;
+      if (ta !== tb) return ta - tb;
+      const da = a.days_to_sale == null ? 9999 : a.days_to_sale;
+      const db = b.days_to_sale == null ? 9999 : b.days_to_sale;
+      if (da !== db) return da - db;
+      return (b.discount || 0) - (a.discount || 0);
+    });
+    return unvalidated;
+  }
+
+  function updateZQueueSidebarCount(d) {
+    const el = document.getElementById('fc-sc-zqueue');
+    if (el) el.textContent = getZillowQueue(d).length;
+  }
+
+  function renderZillowQueue(d) {
+    const container = document.getElementById('fc-view-zillow-queue');
+    if (!container) return;
+
+    const queue = getZillowQueue(d);
+    const allProps = filterByState(d).foreclosures || [];
+    const validatedCount = allProps.filter(p => getZillowValues(p.id)).length;
+    const totalCount = allProps.length;
+    const percent = totalCount ? Math.round((validatedCount / totalCount) * 100) : 0;
+
+    if (queue.length === 0) {
+      container.innerHTML = `
+        <div class="fc-card" style="padding:48px;text-align:center">
+          <div class="fc-eyebrow" style="margin-bottom:12px">All caught up</div>
+          <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;color:var(--ink);margin-bottom:8px">
+            ${validatedCount} of ${totalCount} properties have Zillow data.
+          </div>
+          <div style="color:var(--muted);font-size:13px">
+            New properties from the next weekly scrape will queue here automatically.
+          </div>
+        </div>
+      `;
+      updateZQueueSidebarCount(d);
+      return;
+    }
+
+    // Clamp index so Previous/Next stay inside bounds after save/skip.
+    if (__zqueueIndex >= queue.length) __zqueueIndex = queue.length - 1;
+    if (__zqueueIndex < 0) __zqueueIndex = 0;
+
+    const p = queue[__zqueueIndex];
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const addressSlug = (p.address || '').replace(/\s+/g, '-');
+    const citySlug = (p.city || '').replace(/\s+/g, '-');
+    const zillowUrl = `https://www.zillow.com/homes/${addressSlug},-${citySlug},-${p.state || 'VA'}-${p.zip || ''}_rb/`;
+
+    const daysLabel = p.days_to_sale == null ? '—'
+      : p.days_to_sale <= 0 ? 'Sale passed/today'
+      : p.days_to_sale === 1 ? 'Tomorrow'
+      : `${p.days_to_sale} days`;
+    const daysColor = (p.days_to_sale != null && p.days_to_sale <= 7 && p.days_to_sale >= 0) ? 'var(--coral)' : 'var(--ink)';
+
+    const autoOpen = localStorage.getItem(ZQUEUE_AUTO_OPEN_KEY) !== '0';
+
+    container.innerHTML = `
+      <div class="fc-card" style="max-width:720px;margin:0 auto;padding:0;overflow:hidden">
+        <!-- Progress bar -->
+        <div style="padding:16px 24px;border-bottom:1px solid var(--hair);background:var(--paper-2)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+            <div>
+              <span class="fc-eyebrow">Progress</span>
+              <span style="margin-left:8px;font-family:var(--f-mono);font-size:12px;color:var(--muted)">
+                ${validatedCount} / ${totalCount} validated · ${queue.length} remaining in queue
+              </span>
+            </div>
+            <div style="font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--ink)">${percent}%</div>
+          </div>
+          <div style="height:6px;background:var(--hair);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${percent}%;background:var(--sage);transition:width 240ms"></div>
+          </div>
+        </div>
+
+        <!-- Property header -->
+        <div style="padding:24px">
+          <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px">
+            <div>${gradeBadgeLarge(p.grade)}</div>
+            <div style="flex:1">
+              <div style="font-family:var(--f-serif);font-size:22px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:4px">
+                ${escapeHtml(p.address || '—')}
+              </div>
+              <div style="font-size:13px;color:var(--muted);margin-bottom:12px">
+                ${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(p.county || '')}
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${typePill(p.listingType)}
+                <span class="fc-pill" style="color:${daysColor}">${daysLabel}</span>
+                ${rule70Pill(p)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Current heuristic values (for context before Zillow override) -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;padding:12px;background:var(--paper-2);border-radius:4px">
+            <div>
+              <div class="fc-eyebrow" style="margin-bottom:3px">Purchase</div>
+              <div class="fc-mono" style="font-size:14px;font-weight:600">$${(p.price || 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div class="fc-eyebrow" style="margin-bottom:3px">Heuristic ARV</div>
+              <div class="fc-mono" style="font-size:14px;font-weight:600;color:var(--muted)">$${(p.arv || 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div class="fc-eyebrow" style="margin-bottom:3px">Heuristic Rent</div>
+              <div class="fc-mono" style="font-size:14px;font-weight:600;color:var(--muted)">$${(p.monthlyRent || 0).toLocaleString()}/mo</div>
+            </div>
+          </div>
+
+          <!-- Open Zillow -->
+          <a href="${escapeAttr(zillowUrl)}" target="_blank" rel="noopener"
+             id="fc-zq-open"
+             class="fc-btn fc-btn-dark"
+             style="width:100%;justify-content:center;margin-bottom:20px;height:40px;font-size:14px">
+             Open on Zillow ↗
+          </a>
+
+          <!-- Input fields -->
+          <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+            <div>
+              <label for="fc-zq-arv" style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px">
+                Zestimate (ARV)
+              </label>
+              <input id="fc-zq-arv" type="number" inputmode="numeric" placeholder="e.g. 425000"
+                style="width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-mono);font-size:14px;box-sizing:border-box">
+            </div>
+            <div>
+              <label for="fc-zq-rent" style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px">
+                Rent Zestimate (monthly)
+              </label>
+              <input id="fc-zq-rent" type="number" inputmode="numeric" placeholder="e.g. 2400"
+                style="width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-mono);font-size:14px;box-sizing:border-box">
+            </div>
+            <div>
+              <label for="fc-zq-notes" style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px">
+                Notes (optional)
+              </label>
+              <input id="fc-zq-notes" type="text" placeholder="Condition, red flags, comps..."
+                style="width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-ui);font-size:13px;box-sizing:border-box">
+            </div>
+          </div>
+
+          <!-- Keyboard hint -->
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;font-family:var(--f-mono)">
+            <kbd style="padding:1px 5px;background:var(--paper-2);border:1px solid var(--hair);border-radius:3px">Tab</kbd>
+            between fields ·
+            <kbd style="padding:1px 5px;background:var(--paper-2);border:1px solid var(--hair);border-radius:3px">Enter</kbd>
+            to save + next ·
+            <kbd style="padding:1px 5px;background:var(--paper-2);border:1px solid var(--hair);border-radius:3px">Esc</kbd>
+            to skip
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:8px">
+            <button class="fc-btn fc-btn-dark" id="fc-zq-save" style="flex:1">Save + Next →</button>
+            <button class="fc-btn" id="fc-zq-skip">Skip</button>
+            <button class="fc-btn fc-btn-ghost" id="fc-zq-prev" ${__zqueueIndex === 0 ? 'disabled' : ''}>← Previous</button>
+            <button class="fc-btn fc-btn-ghost" id="fc-zq-drawer">Open full drawer</button>
+          </div>
+
+          <!-- Auto-open toggle -->
+          <label style="display:flex;align-items:center;gap:6px;margin-top:16px;font-size:11px;color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="fc-zq-autoopen" ${autoOpen ? 'checked' : ''}>
+            Auto-open Zillow for next property after save
+          </label>
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--hair);font-size:11px;color:var(--muted2);text-align:center">
+            Property ${__zqueueIndex + 1} of ${queue.length} in queue
+          </div>
+        </div>
+      </div>
+    `;
+
+    wireZillowQueue(queue);
+    updateZQueueSidebarCount(d);
+
+    // Auto-open Zillow for this property if the toggle is on.
+    if (autoOpen) {
+      // Small delay so the user sees the property card first, then the tab.
+      setTimeout(() => {
+        const link = document.getElementById('fc-zq-open');
+        if (link) window.open(link.href, '_blank', 'noopener');
+      }, 200);
+    }
+
+    // Focus Zestimate field for immediate pasting.
+    setTimeout(() => {
+      const el = document.getElementById('fc-zq-arv');
+      if (el) el.focus();
+    }, 250);
+  }
+
+  function wireZillowQueue(queue) {
+    const arvEl = document.getElementById('fc-zq-arv');
+    const rentEl = document.getElementById('fc-zq-rent');
+    const notesEl = document.getElementById('fc-zq-notes');
+
+    const saveAndAdvance = () => {
+      if (!queue.length) return;
+      const p = queue[__zqueueIndex];
+      if (!p) return;
+      const arv = arvEl ? arvEl.value.trim() : '';
+      const rent = rentEl ? rentEl.value.trim() : '';
+      const notes = notesEl ? notesEl.value.trim() : '';
+      // Require at least Zestimate or Rent to save. Otherwise treat as skip.
+      if (!arv && !rent) {
+        advanceQueue(1);
+        return;
+      }
+      setZillowValues(p.id, { zestimate: arv, rent, notes });
+      applyAllZillowOverrides(window.__fcData);
+      // Re-render other views silently so they reflect the new data.
+      renderKPIs(window.__fcData);
+      renderPriorityQueue(window.__fcData);
+      renderHotCounties(window.__fcData);
+      renderListings(window.__fcData);
+      // Advance (queue will shrink since this property is now validated).
+      renderZillowQueue(window.__fcData);
+    };
+
+    const advanceQueue = (delta) => {
+      __zqueueIndex += delta;
+      renderZillowQueue(window.__fcData);
+    };
+
+    const saveBtn = document.getElementById('fc-zq-save');
+    const skipBtn = document.getElementById('fc-zq-skip');
+    const prevBtn = document.getElementById('fc-zq-prev');
+    const drawerBtn = document.getElementById('fc-zq-drawer');
+    const autoToggle = document.getElementById('fc-zq-autoopen');
+
+    if (saveBtn) saveBtn.onclick = saveAndAdvance;
+    if (skipBtn) skipBtn.onclick = () => advanceQueue(1);
+    if (prevBtn) prevBtn.onclick = () => advanceQueue(-1);
+    if (drawerBtn) {
+      drawerBtn.onclick = () => {
+        const p = queue[__zqueueIndex];
+        if (p && p.id) openPropertyDrawer(p.id);
+      };
+    }
+    if (autoToggle) {
+      autoToggle.onchange = (e) => {
+        localStorage.setItem(ZQUEUE_AUTO_OPEN_KEY, e.target.checked ? '1' : '0');
+      };
+    }
+
+    // Keyboard shortcuts — Enter anywhere in the input group saves+advances,
+    // Escape skips. Arrow keys don't conflict with number inputs.
+    [arvEl, rentEl, notesEl].forEach(el => {
+      if (!el) return;
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveAndAdvance();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          advanceQueue(1);
+        }
+      });
     });
   }
 
@@ -1777,6 +2063,7 @@ Return ONLY the 2-sentence analysis.`,
         </div>
         <div class="fc-side-section">
           <div class="fc-side-label">Tools</div>
+          <div class="fc-side-item" data-view="zillow-queue">${ICO.plus}<span>Zillow Queue</span><span class="fc-side-count" id="fc-sc-zqueue">—</span></div>
           <div class="fc-side-item" data-view="rehab">${ICO.calc}<span>Rehab Calculator</span></div>
           <div class="fc-side-item" data-view="market">${ICO.chart}<span>Market Analysis</span></div>
           <div class="fc-side-item" data-view="brrrr">${ICO.book}<span>BRRRR Calculator</span></div>
@@ -1931,6 +2218,9 @@ Return ONLY the 2-sentence analysis.`,
                container on init so Google Maps keeps working but lives in the
                natural layout flow under the topbar/sidebar. -->
           <div id="fc-view-map" style="display:none; margin:-24px -32px"></div>
+
+          <!-- Zillow Queue view — rapid manual lookup workflow -->
+          <div id="fc-view-zillow-queue" style="display:none"></div>
 
           <!-- Placeholder views -->
           ${['alerts', 'rehab', 'market', 'brrrr', 'settings'].map(v => `
