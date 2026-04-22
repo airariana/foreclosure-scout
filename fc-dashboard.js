@@ -2097,6 +2097,8 @@ Return ONLY the 2-sentence analysis.`,
           ${isHUD ? '<div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:11px">Search this case number directly at hudhomestore.gov to see photos, disclosures, and submit a bid.</div>' : ''}
         `)}
 
+        ${ownershipSection(p)}
+
         ${(() => {
           const s = buildShareContent(p);
           const subject = encodeURIComponent(s.subject);
@@ -2210,6 +2212,193 @@ Return ONLY the 2-sentence analysis.`,
         `)}
       </div>
     `;
+  }
+
+  // ── Public records & ownership ──────────────────────────────────────────
+  // For properties we have owner data on (DC Vacant via ArcGIS layer 80),
+  // render the owner block. For all properties, add external deep-links to
+  // county assessor + deed/land-records sites so the user can click through
+  // to verify owner, tax status, and recorded mortgages.
+
+  // Mapping of state/county → {assessor, deeds} public portal URLs.
+  // Some counties don't support query-string presets; those links just open
+  // the portal landing page and the user searches manually from there.
+  const COUNTY_PORTALS = {
+    // ── DC ──
+    'DC:District of Columbia': {
+      assessor: (p) => `https://mytax.dc.gov/_/#6`, // Real Property Assessment Search
+      deeds:    (p) => `https://otr.cfo.dc.gov/page/recorder-deeds-services`,
+    },
+    // ── VA — Northern Virginia / DC metro ──
+    'VA:Fairfax County': {
+      assessor: (p) => `https://icare.fairfaxcounty.gov/ffxcare/search/commonsearch.aspx?mode=address`,
+      deeds:    () => `https://lisweb.fairfaxcounty.gov/PaxWorld/`,
+    },
+    'VA:Arlington County': {
+      assessor: () => `https://realestate.arlingtonva.us/`,
+      deeds:    () => `https://risweb.arlingtonva.us/arlinwebpublic/`,
+    },
+    'VA:Loudoun County': {
+      assessor: () => `https://lonet.loudoun.gov/assessment/Search.aspx`,
+      deeds:    () => `https://lisweb.loudoun.gov/PaxWorld/`,
+    },
+    'VA:Prince William County': {
+      assessor: () => `https://www.pwcva.gov/office/real-estate-assessments`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Alexandria City': {
+      assessor: () => `https://realestate.alexandriava.gov/`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Falls Church City': {
+      assessor: () => `https://www.fallschurchva.gov/1079/Real-Estate-Assessments`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Manassas City': {
+      assessor: () => `https://www.manassascity.org/169/Real-Estate-Assessment`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Stafford County': {
+      assessor: () => `https://realestate.staffordcountyva.gov/`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Spotsylvania County': {
+      assessor: () => `https://realestate.spotsylvania.va.us/`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Fredericksburg City': {
+      assessor: () => `https://www.fredericksburgva.gov/185/Real-Estate-Assessments`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    // ── VA — Shenandoah Valley ──
+    'VA:Frederick County': {
+      assessor: () => `https://www.fcva.us/commissioner-of-the-revenue/real-estate`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Winchester City': {
+      assessor: () => `https://www.winchesterva.gov/assessor`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Rockingham County': {
+      assessor: () => `https://www.rockinghamcountyva.gov/261/Real-Estate`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    'VA:Augusta County': {
+      assessor: () => `https://www.co.augusta.va.us/government/commissioner-of-the-revenue`,
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    // ── MD ──
+    'MD:Montgomery County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    "MD:Prince George's County": {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Howard County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Anne Arundel County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Baltimore County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Baltimore City': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Frederick County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Carroll County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Harford County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    'MD:Charles County': {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+  };
+
+  // Statewide fallbacks when a specific county isn't in the map.
+  const STATE_FALLBACKS = {
+    VA: {
+      assessor: null, // VA has no statewide property search
+      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+    },
+    MD: {
+      assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
+      deeds:    () => `https://mdlandrec.net/msa/stagsere/s1400/s1401/html/ssearch.html`,
+    },
+    DC: {
+      assessor: () => `https://mytax.dc.gov/_/#6`,
+      deeds:    () => `https://otr.cfo.dc.gov/page/recorder-deeds-services`,
+    },
+  };
+
+  function getCountyPortals(p) {
+    const key = `${(p.state || 'VA').toUpperCase()}:${p.county || ''}`;
+    const county = COUNTY_PORTALS[key];
+    const state = STATE_FALLBACKS[(p.state || 'VA').toUpperCase()] || {};
+    return {
+      assessor: county && county.assessor ? county.assessor(p) : (state.assessor ? state.assessor(p) : null),
+      deeds:    county && county.deeds    ? county.deeds(p)    : (state.deeds    ? state.deeds(p)    : null),
+    };
+  }
+
+  function ownershipSection(p) {
+    const portals = getCountyPortals(p);
+    const hasOwner = !!(p.owner_name || p.owner_address || p.assessed_value);
+
+    // Skip the section entirely if there's nothing useful (no owner data + no
+    // portal links — unlikely since we have statewide fallbacks).
+    if (!hasOwner && !portals.assessor && !portals.deeds) return '';
+
+    const ownerRows = !hasOwner ? '' : `
+      ${p.owner_name ? kvRow('Owner', escapeHtml(p.owner_name)) : ''}
+      ${p.owner_address ? kvRow('Mailing address', escapeHtml(p.owner_address),
+            p.absentee_owner ? 'coral' : 'ink',
+            p.absentee_owner ? 'Absentee (out-of-DC)' : '') : ''}
+      ${p.assessed_value ? kvRow('Assessed value', '$' + p.assessed_value.toLocaleString()) : ''}
+      ${p.tax_class ? kvRow('Tax class', escapeHtml(p.tax_class),
+            (p.tax_class || '').includes('3') ? 'coral' : 'muted',
+            (p.tax_class || '').includes('3') ? 'Class 3 = blighted (5× tax rate)' : '') : ''}
+    `;
+
+    const portalButtons = [];
+    if (portals.assessor) {
+      portalButtons.push(`
+        <a class="fc-btn fc-btn-sm" href="${escapeAttr(portals.assessor)}" target="_blank" rel="noopener">
+          🏛️ County assessor
+        </a>`);
+    }
+    if (portals.deeds) {
+      portalButtons.push(`
+        <a class="fc-btn fc-btn-sm" href="${escapeAttr(portals.deeds)}" target="_blank" rel="noopener">
+          📜 Deed / land records
+        </a>`);
+    }
+
+    const portalRow = portalButtons.length ? `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:${hasOwner ? '12px' : '0'}">
+        ${portalButtons.join('')}
+      </div>
+      <div class="fc-kv-caption" style="margin-top:6px;color:var(--muted);font-size:10px">
+        Search the property address on the county site to verify ownership, tax status, and any recorded mortgage (deed of trust).
+      </div>
+    ` : '';
+
+    return section('Ownership & public records', ownerRows + portalRow);
   }
 
   function section(title, bodyHtml) {

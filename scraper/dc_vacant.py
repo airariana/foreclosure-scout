@@ -7,9 +7,19 @@ rate (5x the standard rate), creating sustained financial pressure that
 often cascades into tax-sale auctions and foreclosures. These aren't
 active listings — they're high-probability distress LEADS.
 
-Data source: DC ArcGIS Hub, FeatureServer layer 82
-  https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/
-    Property_and_Land_WebMercator/FeatureServer/82
+Data sources (two sibling DC ArcGIS layers, joined by SSL):
+  - Layer 82: Vacant/Blighted addresses (address + geometry + ward)
+    https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/
+      Property_and_Land_WebMercator/FeatureServer/82
+  - Layer 80: ITSPE Property Records (owner name + owner mailing address
+    + tax class + assessed value)
+    https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/
+      Property_and_Land_WebMercator/MapServer/80
+
+Joining layer 82 (addresses) with layer 80 (ownership) via SSL gives us
+distress leads annotated with owner contact info. Absentee owners —
+where mailing address != property address — are the highest-value
+outreach candidates.
 
 ~2,400 active rows. Daily refresh. Geocoded. No auth required.
 """
@@ -28,6 +38,10 @@ log = logging.getLogger(__name__)
 ARCGIS_URL = (
     "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/"
     "Property_and_Land_WebMercator/FeatureServer/82/query"
+)
+ARCGIS_ITSPE_URL = (
+    "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/"
+    "Property_and_Land_WebMercator/MapServer/80/query"
 )
 
 # DC ArcGIS caps queries to 2000 features per call. Registry is ~2,400 rows,
@@ -93,7 +107,108 @@ def scrape_dc_vacant() -> list[dict]:
         offset += PAGE_SIZE
 
     log.info(f"DC Vacant: {len(properties)} active properties (cap={DC_VACANT_LIMIT or 'none'})")
+
+    # Enrich with owner info from layer 80 (ITSPE property records).
+    _enrich_with_owner_data(properties)
+
     return properties
+
+
+def _enrich_with_owner_data(properties: list[dict]) -> None:
+    """
+    Look up OWNERNAME + owner mailing address from DC's ITSPE property-record
+    layer (MapServer layer 80) and merge into each property by SSL.
+
+    We fetch layer 80 in bulk filtered to the SSLs of our properties — one
+    query instead of 300. Falls through silently if the layer is unreachable;
+    DC Vacant entries remain useful even without owner data.
+    """
+    ssl_by_id = {p["id"]: (p.get("firm_file_number") or "") for p in properties}
+    ssls = [s for s in ssl_by_id.values() if s]
+    if not ssls:
+        log.info("DC Vacant owner enrichment: no SSLs, skipping")
+        return
+
+    # ArcGIS WHERE clause size-limited; batch in chunks of ~100 SSLs.
+    BATCH = 100
+    owner_by_ssl: dict[str, dict] = {}
+
+    for i in range(0, len(ssls), BATCH):
+        chunk = ssls[i:i + BATCH]
+        where = "SSL IN (" + ",".join(f"'{s}'" for s in chunk) + ")"
+        try:
+            r = requests.get(
+                ARCGIS_ITSPE_URL,
+                params={
+                    "where":              where,
+                    "outFields":          "SSL,OWNERNAME,ADDRESS1,ADDRESS2,CITYSTZIP,CLASSTYPE,USECODE,NEWTOTAL",
+                    "f":                  "json",
+                    "returnGeometry":     "false",
+                    "resultRecordCount":  BATCH,
+                },
+                timeout=20,
+            )
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            log.warning(f"DC Vacant owner enrichment: batch fetch failed at i={i}: {e}")
+            continue
+
+        for f in data.get("features") or []:
+            attrs = f.get("attributes") or {}
+            ssl = str(attrs.get("SSL") or "").strip()
+            if not ssl:
+                continue
+            owner_by_ssl[ssl] = {
+                "owner_name":      (attrs.get("OWNERNAME") or "").strip() or None,
+                "owner_addr1":     (attrs.get("ADDRESS1") or "").strip() or None,
+                "owner_addr2":     (attrs.get("ADDRESS2") or "").strip() or None,
+                "owner_citystzip": (attrs.get("CITYSTZIP") or "").strip() or None,
+                "tax_class":       (attrs.get("CLASSTYPE") or "").strip() or None,
+                "use_code":        (attrs.get("USECODE") or "").strip() or None,
+                "assessed_value":  _to_int(attrs.get("NEWTOTAL")),
+            }
+
+    enriched_count = 0
+    absentee_count = 0
+    for p in properties:
+        ssl = p.get("firm_file_number") or ""
+        o = owner_by_ssl.get(ssl)
+        if not o:
+            continue
+        enriched_count += 1
+        if o.get("owner_name"):      p["owner_name"]      = o["owner_name"]
+        if o.get("owner_addr1"):     p["owner_address"]   = _join_owner_address(o)
+        if o.get("tax_class"):       p["tax_class"]       = o["tax_class"]
+        if o.get("use_code"):        p["use_code"]        = o["use_code"]
+        if o.get("assessed_value"):  p["assessed_value"]  = o["assessed_value"]
+
+        # Flag absentee owners — mailing address is different from property.
+        # Heuristic: if owner city+state+zip doesn't contain "Washington, DC"
+        # (or "DC 200xx"), owner is out-of-district.
+        citystzip = (o.get("owner_citystzip") or "").lower()
+        if citystzip and "dc" not in citystzip and "district of columbia" not in citystzip:
+            p["absentee_owner"] = True
+            absentee_count += 1
+
+    log.info(
+        f"DC Vacant owner enrichment: {enriched_count}/{len(properties)} matched, "
+        f"{absentee_count} flagged absentee (out-of-DC mailing address)"
+    )
+
+
+def _join_owner_address(o: dict) -> str:
+    parts = [o.get("owner_addr1"), o.get("owner_addr2"), o.get("owner_citystzip")]
+    return ", ".join(p for p in parts if p)
+
+
+def _to_int(v) -> int | None:
+    if v is None or v == "":
+        return None
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
 
 
 def _build_property(feature: dict) -> dict | None:
