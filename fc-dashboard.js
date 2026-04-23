@@ -238,6 +238,14 @@
     wireTopbarWatchlist(root);
     wireSidebarDrawer(root);
     wireRoleChip(root);
+
+    // Publish the actual topbar height to a CSS var so fc-body + sidebar
+    // reserve exactly the right amount of space (no dead gap). Run
+    // multiple times since fonts + layout can settle asynchronously.
+    measureTopbar();
+    requestAnimationFrame(measureTopbar);
+    setTimeout(measureTopbar, 120);
+    setTimeout(measureTopbar, 400);
   }
 
   // Role chip: shows current role, click to sign out (clears role +
@@ -632,6 +640,10 @@
           const text = await file.text();
           const { imported, skipped } = importZillowData(text);
           flash(`✓ Imported ${imported}${skipped ? ' (skipped ' + skipped + ' non-Zillow keys)' : ''}`, 'var(--sage)');
+          // User just restored from a file, so treat this as a fresh
+          // backup moment — clear the stale-export nudge.
+          setLastExportAt(Date.now());
+          updateExportReminderBadge();
           // Apply overrides + re-render so the newly-imported entries take effect.
           if (window.__fcData) {
             applyAllZillowOverrides(window.__fcData);
@@ -825,6 +837,26 @@
   // Export all Zillow entries as a single JSON blob and trigger a download.
   // Safe to run anytime as a local backup. The exported file is plain JSON
   // so it can be hand-edited or committed to a private repo for safekeeping.
+  const LAST_EXPORT_LS_KEY = 'fs_zillow_last_export';
+  const EXPORT_REMINDER_DAYS = 7;
+
+  function countZillowEntries() {
+    let n = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(ZILLOW_LS_PREFIX)) n += 1;
+    }
+    return n;
+  }
+  function getLastExportAt() {
+    const v = localStorage.getItem(LAST_EXPORT_LS_KEY);
+    return v ? Number(v) : 0;
+  }
+  function setLastExportAt(ts) {
+    try { localStorage.setItem(LAST_EXPORT_LS_KEY, String(ts || Date.now())); }
+    catch (e) { /* ignore quota */ }
+  }
+
   function exportZillowData() {
     const entries = {};
     for (let i = 0; i < localStorage.length; i++) {
@@ -849,8 +881,32 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    // Record successful export so the stale-backup badge can clear.
+    setLastExportAt(Date.now());
+    updateExportReminderBadge();
     return payload.count;
   }
+
+  // Yellow dot + tooltip on the ⚙ gear icon if the user has >5 Zillow
+  // validations but hasn't exported in > EXPORT_REMINDER_DAYS days (or
+  // has never exported). Keeps the work safe against a browser wipe.
+  function updateExportReminderBadge() {
+    const btn = document.getElementById('fc-tb-keys');
+    if (!btn) return;
+    const entries = countZillowEntries();
+    const lastExport = getLastExportAt();
+    const now = Date.now();
+    const daysSince = lastExport ? (now - lastExport) / (1000 * 60 * 60 * 24) : Infinity;
+    const shouldNudge = entries >= 5 && daysSince >= EXPORT_REMINDER_DAYS;
+    btn.classList.toggle('fc-tb-btn-nudge', shouldNudge);
+    if (shouldNudge) {
+      const d = daysSince === Infinity ? 'never exported' : `${Math.round(daysSince)} days since last export`;
+      btn.title = `${entries} Zillow validations · ${d}. Tap to back up.`;
+    } else {
+      btn.title = 'Data Keys';
+    }
+  }
+  window.fcUpdateExportBadge = updateExportReminderBadge;
 
   // Parse an import JSON blob and write entries back to localStorage. Accepts
   // either the wrapped export format OR a flat {key: value} dictionary (for
@@ -1073,6 +1129,23 @@
       setView(v);
     });
   }
+
+  // Measure the fixed topbar's actual height and publish it as the CSS var
+  // --topbar-h so fc-body's padding-top + sidebar's top offset match
+  // exactly. Eliminates the dead gap between the topbar and page-head.
+  // Called on init, on window resize, and after any layout that can change
+  // the topbar (e.g. auth state → role chip visibility flips).
+  function measureTopbar() {
+    const tb = document.querySelector('#fc-dash-root .fc-topbar');
+    const root = document.getElementById('fc-dash-root');
+    if (!tb || !root) return;
+    const h = Math.ceil(tb.getBoundingClientRect().height);
+    if (h > 0) root.style.setProperty('--topbar-h', h + 'px');
+  }
+  window.addEventListener('resize', () => {
+    // Debounce lightly: topbar height stabilizes after font/layout settle.
+    requestAnimationFrame(measureTopbar);
+  });
 
   // ─── Mobile sidebar drawer ──────────────────────────────────────────────
   // On viewports ≤768px the sidebar becomes an off-canvas drawer. Hamburger
@@ -1419,6 +1492,7 @@
     const el = document.getElementById('fc-sc-listings');
     if (el) el.textContent = count;
     updateZQueueSidebarCount(d);
+    updateExportReminderBadge();
   }
 
   // ─── Listings view — full sortable table ────────────────────────────────
@@ -1797,6 +1871,9 @@
       renderPriorityQueue(window.__fcData);
       renderHotCounties(window.__fcData);
       renderListings(window.__fcData);
+      // Refresh the stale-backup nudge — an entry was just added so
+      // the badge may need to light up.
+      updateExportReminderBadge();
       // Advance (queue will shrink since this property is now validated).
       renderZillowQueue(window.__fcData);
     };
@@ -4452,6 +4529,26 @@ Return ONLY the 2-sentence analysis.`,
     border-color: var(--ink);
   }
   .fc-tb-btn.fc-primary svg { stroke-width: 2; }
+
+  /* Stale-backup nudge: yellow dot on the gear icon when the user has
+     unsaved Zillow validations and hasn't exported in 7+ days. */
+  .fc-tb-btn.fc-tb-btn-nudge {
+    position: relative;
+  }
+  .fc-tb-btn.fc-tb-btn-nudge::after {
+    content: '';
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gold-deep);
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--gold-deep);
+    animation: fc-nudge-pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes fc-nudge-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(1.15); }
+  }
   .fc-avatar {
     width: 26px; height: 26px; border-radius: 50%;
     background: var(--gold); color: var(--ink);
@@ -5604,18 +5701,21 @@ Return ONLY the 2-sentence analysis.`,
       box-shadow: 0 1px 0 var(--hair);
       padding-top: calc(8px + env(safe-area-inset-top, 0));
     }
-    /* Reserve topbar space. Generous buffer (130px) covers the 2-row
-       wrapped topbar + safe-area + box-shadow so page-head content
-       (eyebrow, title, Live data pill, subline) fully clears the
-       fixed topbar on all iPhones. */
+    /* Reserve topbar space. The initial fallback (92px) is overridden by
+       --topbar-h set dynamically in measureTopbar() from the actual
+       rendered topbar height, so there's no dead space below the
+       topbar on any device. */
     .fc-body {
-      padding-top: 130px;
+      padding-top: var(--topbar-h, 92px);
     }
     /* Sidebar drawer starts below the fixed topbar */
     .fc-sidebar {
-      top: 130px !important;
-      height: calc(100dvh - 130px) !important;
+      top: var(--topbar-h, 92px) !important;
+      height: calc(100dvh - var(--topbar-h, 92px)) !important;
     }
+    /* Trim fc-main-inner top padding on mobile — page-head has its own
+       rhythm, no need for extra gap above the eyebrow. */
+    .fc-main-inner { padding-top: 6px !important; }
     /* Smooth momentum scroll on iOS for the main pane. Vertical-only. */
     .fc-main {
       -webkit-overflow-scrolling: touch;
