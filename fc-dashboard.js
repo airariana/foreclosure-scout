@@ -241,10 +241,11 @@
   }
 
   // Role chip: shows current role, click to sign out (clears role +
-  // reloads so the gate reappears).
+  // reloads so the gate reappears). Hidden entirely when auth is disabled.
   function wireRoleChip(root) {
     const btn = root.querySelector('#fc-tb-role');
     if (!btn) return;
+    if (!AUTH_ENABLED) { btn.style.display = 'none'; return; }
     const role = getRole() || 'guest';
     const label = role === 'admin' ? '● Admin' : role === 'viewer' ? '○ Viewer' : '? Guest';
     btn.textContent = label;
@@ -3840,14 +3841,18 @@ Return ONLY the 2-sentence analysis.`,
   // Builds the dashboard shell on all viewports now. Mobile adaptations
   // happen via responsive CSS (sidebar becomes an off-canvas drawer,
   // condensed topbar, single-column layouts).
+  // Feature flag: when true, the passphrase gate + role-based UI hides
+  // are active. Currently disabled while we iterate on features — flip
+  // to true + commit when ready to re-enable auth.
+  const AUTH_ENABLED = false;
+
   async function init() {
     loadFonts();
     injectCSS();
-    // Auth gate — if no role stored yet, block until user enters passphrase.
-    if (!isAuthed()) {
-      await showAuthGate();
+    if (AUTH_ENABLED) {
+      if (!isAuthed()) await showAuthGate();
+      applyRoleToDom();
     }
-    applyRoleToDom();
     buildShell();
     loadData();
   }
