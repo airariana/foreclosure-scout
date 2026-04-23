@@ -4374,8 +4374,11 @@ Return ONLY the 2-sentence analysis.`,
        shell locked so only the inner pane scrolls. */
     overscroll-behavior: none;
     overflow-y: hidden;
-    /* Respect iPhone safe-area (notch/Dynamic Island + home indicator). */
-    padding-top: env(safe-area-inset-top, 0) !important;
+    /* Safe-area: the fixed .fc-topbar handles the top inset via its own
+       padding-top, so body MUST NOT also pad top — that double-offsets
+       fc-dash-root by ~60px on iPhone PWA, leaving a large gap between
+       the topbar and first page content. Keep only the bottom inset
+       for home-indicator clearance. */
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
   }
 
