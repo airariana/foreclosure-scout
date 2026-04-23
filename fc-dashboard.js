@@ -1222,6 +1222,22 @@
       fitMapWhenReady();
     }
 
+    // Browser-level hash navigation (#map, #listings, etc.) auto-scrolls
+    // to any element whose id matches. The legacy Google Map div has
+    // id="map" — so loading with #map jumps fc-main's scroll past the
+    // topbar + page-head. Reset scroll to top on every view change so
+    // the page chrome is always visible when a view opens. Both sync and
+    // async reset: browser hash-anchor-scroll runs after layout commit,
+    // so rAF catches the late scroll.
+    const resetScroll = () => {
+      const mainPane = document.querySelector('#fc-dash-root .fc-main');
+      if (mainPane) mainPane.scrollTop = 0;
+      if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    };
+    resetScroll();
+    requestAnimationFrame(resetScroll);
+    setTimeout(resetScroll, 80);
+
     // Update page title + eyebrow per view
     const titles = {
       dashboard: 'Command Center',
