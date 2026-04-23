@@ -5592,10 +5592,25 @@ Return ONLY the 2-sentence analysis.`,
       padding: 6px 10px 8px;
       gap: 6px;
       height: auto;
-      /* Keep topbar stuck to the top even during overscroll/rubber-band. */
-      position: sticky;
-      top: 0;
-      z-index: 50;
+      /* Pin topbar to viewport top absolutely so no scroll or layout
+         shift can push it out of view. Sidebar + main compensate via
+         padding-top so content starts below the fixed topbar. */
+      position: fixed !important;
+      top: env(safe-area-inset-top, 0);
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: var(--paper);
+      box-shadow: 0 1px 0 var(--hair);
+    }
+    /* Reserve topbar space — use a CSS var we compute after render */
+    .fc-body {
+      padding-top: 88px; /* approximate wrapped-topbar height on mobile */
+    }
+    /* Sidebar drawer starts below the fixed topbar */
+    .fc-sidebar {
+      top: calc(88px + env(safe-area-inset-top, 0)) !important;
+      height: calc(100dvh - 88px - env(safe-area-inset-top, 0)) !important;
     }
     /* Smooth momentum scroll on iOS for the main pane. Vertical-only. */
     .fc-main {
@@ -5738,11 +5753,15 @@ Return ONLY the 2-sentence analysis.`,
 
     /* fc-view-map has a negative margin (-24px -32px) to bleed the map
        edge-to-edge on desktop. On mobile that collapses past the 12px
-       padding of fc-main-inner and causes horizontal overflow. Reset. */
+       padding of fc-main-inner and causes horizontal overflow. Reset.
+       Height tuned to fit within fc-main without forcing scroll — leaves
+       page-head (~140px), topbar padding (88px) + safe-area (~50px) +
+       bottom buffer visible above the map. */
     #fc-view-map {
       margin: 0 !important;
       width: 100%;
-      height: calc(100dvh - 180px);  /* allow space for wrapped topbar + page-head */
+      height: calc(100dvh - 320px);
+      min-height: 280px;
     }
     #fc-view-map .mobile-frame {
       height: 100% !important;
