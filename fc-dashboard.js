@@ -4240,6 +4240,13 @@ Return ONLY the 2-sentence analysis.`,
     align-items: stretch !important;
     justify-content: stretch !important;
     overflow-x: hidden !important;
+    /* Prevent iOS body bounce when scrolling inside fc-main — keeps the
+       shell locked so only the inner pane scrolls. */
+    overscroll-behavior: none;
+    overflow-y: hidden;
+    /* Respect iPhone safe-area (notch/Dynamic Island + home indicator). */
+    padding-top: env(safe-area-inset-top, 0) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0) !important;
   }
 
   /* ─── Root layout ─── */
@@ -4252,7 +4259,11 @@ Return ONLY the 2-sentence analysis.`,
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "ss01", "cv11";
     font-variant-numeric: tabular-nums;
+    /* iOS Safari 100vh bug: includes the address-bar area so content
+       "jumps" when the bar collapses on scroll. 100dvh (dynamic viewport
+       height) is the real visible area at any moment — locks the layout. */
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -5529,7 +5540,21 @@ Return ONLY the 2-sentence analysis.`,
       padding: 6px 10px 8px;
       gap: 6px;
       height: auto;
+      /* Keep topbar stuck to the top even during overscroll/rubber-band. */
+      position: sticky;
+      top: 0;
+      z-index: 50;
     }
+    /* Smooth momentum scroll on iOS for the main pane. */
+    .fc-main {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    /* Hide the legacy floating Auction Calendar button — it's positioned
+       fixed relative to the viewport (not inside .mobile-frame) so it
+       bleeds through onto the dashboard on mobile. Its auction-calendar
+       feature isn't wired into the new dashboard yet. */
+    .floating-calendar-btn { display: none !important; }
     /* Hide breadcrumb on mobile — too cramped. Keep search visible so
        users can filter by city/zip/etc. on their phone. */
     .fc-topbar-sep,
