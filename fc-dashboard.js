@@ -1444,6 +1444,67 @@
     if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
     if (view === 'zillow-queue' && window.__fcData) renderZillowQueue(window.__fcData);
     if (view === 'financing-203k' && window.__fcData) render203k(window.__fcData);
+    if (view === 'settings') wireSettingsView();
+  }
+
+  // ─── Settings view: Zillow sync token UI ────────────────────────────────
+  // Bound lazily (every time user navigates to Settings) because the view
+  // markup exists in SHELL_HTML but its buttons need live references to
+  // sync helpers. Idempotent — re-binding replaces prior listeners.
+  function wireSettingsView() {
+    const input  = document.getElementById('fc-sync-token-input');
+    const save   = document.getElementById('fc-sync-save');
+    const upload = document.getElementById('fc-sync-upload');
+    const clear  = document.getElementById('fc-sync-clear');
+    const status = document.getElementById('fc-sync-status');
+    const log    = document.getElementById('fc-sync-log');
+    if (!input || !save) return;
+
+    const existing = getZillowSyncToken();
+    if (existing) {
+      input.value = existing;
+      status.textContent = 'connected';
+      status.className = 'fc-pill sage';
+    } else {
+      status.textContent = 'not connected';
+      status.className = 'fc-pill';
+    }
+
+    const writeLog = (msg) => { log.textContent = msg; };
+
+    save.onclick = async () => {
+      const t = input.value.trim();
+      if (!t) { writeLog('Paste a token first.'); return; }
+      setZillowSyncToken(t);
+      writeLog('Token saved. Syncing from server…');
+      const res = await syncZillowFromServer();
+      if (res.ok) {
+        writeLog(`✓ Synced. Pulled ${res.pulled} of ${res.total} remote entries into this device.`);
+        status.textContent = 'connected';
+        status.className = 'fc-pill sage';
+      } else {
+        writeLog(`✗ Sync failed: ${res.reason}`);
+        status.textContent = 'error';
+        status.className = 'fc-pill coral';
+      }
+    };
+
+    upload.onclick = async () => {
+      if (!getZillowSyncToken()) { writeLog('Save a token first.'); return; }
+      writeLog('Uploading local entries to server…');
+      const res = await uploadAllZillowToServer();
+      writeLog(res.ok
+        ? `✓ Uploaded ${res.pushed} entries. ${res.failed} failed. (${res.total} total in localStorage)`
+        : `✗ Upload failed: ${res.reason}`);
+    };
+
+    clear.onclick = () => {
+      setZillowSyncToken('');
+      input.value = '';
+      writeLog('Token cleared. Syncing disabled on this device.');
+      status.textContent = 'not connected';
+      status.className = 'fc-pill';
+    };
   }
 
   // ─── State filter ───────────────────────────────────────────────────────
@@ -4385,7 +4446,7 @@ Return ONLY the 2-sentence analysis.`,
           <div id="fc-view-financing-203k" style="display:none"></div>
 
           <!-- Placeholder views -->
-          ${['alerts', 'rehab', 'market', 'brrrr', 'settings'].map(v => `
+          ${['alerts', 'rehab', 'market', 'brrrr'].map(v => `
             <div id="fc-view-${v}" style="display:none">
               <div class="fc-stage-placeholder">
                 <div class="fc-eyebrow">${v.toUpperCase()}</div>
@@ -4394,6 +4455,37 @@ Return ONLY the 2-sentence analysis.`,
               </div>
             </div>
           `).join('')}
+
+          <!-- Settings view: Zillow Queue sync-token paste UI so iPhone /
+               secondary devices can activate sync without DevTools. -->
+          <div id="fc-view-settings" style="display:none">
+            <div class="fc-card" style="max-width:640px">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Zillow Queue sync</div>
+                <span class="fc-pill" id="fc-sync-status">checking…</span>
+              </div>
+              <div style="padding:16px 18px;font-size:13px;color:var(--ink-2);line-height:1.55">
+                <p style="margin-bottom:12px">
+                  Paste the sync token below to keep Zillow validations in step across devices.
+                  Stored locally in this browser only — never sent anywhere except your own
+                  <code style="font-family:var(--f-mono);font-size:12px">nestscoop-api</code> worker.
+                </p>
+                <label for="fc-sync-token-input" class="fc-eyebrow" style="display:block;margin-bottom:6px">Sync token</label>
+                <input id="fc-sync-token-input" type="password" autocomplete="off" spellcheck="false"
+                  placeholder="Paste 64-character token"
+                  style="width:100%;padding:10px 12px;font-family:var(--f-mono);font-size:12px;
+                         border:1px solid var(--hair);border-radius:6px;background:var(--paper-2);
+                         color:var(--ink);outline:none;box-sizing:border-box" />
+                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                  <button id="fc-sync-save" class="fc-btn fc-btn-dark">Save &amp; sync</button>
+                  <button id="fc-sync-upload" class="fc-btn">Upload local to server</button>
+                  <button id="fc-sync-clear" class="fc-btn fc-btn-ghost">Clear token</button>
+                </div>
+                <div id="fc-sync-log" style="margin-top:14px;font-family:var(--f-mono);font-size:12px;
+                     color:var(--muted);min-height:18px;white-space:pre-wrap"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
