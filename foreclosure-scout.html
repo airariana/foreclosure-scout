@@ -1135,7 +1135,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=61"></script>
+<script src="fc-dashboard.js?v=62"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -2501,15 +2501,37 @@ function parseGeminiJSON(raw){
   throw new Error('Could not parse JSON from Gemini response. Raw: ' + clean.slice(0,200));
 }
 
+// Gemini calls proxy through the Nestscoop worker so the API key lives
+// in one place (worker secret) instead of every browser's localStorage.
+// Auth is the same sync token used by Zillow sync. Falls back to the
+// legacy direct-call path if the user has a local key but no sync token
+// yet — this keeps the AI flows working during the transition.
 async function callGemini(prompt, system){
-  const key = getGeminiKey();
-  if(!key){ showKeyModal(); throw new Error('No Gemini API key set'); }
+  const syncToken = localStorage.getItem('fs_zillow_sync_token') || '';
   const fullPrompt = system ? system + '\n\n' + prompt : prompt;
+
+  if (syncToken) {
+    const res = await fetch('https://nestscoop-api.ajbb705.workers.dev/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Nestscoop-Token': syncToken,
+      },
+      body: JSON.stringify({ prompt, system, model: GEMINI_MODEL, temperature: 0.7, maxOutputTokens: 8192 }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error('Gemini proxy error: ' + (err.error || res.status) + (err.detail ? ' — ' + err.detail.slice(0,120) : ''));
+    }
+    const data = await res.json();
+    return data.text || '';
+  }
+
+  // Legacy fallback: direct Google call with localStorage key. Prompts
+  // for the key if neither a sync token nor a local key exists.
+  const key = getGeminiKey();
+  if(!key){ showKeyModal(); throw new Error('No sync token or Gemini key set. Either paste your sync token in Settings or your Gemini key in Data Keys.'); }
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+key;
-  // responseMimeType is left at the Gemini default (text/plain) — the
-  // AI-analysis and offer-letter prompts return natural language. Forcing
-  // application/json caused 400s on the 2.5-flash model when the prompt
-  // didn't specify a JSON schema.
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

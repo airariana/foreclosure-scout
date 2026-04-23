@@ -881,6 +881,31 @@
   }
   window.fcUploadAllZillowToServer = uploadAllZillowToServer;
 
+  // One-tap activation via URL param: if the page is opened with
+  // ?sync=<token>, save the token, strip the param from the URL (so
+  // it doesn't get shared/bookmarked/screenshotted), then kick sync.
+  // This is how you activate a new device (e.g. iPhone) without ever
+  // pasting into a text field.
+  (function consumeActivationLink() {
+    try {
+      const params = new URLSearchParams(location.search);
+      const t = params.get('sync');
+      if (!t) return;
+      setZillowSyncToken(t);
+      params.delete('sync');
+      const qs = params.toString();
+      const clean = location.pathname + (qs ? '?' + qs : '') + location.hash;
+      history.replaceState(null, '', clean);
+      // Flash a quick confirmation — showToast is defined in the legacy
+      // HTML and may not exist if the shell loads before it, so guard.
+      setTimeout(() => {
+        if (typeof window.showToast === 'function') {
+          window.showToast('Sync activated on this device', 'green');
+        }
+      }, 400);
+    } catch (e) { /* non-fatal */ }
+  })();
+
   // Kick off an initial sync — don't block, UI uses localStorage immediately.
   syncZillowFromServer();
 
@@ -1455,6 +1480,7 @@
     const input  = document.getElementById('fc-sync-token-input');
     const save   = document.getElementById('fc-sync-save');
     const upload = document.getElementById('fc-sync-upload');
+    const linkBtn = document.getElementById('fc-sync-link');
     const clear  = document.getElementById('fc-sync-clear');
     const status = document.getElementById('fc-sync-status');
     const log    = document.getElementById('fc-sync-log');
@@ -1496,6 +1522,19 @@
       writeLog(res.ok
         ? `✓ Uploaded ${res.pushed} entries. ${res.failed} failed. (${res.total} total in localStorage)`
         : `✗ Upload failed: ${res.reason}`);
+    };
+
+    linkBtn.onclick = async () => {
+      const t = getZillowSyncToken();
+      if (!t) { writeLog('No token saved. Save one first, then generate a link.'); return; }
+      const link = `${location.origin}${location.pathname}?sync=${encodeURIComponent(t)}#settings`;
+      try {
+        await navigator.clipboard.writeText(link);
+        writeLog('✓ Activation link copied. Text it to your other device — opening the link auto-activates sync, then cleans itself out of the URL.');
+      } catch (e) {
+        // Fallback: show in the log so user can long-press to copy
+        writeLog('Copy failed. Long-press to copy:\n' + link);
+      }
     };
 
     clear.onclick = () => {
@@ -4479,6 +4518,7 @@ Return ONLY the 2-sentence analysis.`,
                 <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
                   <button id="fc-sync-save" class="fc-btn fc-btn-dark">Save &amp; sync</button>
                   <button id="fc-sync-upload" class="fc-btn">Upload local to server</button>
+                  <button id="fc-sync-link" class="fc-btn">Copy activation link</button>
                   <button id="fc-sync-clear" class="fc-btn fc-btn-ghost">Clear token</button>
                 </div>
                 <div id="fc-sync-log" style="margin-top:14px;font-family:var(--f-mono);font-size:12px;
