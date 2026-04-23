@@ -5586,8 +5586,12 @@ Return ONLY the 2-sentence analysis.`,
     .fc-sidebar.open { transform: translateX(0); }
     body.fc-sidebar-locked { overflow: hidden; }
 
-    /* Main takes full viewport width */
-    .fc-body { display: block; }
+    /* Sidebar is position:fixed (off-canvas drawer) so it's out of the
+       normal flow. fc-body stays flex-row; fc-main is the only in-flow
+       child and takes 100% width naturally. Keeping the flex parent is
+       critical so fc-main inherits its height from the flex layout
+       (without it, fc-main collapses to content height and the scroll
+       wraps/clips the page-head). */
     .fc-main { width: 100%; }
     .fc-main-inner { padding: 12px !important; }
 
