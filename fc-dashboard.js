@@ -2746,6 +2746,12 @@
   }
 
   // ─── Property drawer — full profile slide-over ─────────────────────────
+  // Exposed on window so inline onclick handlers (203(k) rows, etc.) and
+  // the legacy foreclosure-scout.html map-pin click path can route here
+  // instead of showing the older legacy drawer.
+  window.openPropertyDrawer = openPropertyDrawer;
+  window.closePropertyDrawer = closePropertyDrawer;
+
   function openPropertyDrawer(propId) {
     const data = window.__fcData;
     if (!data) return;

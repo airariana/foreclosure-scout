@@ -1135,7 +1135,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=50"></script>
+<script src="fc-dashboard.js?v=51"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -2785,7 +2785,16 @@ function selectProperty(id){
   selectedId=id;
   sortAndRender(document.querySelector('.sort-select')?.value||'score');
   const p=allProperties.find(x=>x.id===id); if(!p)return;
-  map.panTo({lat:p.lat,lng:p.lng}); map.setZoom(14); openDrawer(p);
+  // Pan the map to the property for context regardless of which drawer opens.
+  if(map){ map.panTo({lat:p.lat,lng:p.lng}); map.setZoom(14); }
+  // When the new Nestscoop dashboard is loaded, use its richer drawer
+  // (Street View, external listings, Deal Summary, etc.) instead of the
+  // legacy openDrawer. Falls through to legacy if the dashboard isn't up.
+  if(typeof window.openPropertyDrawer==='function' && document.getElementById('fc-dash-root')){
+    window.openPropertyDrawer(id);
+    return;
+  }
+  openDrawer(p);
 }
 
 async function openDrawer(p){
