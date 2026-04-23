@@ -3919,12 +3919,33 @@ Return ONLY the 2-sentence analysis.`,
   async function init() {
     loadFonts();
     injectCSS();
+
+    // PREVENT BROWSER HASH-ANCHOR-SCROLL: the legacy Google Maps div has
+    // id="map" so loading with URL "#map" causes the browser to
+    // auto-scroll that element into view, which shoves fc-main's scroll
+    // past the topbar + page-head. Strip the hash NOW before the browser
+    // can anchor-scroll to it. Restore after buildShell via replaceState
+    // (replaceState does NOT trigger anchor-scroll, so it's safe).
+    const deferredHash = (location.hash || '').replace('#', '');
+    if (deferredHash) {
+      try { history.replaceState(null, '', location.pathname + location.search); }
+      catch (e) { /* safari private mode */ }
+    }
+
     if (AUTH_ENABLED) {
       if (!isAuthed()) await showAuthGate();
       applyRoleToDom();
     }
     buildShell();
     loadData();
+
+    // Now that the shell is up and setView('dashboard') ran (because hash
+    // was empty at buildShell time), re-apply the user's intended view.
+    if (deferredHash && deferredHash !== 'dashboard') {
+      try { history.replaceState(null, '', location.pathname + location.search + '#' + deferredHash); }
+      catch (e) { /* ignore */ }
+      setView(deferredHash);
+    }
   }
 
   // Run after DOM is parsed so the mobile-frame exists to hide.
