@@ -5609,8 +5609,11 @@ Return ONLY the 2-sentence analysis.`,
 
     /* 203(k) rows are already @max-width:900px 1fr, good */
 
-    /* Mobile-frame (hosts Google Map) — when Map view is active, hide its
-       duplicate chrome on mobile too, not just desktop. */
+    /* Mobile-frame (hosts Google Map) — hide ALL legacy PWA chrome on
+       mobile so the Map view is clean. Without these, users see leftover
+       FC wordmark, filter bar, stats banner, "View All Properties" big
+       orange button, "Filter by Type" legend, and floating calendar
+       button bleeding through over the dashboard. */
     .mobile-frame .ptr-progress,
     .mobile-frame .ptr-indicator,
     .mobile-frame header,
@@ -5620,12 +5623,41 @@ Return ONLY the 2-sentence analysis.`,
     .mobile-frame .filter-sidebar,
     .mobile-frame .mobile-bottom-bar,
     .mobile-frame [class*="mobile-bottom"],
-    .mobile-frame .floating-calendar-btn {
+    .mobile-frame .floating-calendar-btn,
+    .mobile-frame .list-view-btn,
+    .mobile-frame .map-overlay,
+    .mobile-frame .source-legend {
       display: none !important;
     }
+    /* Strip mobile-frame bg + padding so the map is edge-to-edge */
+    .mobile-frame .app,
+    .mobile-frame .app::before {
+      padding: 0 !important;
+      background-image: none !important;
+      background: transparent !important;
+    }
+    .mobile-frame .map-panel {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
     .mobile-frame #map {
-      height: calc(100dvh - 48px) !important;
-      min-height: calc(100dvh - 48px) !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 60vh !important;
+    }
+
+    /* fc-view-map has a negative margin (-24px -32px) to bleed the map
+       edge-to-edge on desktop. On mobile that collapses past the 12px
+       padding of fc-main-inner and causes horizontal overflow. Reset. */
+    #fc-view-map {
+      margin: 0 !important;
+      width: 100%;
+      height: calc(100dvh - 180px);  /* allow space for wrapped topbar + page-head */
+    }
+    #fc-view-map .mobile-frame {
+      height: 100% !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
     }
 
     /* Zillow Queue card — remove side padding buffer on tight screens */
