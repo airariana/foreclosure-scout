@@ -5540,6 +5540,15 @@ Return ONLY the 2-sentence analysis.`,
   @keyframes fc-bd-in { from { opacity: 0 } to { opacity: 1 } }
 
   @media (max-width: 768px) {
+    /* Lock horizontal — no element is allowed to push past the viewport
+       edge. The page should ONLY scroll vertically on mobile; wide tables
+       scroll inside their own containers (see .fc-table-scroll below). */
+    html, body, #fc-dash-root, .fc-body, .fc-main, .fc-main-inner {
+      overflow-x: hidden !important;
+      max-width: 100vw !important;
+    }
+    #fc-dash-root.fc-dash { width: 100vw !important; }
+
     .fc-tb-hamburger { display: inline-flex; }
     .fc-topbar {
       flex-wrap: wrap;
@@ -5551,10 +5560,44 @@ Return ONLY the 2-sentence analysis.`,
       top: 0;
       z-index: 50;
     }
-    /* Smooth momentum scroll on iOS for the main pane. */
+    /* Smooth momentum scroll on iOS for the main pane. Vertical-only. */
     .fc-main {
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      overflow-x: hidden !important;
+      overflow-y: auto;
+    }
+
+    /* Tables: force them to scroll inside a container rather than pushing
+       the whole page sideways. Apply to every .fc-table's parent element
+       so users can swipe horizontally on the table alone. */
+    .fc-table {
+      display: block !important;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+      min-width: 100% !important;
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .fc-table thead, .fc-table tbody {
+      display: table !important;
+      width: max-content;
+      min-width: 100%;
+    }
+    .fc-table th, .fc-table td {
+      padding: 8px 10px;
+      font-size: 11.5px;
+    }
+
+    /* KPI tiles on mobile — avoid forcing a wide grid that overflows */
+    .fc-kpi-grid { min-width: 0 !important; }
+    .fc-kpi { min-height: 90px; padding: 12px; }
+
+    /* Any card that has overflow:visible on desktop — clamp on mobile */
+    .fc-card {
+      max-width: 100% !important;
+      min-width: 0 !important;
     }
     /* Hide the legacy floating Auction Calendar button — it's positioned
        fixed relative to the viewport (not inside .mobile-frame) so it
