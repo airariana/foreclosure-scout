@@ -1135,17 +1135,27 @@
   // exactly. Eliminates the dead gap between the topbar and page-head.
   // Called on init, on window resize, and after any layout that can change
   // the topbar (e.g. auth state → role chip visibility flips).
+  //
+  // Always add a small buffer so content never tucks UNDER the topbar —
+  // measurement can under-report height while fonts/layout are still
+  // settling, and the cost of an 8px over-reserve is tiny vs the
+  // UX cost of the topbar covering the eyebrow + title.
   function measureTopbar() {
     const tb = document.querySelector('#fc-dash-root .fc-topbar');
     const root = document.getElementById('fc-dash-root');
     if (!tb || !root) return;
     const h = Math.ceil(tb.getBoundingClientRect().height);
-    if (h > 0) root.style.setProperty('--topbar-h', h + 'px');
+    if (h > 0) root.style.setProperty('--topbar-h', (h + 8) + 'px');
   }
   window.addEventListener('resize', () => {
     // Debounce lightly: topbar height stabilizes after font/layout settle.
     requestAnimationFrame(measureTopbar);
   });
+  // Run measurement again after fonts finish loading — Inter Tight + Source
+  // Serif 4 reflow changes line-heights, which changes topbar height.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(measureTopbar);
+  }
 
   // ─── Mobile sidebar drawer ──────────────────────────────────────────────
   // On viewports ≤768px the sidebar becomes an off-canvas drawer. Hamburger
@@ -5701,17 +5711,17 @@ Return ONLY the 2-sentence analysis.`,
       box-shadow: 0 1px 0 var(--hair);
       padding-top: calc(8px + env(safe-area-inset-top, 0));
     }
-    /* Reserve topbar space. The initial fallback (92px) is overridden by
-       --topbar-h set dynamically in measureTopbar() from the actual
-       rendered topbar height, so there's no dead space below the
-       topbar on any device. */
+    /* Reserve topbar space. The initial fallback (120px) covers a
+       2-row wrapped topbar with safe-area insets; measureTopbar()
+       overrides --topbar-h with the actual rendered height + 8px
+       buffer once layout settles. */
     .fc-body {
-      padding-top: var(--topbar-h, 92px);
+      padding-top: var(--topbar-h, 120px);
     }
     /* Sidebar drawer starts below the fixed topbar */
     .fc-sidebar {
-      top: var(--topbar-h, 92px) !important;
-      height: calc(100dvh - var(--topbar-h, 92px)) !important;
+      top: var(--topbar-h, 120px) !important;
+      height: calc(100dvh - var(--topbar-h, 120px)) !important;
     }
     /* Trim fc-main-inner top padding on mobile — page-head has its own
        rhythm, no need for extra gap above the eyebrow. */
