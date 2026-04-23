@@ -1052,27 +1052,78 @@
     document.body.classList.remove('fc-sidebar-locked');
   }
 
-  // Robustly fit the Google Map viewport to the loaded markers, with
-  // polling to handle the two common races: (a) the map container just
-  // resized, (b) the data fetch that populates markers is still in flight.
-  // The legacy script's `map` and `markers` are module-scoped `let`s, so
-  // we access them via window.__fcGetMap / window.__fcGetMarkers accessors
-  // exposed from foreclosure-scout.html.
+  // Robustly fit the Google Map viewport to DC/MD/VA on mobile.
+  //
+  // Why the naive fitBounds(markers) approach failed on mobile:
+  //   1. The map container starts display:none (map only shown when Map view
+  //      is selected). Google Maps initializes its internal size tracking
+  //      with 0×0 and never fully recovers, even after a resize event.
+  //   2. Calling fitBounds on a 0-dimension map projects coordinates
+  //      incorrectly → viewport lands on Ottawa/Montreal instead of DC/MD/VA.
+  //   3. One-shot setTimeout(300ms) races with the data-fetch that populates
+  //      markers (`markers` is module-scoped in foreclosure-scout.html, now
+  //      accessed via window.__fcGetMarkers / window.__fcGetMap closures).
+  //
+  // Fix: multi-phase recovery.
+  //   Phase A: fire resize on the map to re-measure its container
+  //   Phase B: wait two animation frames so layout/paint commits
+  //   Phase C: setCenter + setZoom to an explicit DC-region viewport
+  //            (guaranteed correct regardless of marker state)
+  //   Phase D: once markers land, call fitAll as an enhancement
+  // Retries Phase A–C until the container has real dimensions, then D when
+  // markers are populated.
+  const DC_CENTER = { lat: 38.9, lng: -77.2 };   // matches initMap default
+  const DC_REGIONAL_ZOOM = 8;                     // DC → Richmond, DC → Baltimore
+  let __fcMapSeeded = false;
+
   function fitMapWhenReady(attempt) {
     attempt = attempt || 0;
-    const MAX_ATTEMPTS = 12;
-    const DELAY_MS = 400;
+    const MAX_ATTEMPTS = 14;
+    const DELAY_MS = 350;
     try {
       const g = window.google;
       const mapRef = typeof window.__fcGetMap === 'function' ? window.__fcGetMap() : null;
-      const markersRef = typeof window.__fcGetMarkers === 'function' ? window.__fcGetMarkers() : null;
       if (g && g.maps && mapRef) {
+        // Phase A: re-measure
         g.maps.event.trigger(mapRef, 'resize');
-        const haveMarkers = Array.isArray(markersRef) && markersRef.length > 0;
-        if (haveMarkers && typeof window.fitAll === 'function') {
-          window.fitAll();
-          return;
-        }
+        // Phase B + C: wait for layout, then seed DC viewport
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            try {
+              const mapEl = document.getElementById('map');
+              const w = mapEl ? mapEl.offsetWidth  : 0;
+              const h = mapEl ? mapEl.offsetHeight : 0;
+              if (w > 50 && h > 50) {
+                // Guaranteed-correct viewport. Overrides any prior bad fit.
+                if (!__fcMapSeeded) {
+                  mapRef.setCenter(DC_CENTER);
+                  mapRef.setZoom(DC_REGIONAL_ZOOM);
+                  __fcMapSeeded = true;
+                }
+                // Phase D: enhance with marker-based fit if markers loaded.
+                const markersRef = typeof window.__fcGetMarkers === 'function'
+                  ? window.__fcGetMarkers() : null;
+                if (Array.isArray(markersRef) && markersRef.length > 0) {
+                  const bounds = new g.maps.LatLngBounds();
+                  markersRef.forEach(m => {
+                    try {
+                      const pos = m.getPosition && m.getPosition();
+                      if (pos) bounds.extend(pos);
+                    } catch (e) { /* skip bad marker */ }
+                  });
+                  if (!bounds.isEmpty()) {
+                    mapRef.fitBounds(bounds, 40);
+                  }
+                  return; // done — full fit succeeded
+                }
+              }
+            } catch (e) { /* fall through to retry */ }
+            if (attempt < MAX_ATTEMPTS) {
+              setTimeout(() => fitMapWhenReady(attempt + 1), DELAY_MS);
+            }
+          });
+        });
+        return;
       }
     } catch (e) { /* retry below */ }
     if (attempt < MAX_ATTEMPTS) {
@@ -1115,14 +1166,10 @@
         'position: relative',
       ].join('; ') + ';';
 
-      // Tell Google Maps the container resized and auto-fit markers so the
-      // viewport is centered on the actual properties instead of the
-      // default US-wide / Great Lakes bounds. On mobile the Google Map
-      // initialized into a 0-height container (it was display:none until
-      // the Map view opened) AND markers may still be loading from the
-      // legacy data fetch — so fitAll() fails silently when markers.length
-      // is 0. Retry every 400ms (up to 8 attempts ≈ 3.2s) until markers
-      // are actually populated, then fit.
+      // Reset the one-shot seed flag so returning to Map view re-centers
+      // on DC (user may have panned somewhere else last time). The retry
+      // loop then re-seeds + fits to markers.
+      __fcMapSeeded = false;
       fitMapWhenReady();
     }
 
