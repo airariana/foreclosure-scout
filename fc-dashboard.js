@@ -265,6 +265,22 @@
     const results = root.querySelector('#fc-tb-search-results');
     if (!input || !results) return;
 
+    // Apply a "search" filter to the Listings view and navigate there.
+    // Uses the same __listingsFilter plumbing as the Live Signal drill-downs
+    // so the chip + ✕ clear come along for free.
+    const applySearchFilter = (query, matchIds) => {
+      const ids = new Set(matchIds);
+      __listingsFilter = {
+        label: `Search: "${query}" (${matchIds.length})`,
+        predicate: (p) => ids.has(p.id),
+        sortBy: 'score',
+      };
+      input.value = '';
+      render([], '');
+      location.hash = 'listings';
+      if (window.__fcData) renderListings(window.__fcData);
+    };
+
     const render = (matches, query) => {
       if (!query) {
         results.style.display = 'none';
@@ -285,7 +301,18 @@
         if (idx < 0) return safe;
         return safe.slice(0, idx) + '<mark>' + safe.slice(idx, idx + q.length) + '</mark>' + safe.slice(idx + q.length);
       };
-      results.innerHTML = matches.slice(0, 10).map((p, i) => `
+      // Sticky "View all N in Listings" row at the top — filters the
+      // Listings view to all matches instead of opening one drawer.
+      // When search matches all 527 entries (e.g. query is too generic),
+      // still useful as a way to view + sort/filter further.
+      const filterAllRow = `
+        <div class="fc-tb-search-filter-all" id="fc-tb-search-filter-all"
+             title="Filter Listings to all ${matches.length} matches">
+          <span class="fc-tb-search-filter-ico">⌕</span>
+          <span>View all ${matches.length} matches in Listings</span>
+          <kbd>↵</kbd>
+        </div>`;
+      results.innerHTML = filterAllRow + matches.slice(0, 10).map((p, i) => `
         <div class="fc-tb-search-result ${i === __searchSelectedIndex ? 'selected' : ''}" data-prop-id="${escapeAttr(p.id || '')}">
           <div class="fc-tb-search-result-addr">${hl(p.address || '—')}</div>
           <div class="fc-tb-search-result-meta">
@@ -298,6 +325,12 @@
       `).join('');
       results.style.display = 'block';
 
+      // Wire the "view all" action
+      const filterAllEl = results.querySelector('#fc-tb-search-filter-all');
+      if (filterAllEl) {
+        filterAllEl.onclick = () => applySearchFilter(query, matches.map(p => p.id));
+      }
+
       // Wire result clicks
       results.querySelectorAll('.fc-tb-search-result').forEach(el => {
         el.onclick = () => {
@@ -308,6 +341,10 @@
         };
       });
     };
+
+    // Stash the latest search state so the Enter handler can reach it.
+    let __lastMatches = [];
+    let __lastQuery = '';
 
     const runSearch = (q) => {
       const d = window.__fcData;
@@ -329,14 +366,18 @@
     let debounceTimer = null;
     input.addEventListener('input', (e) => {
       const q = (e.target.value || '').trim();
-      __searchSelectedIndex = 0;
+      __searchSelectedIndex = -1; // start with no item selected → Enter = filter-all
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        render(runSearch(q), q);
+        __lastQuery = q;
+        __lastMatches = runSearch(q);
+        render(__lastMatches, q);
       }, 80);
     });
 
-    // Keyboard: arrows navigate, Enter opens selected, Escape clears
+    // Keyboard: arrows navigate individual items, Enter applies the
+    // "view all" filter when nothing specific is selected, or opens the
+    // highlighted property's drawer when one is. Escape clears.
     input.addEventListener('keydown', (e) => {
       const items = results.querySelectorAll('.fc-tb-search-result');
       if (e.key === 'ArrowDown' && items.length) {
@@ -346,17 +387,24 @@
         items[__searchSelectedIndex].scrollIntoView({ block: 'nearest' });
       } else if (e.key === 'ArrowUp' && items.length) {
         e.preventDefault();
-        __searchSelectedIndex = Math.max(__searchSelectedIndex - 1, 0);
-        items.forEach((el, i) => el.classList.toggle('selected', i === __searchSelectedIndex));
-        items[__searchSelectedIndex].scrollIntoView({ block: 'nearest' });
+        if (__searchSelectedIndex <= 0) {
+          __searchSelectedIndex = -1; // bounce back to "view all" row
+          items.forEach((el) => el.classList.remove('selected'));
+        } else {
+          __searchSelectedIndex -= 1;
+          items.forEach((el, i) => el.classList.toggle('selected', i === __searchSelectedIndex));
+          items[__searchSelectedIndex].scrollIntoView({ block: 'nearest' });
+        }
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const selected = items[__searchSelectedIndex];
-        if (selected) {
-          const id = selected.getAttribute('data-prop-id');
+        if (__searchSelectedIndex >= 0 && items[__searchSelectedIndex]) {
+          const id = items[__searchSelectedIndex].getAttribute('data-prop-id');
           if (id) openPropertyDrawer(id);
           input.value = '';
           render([], '');
+        } else if (__lastMatches.length) {
+          // No individual item selected → filter Listings to all matches.
+          applySearchFilter(__lastQuery, __lastMatches.map(p => p.id));
         }
       } else if (e.key === 'Escape') {
         input.value = '';
@@ -4304,6 +4352,32 @@ Return ONLY the 2-sentence analysis.`,
     padding: 20px; text-align: center;
     font-family: var(--f-mono); font-size: 11px; color: var(--muted);
   }
+  /* Sticky "View all N matches in Listings" row at top of the search results */
+  .fc-tb-search-filter-all {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--hair);
+    background: linear-gradient(90deg, var(--gold-soft) 0%, var(--paper-2) 100%);
+    font-size: 12px; font-weight: 600; color: var(--gold-ink);
+    transition: background 120ms;
+    user-select: none;
+  }
+  .fc-tb-search-filter-all:hover { background: var(--gold-soft); }
+  .fc-tb-search-filter-ico {
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--gold); color: var(--ink);
+    border-radius: 3px;
+    font-size: 12px; font-weight: 700;
+  }
+  .fc-tb-search-filter-all kbd {
+    margin-left: auto;
+    font-family: var(--f-mono); font-size: 10px;
+    padding: 1px 6px; border-radius: 3px;
+    background: var(--white); border: 1px solid var(--gold-deep);
+    color: var(--gold-ink);
+  }
   .fc-tb-search-result mark {
     background: var(--gold-soft); color: var(--gold-ink);
     padding: 0 2px; border-radius: 2px; font-weight: 600;
@@ -5450,11 +5524,23 @@ Return ONLY the 2-sentence analysis.`,
 
   @media (max-width: 768px) {
     .fc-tb-hamburger { display: inline-flex; }
-    .fc-topbar { padding: 0 10px; gap: 8px; }
-    /* Hide breadcrumb + search on mobile — too cramped */
+    .fc-topbar {
+      flex-wrap: wrap;
+      padding: 6px 10px 8px;
+      gap: 6px;
+      height: auto;
+    }
+    /* Hide breadcrumb on mobile — too cramped. Keep search visible so
+       users can filter by city/zip/etc. on their phone. */
     .fc-topbar-sep,
-    .fc-workspace,
-    .fc-tb-search { display: none; }
+    .fc-workspace { display: none; }
+    /* Search bar drops to its own full-width row below the brand/buttons */
+    .fc-tb-search {
+      order: 10;
+      flex: 1 1 100%;
+      max-width: none;
+    }
+    .fc-tb-search kbd { display: none; } /* hide ⌘K hint on mobile */
     /* Condense topbar right side */
     .fc-tb-right { gap: 2px; }
     .fc-tb-btn { padding: 0 6px; font-size: 11px; height: 26px; }
