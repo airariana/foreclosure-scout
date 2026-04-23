@@ -744,11 +744,27 @@
 
   // ─── Zillow manual-lookup overrides ─────────────────────────────────────
   // Users open Zillow, copy the Zestimate + Rent Zestimate for a property,
-  // and paste them into the drawer. Saved to localStorage per property ID.
-  // Drawer + listings re-render with overridden ARV and monthlyRent so
-  // Cash Flow / Cap Rate / 70% rule reflect Zillow values instead of the
-  // county-heuristic defaults.
+  // and paste them into the drawer. localStorage is the client-side cache
+  // for instant reads; the source of truth is the Cloudflare Worker D1
+  // table `nestscoop_zillow`, which lets desktop + iPhone share one queue.
   const ZILLOW_LS_PREFIX = 'fs_zillow_';
+  // Standalone Nestscoop worker — deliberately NOT on sales-hq-api so a
+  // Nestscoop bug can't affect BeyondPayroll / AJAX Dev.
+  const ZILLOW_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/zillow';
+  const ZILLOW_TOKEN_LS_KEY = 'fs_zillow_sync_token';
+
+  function getZillowSyncToken() {
+    try { return localStorage.getItem(ZILLOW_TOKEN_LS_KEY) || ''; }
+    catch (e) { return ''; }
+  }
+
+  function setZillowSyncToken(token) {
+    try {
+      if (token) localStorage.setItem(ZILLOW_TOKEN_LS_KEY, token);
+      else localStorage.removeItem(ZILLOW_TOKEN_LS_KEY);
+    } catch (e) {}
+  }
+  window.fcSetZillowSyncToken = setZillowSyncToken;
 
   function getZillowValues(propId) {
     if (!propId) return null;
@@ -769,17 +785,104 @@
         _state:   property.state   || '',
         _zip:     property.zip     || property.zip_code || '',
       } : {};
-      localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify({
+      const entry = {
         zestimate: values.zestimate ? Number(values.zestimate) : null,
         rent:      values.rent      ? Number(values.rent)      : null,
         notes:     values.notes || '',
         updatedAt: new Date().toISOString(),
         ...meta,
-      }));
+      };
+      localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify(entry));
+      // Fire-and-forget push to the worker so other devices see it.
+      // Swallow failures silently — localStorage still has the value.
+      const token = getZillowSyncToken();
+      if (token) {
+        fetch(`${ZILLOW_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': token },
+          body: JSON.stringify(entry),
+        }).catch(() => {});
+      }
     } else {
       localStorage.removeItem(ZILLOW_LS_PREFIX + propId);
+      const token = getZillowSyncToken();
+      if (token) {
+        fetch(`${ZILLOW_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+          method: 'DELETE',
+          headers: { 'X-Nestscoop-Token': token },
+        }).catch(() => {});
+      }
     }
   }
+
+  // Pull the server-side overrides on page load and merge into localStorage.
+  // Last-write-wins on updatedAt. Called once at init; safe to call again.
+  async function syncZillowFromServer() {
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    try {
+      const res = await fetch(ZILLOW_SYNC_BASE, {
+        headers: { 'X-Nestscoop-Token': token },
+      });
+      if (!res.ok) return { ok: false, reason: `http-${res.status}` };
+      const data = await res.json();
+      const remote = data.overrides || {};
+      let pulled = 0;
+      for (const [propId, remoteEntry] of Object.entries(remote)) {
+        const localRaw = localStorage.getItem(ZILLOW_LS_PREFIX + propId);
+        if (!localRaw) {
+          localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+          continue;
+        }
+        try {
+          const local = JSON.parse(localRaw);
+          // Last-write-wins. If remote has a newer updatedAt, replace local.
+          if ((remoteEntry.updatedAt || '') > (local.updatedAt || '')) {
+            localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+            pulled++;
+          }
+        } catch (e) {
+          localStorage.setItem(ZILLOW_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+        }
+      }
+      return { ok: true, pulled, total: Object.keys(remote).length };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+  window.fcSyncZillowFromServer = syncZillowFromServer;
+
+  // One-shot: upload every fs_zillow_* in localStorage to the server.
+  // Use after first-time activation on a device that already has entries
+  // (e.g. the desktop that accumulated 55 validations pre-sync). Serial
+  // to stay well inside Worker concurrent-connection limits.
+  async function uploadAllZillowToServer() {
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(ZILLOW_LS_PREFIX) && k !== ZILLOW_TOKEN_LS_KEY);
+    let pushed = 0, failed = 0;
+    for (const k of keys) {
+      const propId = k.slice(ZILLOW_LS_PREFIX.length);
+      let entry;
+      try { entry = JSON.parse(localStorage.getItem(k)); } catch (e) { failed++; continue; }
+      if (!entry || (!entry.zestimate && !entry.rent && !entry.notes)) continue;
+      try {
+        const res = await fetch(`${ZILLOW_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': token },
+          body: JSON.stringify(entry),
+        });
+        if (res.ok) pushed++; else failed++;
+      } catch (e) { failed++; }
+    }
+    return { ok: true, pushed, failed, total: keys.length };
+  }
+  window.fcUploadAllZillowToServer = uploadAllZillowToServer;
+
+  // Kick off an initial sync — don't block, UI uses localStorage immediately.
+  syncZillowFromServer();
 
   // ── Watchlist ──────────────────────────────────────────────────────────
   // Lightweight flag-based watchlist. Single localStorage key holds an array
