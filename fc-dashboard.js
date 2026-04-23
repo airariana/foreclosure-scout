@@ -5589,28 +5589,32 @@ Return ONLY the 2-sentence analysis.`,
     .fc-tb-hamburger { display: inline-flex; }
     .fc-topbar {
       flex-wrap: wrap;
-      padding: 6px 10px 8px;
+      padding: 8px 10px;
       gap: 6px;
       height: auto;
       /* Pin topbar to viewport top absolutely so no scroll or layout
          shift can push it out of view. Sidebar + main compensate via
          padding-top so content starts below the fixed topbar. */
       position: fixed !important;
-      top: env(safe-area-inset-top, 0);
+      top: 0;
       left: 0;
       right: 0;
       z-index: 1000;
       background: var(--paper);
       box-shadow: 0 1px 0 var(--hair);
+      padding-top: calc(8px + env(safe-area-inset-top, 0));
     }
-    /* Reserve topbar space — use a CSS var we compute after render */
+    /* Reserve topbar space. Generous buffer (130px) covers the 2-row
+       wrapped topbar + safe-area + box-shadow so page-head content
+       (eyebrow, title, Live data pill, subline) fully clears the
+       fixed topbar on all iPhones. */
     .fc-body {
-      padding-top: 88px; /* approximate wrapped-topbar height on mobile */
+      padding-top: 130px;
     }
     /* Sidebar drawer starts below the fixed topbar */
     .fc-sidebar {
-      top: calc(88px + env(safe-area-inset-top, 0)) !important;
-      height: calc(100dvh - 88px - env(safe-area-inset-top, 0)) !important;
+      top: 130px !important;
+      height: calc(100dvh - 130px) !important;
     }
     /* Smooth momentum scroll on iOS for the main pane. Vertical-only. */
     .fc-main {
