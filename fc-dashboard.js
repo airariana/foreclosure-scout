@@ -815,6 +815,41 @@
     }
   }
 
+  // ─── Assessor intelligence (server-side fetch, D1-cached) ────────────────
+  // Calls the nestscoop-api /api/assessor/<jurisdiction> endpoint which
+  // does the county-portal scrape worker-side and caches 30d in D1.
+  const ASSESSOR_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/assessor';
+
+  // Dispatch per jurisdiction. Arlington is the only one wired up today;
+  // returns null for everything else so the section self-hides.
+  function assessorJurisdiction(p) {
+    const state = (p.state || '').toUpperCase();
+    const county = (p.county || '').trim();
+    if (state === 'VA' && county === 'Arlington County') return 'arlington';
+    return null;
+  }
+
+  async function fetchAssessorIntel(p) {
+    const jur = assessorJurisdiction(p);
+    if (!jur) return { ok: false, reason: 'no-parser' };
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    try {
+      const qs = new URLSearchParams({ prop_id: p.id, address: p.address || '' });
+      const res = await fetch(`${ASSESSOR_BASE}/${jur}?${qs}`, {
+        headers: { 'X-Nestscoop-Token': token },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, reason: err.error || `http-${res.status}` };
+      }
+      const body = await res.json();
+      return { ok: true, cached: body.cached, data: body.data };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+
   // Pull the server-side overrides on page load and merge into localStorage.
   // Last-write-wins on updatedAt. Called once at init; safe to call again.
   async function syncZillowFromServer() {
@@ -3202,6 +3237,9 @@
 
     // Wire the Title & Liens save/clear buttons.
     wireDrawerLiens(p);
+
+    // Fire-and-forget fetch of county assessor data (renders when ready).
+    wireDrawerAssessor(p);
   }
 
   function wireDrawerShareButtons(p) {
@@ -3611,6 +3649,8 @@ Return ONLY the 2-sentence analysis.`,
 
         ${ownershipSection(p)}
 
+        ${assessorIntelSection(p)}
+
         ${liensSection(p)}
 
         ${neighborhoodSection(p)}
@@ -3915,6 +3955,159 @@ Return ONLY the 2-sentence analysis.`,
     ` : '';
 
     return section('Ownership & public records', ownerRows + portalRow);
+  }
+
+  // ── County assessor intelligence ────────────────────────────────────────
+  // Placeholder card rendered synchronously; wireDrawerAssessor fires the
+  // worker-side fetch and populates it. Returns '' for jurisdictions without
+  // a parser so the section self-hides.
+  function assessorIntelSection(p) {
+    if (!assessorJurisdiction(p)) return '';
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    return section('Assessor intelligence', `
+      <div id="fc-assessor-${sid}" style="font-family:var(--f-mono);font-size:12px;color:var(--muted);min-height:40px">
+        Loading county assessor data…
+      </div>
+    `);
+  }
+
+  function renderAssessorIntel(container, p, data) {
+    const fmt$ = (n) => n ? '$' + Number(n).toLocaleString() : '—';
+    const yearsOfHistory = (data.assessment_history || []).length;
+    const oldest = data.assessment_history?.[data.assessment_history.length - 1];
+    const growthPct = (data.assessed_value && oldest?.total)
+      ? Math.round((data.assessed_value - oldest.total) / oldest.total * 100) : null;
+    const compsMed = (() => {
+      const prices = (data.neighborhood_comps || []).map(c => c.price).filter(Boolean).sort((a, b) => a - b);
+      if (!prices.length) return null;
+      return prices[Math.floor(prices.length / 2)];
+    })();
+    // vs heuristic ARV — is the assessor saying we're under/over?
+    const heuristic = p.arv || 0;
+    const vsHeur = (data.assessed_value && heuristic)
+      ? Math.round((data.assessed_value - heuristic) / heuristic * 100) : null;
+
+    const compRows = (data.neighborhood_comps || []).slice(0, 5).map(c =>
+      `<tr>
+         <td style="padding:3px 6px">${c.date}</td>
+         <td style="padding:3px 6px;text-align:right">${fmt$(c.price)}</td>
+         <td style="padding:3px 6px;color:var(--muted)">${escapeHtml(c.address || '')}</td>
+       </tr>`
+    ).join('');
+
+    const historyRows = (data.assessment_history || []).slice(0, 5).map(a =>
+      `<tr>
+         <td style="padding:3px 6px">${a.date.replace('1/1/','')}</td>
+         <td style="padding:3px 6px;text-align:right">${fmt$(a.total)}</td>
+         <td style="padding:3px 6px;color:var(--muted);text-align:right">land ${fmt$(a.land)}</td>
+       </tr>`
+    ).join('');
+
+    const salesRows = (data.sales_history || []).map(s =>
+      `<tr>
+         <td style="padding:3px 6px">${s.date}</td>
+         <td style="padding:3px 6px;text-align:right">${s.price ? fmt$(s.price) : '—'}</td>
+         <td style="padding:3px 6px;color:var(--muted)">${escapeHtml(s.grantee || '')}</td>
+         <td style="padding:3px 6px;color:var(--muted);font-size:11px">${escapeHtml(s.code || '')}</td>
+       </tr>`
+    ).join('');
+
+    const taxPill = data.tax_status === 'paid'
+      ? '<span class="fc-pill sage" style="font-size:10px">Tax balance $0 · paid</span>'
+      : `<span class="fc-pill coral" style="font-size:10px">Tax balance ${fmt$(data.tax_balance_due)} · OWED</span>`;
+
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:3px">Assessed value (${data.assessed_year || ''})</div>
+          <div style="font-family:var(--f-serif);font-size:20px;font-weight:600">${fmt$(data.assessed_value)}</div>
+          ${vsHeur != null ? `<div style="font-size:11px;color:${vsHeur >= 0 ? 'var(--sage)' : 'var(--coral)'}">
+            ${vsHeur >= 0 ? '+' : ''}${vsHeur}% vs heuristic ARV
+          </div>` : ''}
+        </div>
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:3px">Last sale</div>
+          <div style="font-family:var(--f-serif);font-size:20px;font-weight:600">${fmt$(data.last_sale_price)}</div>
+          <div style="font-size:11px;color:var(--muted)">${data.last_sale_date || '—'}</div>
+        </div>
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:3px">Median neighbor comp</div>
+          <div style="font-family:var(--f-serif);font-size:20px;font-weight:600">${fmt$(compsMed)}</div>
+          <div style="font-size:11px;color:var(--muted)">${(data.neighborhood_comps || []).length} recent sales</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        <span class="fc-pill" style="font-size:10px">${escapeHtml(data.owner_name || 'Owner unknown')}</span>
+        <span class="fc-pill" style="font-size:10px">Built ${data.year_built || '—'}</span>
+        <span class="fc-pill" style="font-size:10px">${(data.total_sqft || '—').toLocaleString()} sqft · ${data.baths_total || '—'} ba</span>
+        <span class="fc-pill" style="font-size:10px">Lot ${data.lot_size_sqft ? data.lot_size_sqft.toLocaleString() + ' sqft' : '—'}</span>
+        <span class="fc-pill" style="font-size:10px">${escapeHtml(data.zoning || '—')}</span>
+        ${taxPill}
+        ${growthPct != null ? `<span class="fc-pill" style="font-size:10px">+${growthPct}% assessed in ${yearsOfHistory} yrs</span>` : ''}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:6px">Recent neighbor sales</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            ${compRows || '<tr><td style="color:var(--muted)">No recent comps</td></tr>'}
+          </table>
+        </div>
+        <div>
+          <div class="fc-eyebrow" style="margin-bottom:6px">Property sale history</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            ${salesRows || '<tr><td style="color:var(--muted)">No sale history</td></tr>'}
+          </table>
+        </div>
+      </div>
+
+      <details>
+        <summary style="cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--f-mono)">
+          Assessment history (${yearsOfHistory} yrs)
+        </summary>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">
+          ${historyRows}
+        </table>
+      </details>
+
+      <div style="margin-top:12px;font-size:11px;color:var(--muted);font-family:var(--f-mono)">
+        <a href="${escapeAttr(data.source_url || '')}" target="_blank" rel="noopener" style="color:var(--muted)">
+          Source: Arlington County Property Search ↗
+        </a>
+      </div>
+    `;
+
+    // Auto-pre-fill the Liens form's senior holder + search URL if user
+    // hasn't typed anything — saves one manual step in the workflow.
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const holderEl = document.getElementById(`fc-liens-holder-${sid}`);
+    const searchUrlEl = document.getElementById(`fc-liens-search-url-${sid}`);
+    if (holderEl && !holderEl.value && data.owner_name) {
+      holderEl.placeholder = `Search deeds for: ${data.owner_name}`;
+    }
+    if (searchUrlEl && !searchUrlEl.value && data.source_url) {
+      searchUrlEl.placeholder = data.source_url;
+    }
+  }
+
+  async function wireDrawerAssessor(p) {
+    if (!assessorJurisdiction(p)) return;
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const container = document.getElementById(`fc-assessor-${sid}`);
+    if (!container) return;
+
+    if (!getZillowSyncToken()) {
+      container.innerHTML = '<span style="color:var(--muted)">Paste sync token in Settings to enable assessor data.</span>';
+      return;
+    }
+
+    const res = await fetchAssessorIntel(p);
+    if (!res.ok) {
+      container.innerHTML = `<span style="color:var(--muted)">Assessor data unavailable: ${escapeHtml(res.reason)}</span>`;
+      return;
+    }
+    renderAssessorIntel(container, p, res.data);
   }
 
   // ── Title & Liens: deep-links + manually-entered findings ─────────────
