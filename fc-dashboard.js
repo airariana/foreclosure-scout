@@ -3751,8 +3751,8 @@ Return ONLY the 2-sentence analysis.`,
       deeds:    () => `https://lisweb.fairfaxcounty.gov/PaxWorld/`,
     },
     'VA:Arlington County': {
-      assessor: () => `https://realestate.arlingtonva.us/`,
-      deeds:    () => `https://risweb.arlingtonva.us/arlinwebpublic/`,
+      assessor: () => `https://propertysearch.arlingtonva.us/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Loudoun County': {
       assessor: () => `https://lonet.loudoun.gov/assessment/Search.aspx`,
@@ -3760,48 +3760,48 @@ Return ONLY the 2-sentence analysis.`,
     },
     'VA:Prince William County': {
       assessor: () => `https://www.pwcva.gov/office/real-estate-assessments`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Alexandria City': {
       assessor: () => `https://realestate.alexandriava.gov/`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Falls Church City': {
       assessor: () => `https://www.fallschurchva.gov/1079/Real-Estate-Assessments`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Manassas City': {
       assessor: () => `https://www.manassascity.org/169/Real-Estate-Assessment`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Stafford County': {
       assessor: () => `https://realestate.staffordcountyva.gov/`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Spotsylvania County': {
       assessor: () => `https://realestate.spotsylvania.va.us/`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Fredericksburg City': {
       assessor: () => `https://www.fredericksburgva.gov/185/Real-Estate-Assessments`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     // ── VA — Shenandoah Valley ──
     'VA:Frederick County': {
       assessor: () => `https://www.fcva.us/commissioner-of-the-revenue/real-estate`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Winchester City': {
       assessor: () => `https://www.winchesterva.gov/assessor`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Rockingham County': {
       assessor: () => `https://www.rockinghamcountyva.gov/261/Real-Estate`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     'VA:Augusta County': {
       assessor: () => `https://www.co.augusta.va.us/government/commissioner-of-the-revenue`,
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     // ── MD ──
     'MD:Montgomery County': {
@@ -3850,7 +3850,7 @@ Return ONLY the 2-sentence analysis.`,
   const STATE_FALLBACKS = {
     VA: {
       assessor: null, // VA has no statewide property search
-      deeds:    () => `https://risweb.courts.state.va.us/jsra/public/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
     MD: {
       assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
