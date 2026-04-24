@@ -2008,17 +2008,38 @@
     wireZillowQueue(queue);
     updateZQueueSidebarCount(d);
 
+    // Focus Zestimate field for immediate pasting. Done BEFORE the
+    // Zillow popup opens so the popup's win.focus() doesn't race us.
+    // The input retains its DOM-level focus while the Nestscoop window
+    // is in the background; when the user switches back from Zillow,
+    // the cursor is already in place.
+    const arvEl = document.getElementById('fc-zq-arv');
+    if (arvEl) arvEl.focus();
+
     // Auto-open Zillow for this property if the toggle is on.
     if (autoOpen) {
-      // Small delay so the user sees the property card first, then the window.
       setTimeout(() => openZillowWindow(zillowUrl), 200);
     }
+  }
 
-    // Focus Zestimate field for immediate pasting.
-    setTimeout(() => {
-      const el = document.getElementById('fc-zq-arv');
-      if (el) el.focus();
-    }, 250);
+  // Extra safety net: when the Nestscoop window regains focus (e.g. user
+  // Cmd+Tabs back from the Zillow popup), re-focus the Zestimate field
+  // if we're on the Zillow Queue view and focus isn't already inside one
+  // of its inputs. Registered once — guarded by __zqFocusWired.
+  if (!window.__zqFocusWired) {
+    window.__zqFocusWired = true;
+    const reFocusZQueue = () => {
+      if ((location.hash || '').replace('#', '') !== 'zillow-queue') return;
+      const active = document.activeElement;
+      const zqIds = ['fc-zq-arv', 'fc-zq-rent', 'fc-zq-notes'];
+      if (active && zqIds.includes(active.id)) return; // already inside
+      const arv = document.getElementById('fc-zq-arv');
+      if (arv) arv.focus();
+    };
+    window.addEventListener('focus', reFocusZQueue);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) reFocusZQueue();
+    });
   }
 
   // Open Zillow in a SEPARATE POPUP WINDOW (not a tab). Modern Chrome/Edge
