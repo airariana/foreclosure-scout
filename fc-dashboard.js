@@ -4008,9 +4008,15 @@ Return ONLY the 2-sentence analysis.`,
          <td style="padding:3px 6px">${s.date}</td>
          <td style="padding:3px 6px;text-align:right">${s.price ? fmt$(s.price) : '—'}</td>
          <td style="padding:3px 6px;color:var(--muted)">${escapeHtml(s.grantee || '')}</td>
-         <td style="padding:3px 6px;color:var(--muted);font-size:11px">${escapeHtml(s.code || '')}</td>
+         <td style="padding:3px 6px;color:var(--muted);font-size:11px">${escapeHtml(s.deed || '')}</td>
        </tr>`
     ).join('');
+
+    // Deed refs — only meaningful when we have a deed book/page and the
+    // user actually needs to request docs (Arlington's workflow). Build a
+    // clipboard-ready text block per property for a Clerk email.
+    const deedRefs = (data.sales_history || []).filter(s => s.deed);
+    const hasRefs = deedRefs.length > 0;
 
     const taxPill = data.tax_status === 'paid'
       ? '<span class="fc-pill sage" style="font-size:10px">Tax balance $0 · paid</span>'
@@ -4055,7 +4061,11 @@ Return ONLY the 2-sentence analysis.`,
           </table>
         </div>
         <div>
-          <div class="fc-eyebrow" style="margin-bottom:6px">Property sale history</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div class="fc-eyebrow">Property sale history (deed bk/pg)</div>
+            ${hasRefs ? `<button id="fc-assessor-copyrefs-${(p.id || 'x').replace(/[^a-z0-9]/gi, '')}"
+              class="fc-btn fc-btn-sm fc-btn-ghost" style="font-size:10px;padding:2px 8px">Copy refs</button>` : ''}
+          </div>
           <table style="width:100%;border-collapse:collapse;font-size:12px">
             ${salesRows || '<tr><td style="color:var(--muted)">No sale history</td></tr>'}
           </table>
@@ -4088,6 +4098,33 @@ Return ONLY the 2-sentence analysis.`,
     }
     if (searchUrlEl && !searchUrlEl.value && data.source_url) {
       searchUrlEl.placeholder = data.source_url;
+    }
+
+    // Wire the Copy-refs button — emits a clipboard-ready email body
+    // the user can paste to the Arlington Clerk to request documents.
+    const copyBtn = document.getElementById(`fc-assessor-copyrefs-${sid}`);
+    if (copyBtn && hasRefs) {
+      copyBtn.onclick = async () => {
+        const addr = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+        const lines = [
+          `Document request — ${addr}`,
+          `Owner: ${data.owner_name || ''}`,
+          `Property: ${data.legal_description || ''}`,
+          '',
+          'Recorded transactions per Arlington Property Search:',
+          ...deedRefs.map(s => `  ${s.date}  Deed Bk/Pg ${s.deed}  ·  ${s.grantee || ''}  ${s.code ? '('+s.code+')' : ''}`.trim()),
+          '',
+          `Requesting copies of all deeds of trust, releases, and any judgment liens recorded against the property or ${data.owner_name || 'owner'} since ${(deedRefs[0] && deedRefs[0].date) || 'the last sale'}.`,
+        ].join('\n');
+        try {
+          await navigator.clipboard.writeText(lines);
+          copyBtn.textContent = '✓ Copied';
+          setTimeout(() => { copyBtn.textContent = 'Copy refs'; }, 2000);
+        } catch (e) {
+          copyBtn.textContent = 'Copy failed';
+          setTimeout(() => { copyBtn.textContent = 'Copy refs'; }, 2000);
+        }
+      };
     }
   }
 
@@ -4143,14 +4180,32 @@ Return ONLY the 2-sentence analysis.`,
       ? `<a href="${escapeAttr(href)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">${escapeHtml(label)} ↗</a>`
       : '';
 
+    // Arlington Circuit Court isn't on the VA statewide SRA and doesn't
+    // publish a free public deed search — requests go through the Clerk.
+    // Suppress the generic "Deeds" button and surface the actionable path.
+    const isArlington = p.state === 'VA' && p.county === 'Arlington County';
+    const arlingtonNote = isArlington ? `
+      <div style="padding:10px 12px;border:1px dashed var(--hair);border-radius:6px;margin-bottom:12px;
+                  font-size:12px;color:var(--ink-2);background:var(--paper-2);line-height:1.5">
+        <strong>Arlington deeds:</strong> Circuit Court Clerk does not publish online.
+        Use the <em>Deed Bk/Pg refs</em> from Property sale history (in the Assessor card above)
+        and request documents from the Clerk.
+        <div style="margin-top:4px;color:var(--muted);font-size:11px">
+          Phone <a href="tel:+17032287010">703-228-7010</a> ·
+          Email <a href="mailto:clerkoffice@arlingtonva.us">clerkoffice@arlingtonva.us</a> ·
+          1425 N Courthouse Rd
+        </div>
+      </div>` : '';
+
     const links = `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-        ${linkBtn('Deeds / Land records', portals.deeds)}
+        ${isArlington ? '' : linkBtn('Deeds / Land records', portals.deeds)}
         ${linkBtn('Assessor', portals.assessor)}
         ${linkBtn('Judgment search', judgmentSearch)}
         ${taxSearchDC ? linkBtn('DC tax liens', taxSearchDC) : ''}
         ${taxSearchMD ? linkBtn('MD SDAT tax', taxSearchMD) : ''}
       </div>
+      ${arlingtonNote}
     `;
 
     const noticeHint = seniorLoanFromNotice
