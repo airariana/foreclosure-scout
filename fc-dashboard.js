@@ -909,6 +909,74 @@
   // Kick off an initial sync — don't block, UI uses localStorage immediately.
   syncZillowFromServer();
 
+  // ─── Liens (manual title-search findings) ───────────────────────────────
+  // User clicks deep-links to county recorder / land-records portals from
+  // the drawer, does the title check manually, and records what they find
+  // here. Cached in localStorage for instant reads + synced to nestscoop-api
+  // D1 so desktop + iPhone see the same intelligence.
+  const LIEN_LS_PREFIX = 'fs_liens_';
+  const LIEN_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/liens';
+
+  function getLiens(propId) {
+    if (!propId) return null;
+    try {
+      const raw = localStorage.getItem(LIEN_LS_PREFIX + propId);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveLiens(propId, data) {
+    if (!propId) return;
+    const entry = { ...data, updated_at: new Date().toISOString() };
+    localStorage.setItem(LIEN_LS_PREFIX + propId, JSON.stringify(entry));
+    const token = getZillowSyncToken();
+    if (token) {
+      fetch(`${LIEN_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': token },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+    return entry;
+  }
+
+  async function syncLiensFromServer() {
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    try {
+      const res = await fetch(LIEN_SYNC_BASE, {
+        headers: { 'X-Nestscoop-Token': token },
+      });
+      if (!res.ok) return { ok: false, reason: `http-${res.status}` };
+      const data = await res.json();
+      const remote = data.liens || {};
+      let pulled = 0;
+      for (const [propId, remoteEntry] of Object.entries(remote)) {
+        const localRaw = localStorage.getItem(LIEN_LS_PREFIX + propId);
+        if (!localRaw) {
+          localStorage.setItem(LIEN_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+          continue;
+        }
+        try {
+          const local = JSON.parse(localRaw);
+          if ((remoteEntry.updated_at || '') > (local.updated_at || '')) {
+            localStorage.setItem(LIEN_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+            pulled++;
+          }
+        } catch (e) {
+          localStorage.setItem(LIEN_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+        }
+      }
+      return { ok: true, pulled, total: Object.keys(remote).length };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+  window.fcSyncLiensFromServer = syncLiensFromServer;
+  syncLiensFromServer();
+
   // ── Watchlist ──────────────────────────────────────────────────────────
   // Lightweight flag-based watchlist. Single localStorage key holds an array
   // of { id, address, city, state, zip, addedAt } entries. Persisted client-
@@ -3131,6 +3199,9 @@
 
     // Wire the Share section buttons (Copy link + native Share).
     wireDrawerShareButtons(p);
+
+    // Wire the Title & Liens save/clear buttons.
+    wireDrawerLiens(p);
   }
 
   function wireDrawerShareButtons(p) {
@@ -3540,6 +3611,8 @@ Return ONLY the 2-sentence analysis.`,
 
         ${ownershipSection(p)}
 
+        ${liensSection(p)}
+
         ${neighborhoodSection(p)}
 
         ${(() => {
@@ -3842,6 +3915,162 @@ Return ONLY the 2-sentence analysis.`,
     ` : '';
 
     return section('Ownership & public records', ownerRows + portalRow);
+  }
+
+  // ── Title & Liens: deep-links + manually-entered findings ─────────────
+  // Surfaces the county deeds/land-records URL + a Google search for
+  // judgments, then a simple form to record what the user finds. Saves
+  // to localStorage (instant) + syncs to nestscoop-api D1 (cross-device).
+  // sanitizedId ensures form element ids are unique per-property in case
+  // multiple drawers are ever rendered back-to-back.
+  function liensSection(p) {
+    const portals = getCountyPortals(p);
+    const saved = getLiens(p.id) || {};
+    const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const sid = sanitizedId; // shorthand for id template keys
+    const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+    const q = encodeURIComponent(fullAddress);
+    const judgmentSearch = `https://www.google.com/search?q=${q}+site:courtlistener.com+OR+"judgment"+OR+"lien"`;
+    const taxSearchDC = p.state === 'DC' ? `https://mytax.dc.gov/_/` : null;
+    const taxSearchMD = p.state === 'MD' ? `https://sdat.dat.maryland.gov/RealProperty/` : null;
+
+    const v = (k, def='') => saved[k] != null ? saved[k] : def;
+    const num = (k) => saved[k] != null ? saved[k] : '';
+    const seniorLoanFromNotice = p.pricing && p.pricing.original_loan;
+
+    const headerRight = saved.updated_at
+      ? `<span class="fc-pill ${saved.clear_title ? 'sage' : ''}" style="font-size:10px">
+           ${saved.clear_title ? 'Clear title' : 'Encumbrances logged'}
+           · ${new Date(saved.updated_at).toLocaleDateString()}
+         </span>`
+      : `<span class="fc-pill" style="font-size:10px">Not yet searched</span>`;
+
+    // Deep-link buttons — open county sites in new tabs
+    const linkBtn = (label, href) => href
+      ? `<a href="${escapeAttr(href)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">${escapeHtml(label)} ↗</a>`
+      : '';
+
+    const links = `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        ${linkBtn('Deeds / Land records', portals.deeds)}
+        ${linkBtn('Assessor', portals.assessor)}
+        ${linkBtn('Judgment search', judgmentSearch)}
+        ${taxSearchDC ? linkBtn('DC tax liens', taxSearchDC) : ''}
+        ${taxSearchMD ? linkBtn('MD SDAT tax', taxSearchMD) : ''}
+      </div>
+    `;
+
+    const noticeHint = seniorLoanFromNotice
+      ? `<div class="fc-kv-caption" style="color:var(--muted);font-size:11px;margin-bottom:10px">
+           💡 Notice lists original loan $${seniorLoanFromNotice.toLocaleString()} — pre-fill as senior lien estimate if no payoff quote yet.
+         </div>`
+      : '';
+
+    // Compact form — one row per category. Optional fields.
+    const inputStyle = `width:100%;padding:7px 9px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-mono);font-size:12px;box-sizing:border-box;background:var(--paper)`;
+    const labelStyle = `display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px`;
+
+    const body = `
+      ${links}
+      ${noticeHint}
+      <div id="fc-liens-form-${sid}" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="${labelStyle}">Senior lien (1st DoT) $</label>
+          <input id="fc-liens-senior-${sid}" type="number" inputmode="numeric" placeholder="${seniorLoanFromNotice ? seniorLoanFromNotice.toLocaleString() : 'e.g. 285000'}" value="${num('senior_lien')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Senior lien holder</label>
+          <input id="fc-liens-holder-${sid}" type="text" placeholder="e.g. Wells Fargo" value="${escapeAttr(v('senior_lien_holder'))}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Junior liens total $</label>
+          <input id="fc-liens-junior-${sid}" type="number" inputmode="numeric" placeholder="sum of 2nd+" value="${num('junior_liens_total')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Tax liens $</label>
+          <input id="fc-liens-tax-${sid}" type="number" inputmode="numeric" placeholder="property + IRS" value="${num('tax_liens_total')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Judgments $</label>
+          <input id="fc-liens-judge-${sid}" type="number" inputmode="numeric" placeholder="sum" value="${num('judgments_total')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">HOA liens $</label>
+          <input id="fc-liens-hoa-${sid}" type="number" inputmode="numeric" placeholder="assessment arrears" value="${num('hoa_liens_total')}" style="${inputStyle}">
+        </div>
+        <div style="grid-column:1 / -1">
+          <label style="${labelStyle}">Where did you search?</label>
+          <input id="fc-liens-search-url-${sid}" type="text" placeholder="paste URL from land records portal" value="${escapeAttr(v('search_url'))}" style="${inputStyle}">
+        </div>
+        <div style="grid-column:1 / -1">
+          <label style="${labelStyle}">Notes</label>
+          <input id="fc-liens-notes-${sid}" type="text" placeholder="subordinations, pending releases, red flags" value="${escapeAttr(v('notes'))}" style="${inputStyle}">
+        </div>
+        <label style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);margin-top:4px;cursor:pointer">
+          <input id="fc-liens-clear-${sid}" type="checkbox" ${saved.clear_title ? 'checked' : ''}>
+          Title is clear (no encumbrances beyond senior mortgage)
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+        <button id="fc-liens-save-${sid}" class="fc-btn fc-btn-dark">Save findings</button>
+        ${saved.updated_at ? `<button id="fc-liens-clear-btn-${sid}" class="fc-btn fc-btn-ghost">Clear</button>` : ''}
+        <div id="fc-liens-status-${sid}" style="font-size:11px;color:var(--muted);font-family:var(--f-mono)"></div>
+      </div>
+    `;
+
+    return section(`Title & liens <span style="margin-left:8px">${headerRight}</span>`, body);
+  }
+
+  // Wired after the drawer DOM is in place. Idempotent — replaces prior handlers.
+  function wireDrawerLiens(p) {
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const byId = (s) => document.getElementById(s + sid);
+    const save = byId('fc-liens-save-');
+    if (!save) return;
+    const status = byId('fc-liens-status-');
+
+    const readForm = () => {
+      const num = (s) => { const el = byId(s); const v = el ? el.value.trim() : ''; return v === '' ? null : Number(v); };
+      return {
+        senior_lien:         num('fc-liens-senior-'),
+        senior_lien_holder:  byId('fc-liens-holder-')?.value.trim() || '',
+        junior_liens_total:  num('fc-liens-junior-'),
+        tax_liens_total:     num('fc-liens-tax-'),
+        judgments_total:     num('fc-liens-judge-'),
+        hoa_liens_total:     num('fc-liens-hoa-'),
+        total_encumbrances:  (num('fc-liens-senior-') || 0) + (num('fc-liens-junior-') || 0)
+                           + (num('fc-liens-tax-') || 0)    + (num('fc-liens-judge-') || 0)
+                           + (num('fc-liens-hoa-') || 0),
+        clear_title:         !!byId('fc-liens-clear-')?.checked,
+        search_url:          byId('fc-liens-search-url-')?.value.trim() || '',
+        notes:               byId('fc-liens-notes-')?.value.trim() || '',
+      };
+    };
+
+    save.onclick = () => {
+      const data = readForm();
+      saveLiens(p.id, data);
+      if (status) {
+        status.textContent = '✓ Saved · syncing to other devices';
+        setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+      }
+    };
+
+    const clearBtn = byId('fc-liens-clear-btn-');
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        localStorage.removeItem(LIEN_LS_PREFIX + p.id);
+        const token = getZillowSyncToken();
+        if (token) {
+          fetch(`${LIEN_SYNC_BASE}/${encodeURIComponent(p.id)}`, {
+            method: 'DELETE',
+            headers: { 'X-Nestscoop-Token': token },
+          }).catch(() => {});
+        }
+        // Re-open drawer to reset UI
+        openPropertyDrawer(p.id);
+      };
+    }
   }
 
   // ── Neighborhood / nearby points of interest ─────────────────────────────
