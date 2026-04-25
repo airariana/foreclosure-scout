@@ -3843,6 +3843,52 @@ Return ONLY the 2-sentence analysis.`,
       assessor: () => `https://www.co.augusta.va.us/government/commissioner-of-the-revenue`,
       deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
     },
+    // ── VA — Richmond metro ──
+    'VA:Chesterfield County': {
+      assessor: () => `https://www.chesterfield.gov/176/Real-Estate-Assessment-Database`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Henrico County': {
+      assessor: () => `https://realestate.henrico.us/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Hanover County': {
+      assessor: () => `https://realestate.hanovercounty.gov/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Richmond City': {
+      assessor: () => `https://www.richmondgov.com/Assessor/RealEstate.aspx`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    // ── VA — Hampton Roads ──
+    'VA:Virginia Beach City': {
+      assessor: () => `https://www.vbgov.com/property-search`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Norfolk City': {
+      assessor: () => `https://airassessment.norfolk.gov/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Chesapeake City': {
+      assessor: () => `https://www.cityofchesapeake.net/government/city-departments/departments/Real-Estate/index.htm`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Newport News City': {
+      assessor: () => `https://realestate.nnva.gov/`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Hampton City': {
+      assessor: () => `https://www.hampton.gov/247/Real-Estate-Assessor`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Portsmouth City': {
+      assessor: () => `https://www.portsmouthva.gov/195/Real-Estate-Assessor`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
+    'VA:Suffolk City': {
+      assessor: () => `https://www.suffolkva.us/216/Real-Estate-Assessor`,
+      deeds:    () => `https://risweb.vacourts.gov/jsra/sra/`,
+    },
     // ── MD ──
     'MD:Montgomery County': {
       assessor: () => `https://sdat.dat.maryland.gov/RealProperty/`,
@@ -3906,8 +3952,14 @@ Return ONLY the 2-sentence analysis.`,
     const key = `${(p.state || 'VA').toUpperCase()}:${p.county || ''}`;
     const county = COUNTY_PORTALS[key];
     const state = STATE_FALLBACKS[(p.state || 'VA').toUpperCase()] || {};
+    // Last-resort fallback: a Google search seeded with the county name +
+    // "real estate assessment". Better than no button — user can usually
+    // find the correct portal in the first result.
+    const googleAssessor = (p.county && p.state)
+      ? `https://www.google.com/search?q=${encodeURIComponent(p.county + ' ' + p.state + ' real estate assessment property search')}`
+      : null;
     return {
-      assessor: county && county.assessor ? county.assessor(p) : (state.assessor ? state.assessor(p) : null),
+      assessor: county && county.assessor ? county.assessor(p) : (state.assessor ? state.assessor(p) : googleAssessor),
       deeds:    county && county.deeds    ? county.deeds(p)    : (state.deeds    ? state.deeds(p)    : null),
     };
   }
@@ -4168,12 +4220,15 @@ Return ONLY the 2-sentence analysis.`,
     const num = (k) => saved[k] != null ? saved[k] : '';
     const seniorLoanFromNotice = p.pricing && p.pricing.original_loan;
 
+    // Status pill rendered inside the body — section() escapes the title
+    // string, so HTML tags in the section header get shown as literal text.
     const headerRight = saved.updated_at
       ? `<span class="fc-pill ${saved.clear_title ? 'sage' : ''}" style="font-size:10px">
            ${saved.clear_title ? 'Clear title' : 'Encumbrances logged'}
            · ${new Date(saved.updated_at).toLocaleDateString()}
          </span>`
       : `<span class="fc-pill" style="font-size:10px">Not yet searched</span>`;
+    const statusBar = `<div style="margin-bottom:10px">${headerRight}</div>`;
 
     // Deep-link buttons — open county sites in new tabs
     const linkBtn = (label, href) => href
@@ -4266,7 +4321,7 @@ Return ONLY the 2-sentence analysis.`,
       </div>
     `;
 
-    return section(`Title & liens <span style="margin-left:8px">${headerRight}</span>`, body);
+    return section('Title & liens', statusBar + body);
   }
 
   // Wired after the drawer DOM is in place. Idempotent — replaces prior handlers.
