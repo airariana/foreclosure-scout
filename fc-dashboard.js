@@ -62,8 +62,8 @@
   // then paste the output into the corresponding hash below and commit.
   const AUTH_LS_KEY = 'fc_auth_role';
   const PASS_HASHES = {
-    admin:  'd49ef9f8dcaa1367b1a666285e36c960ddffa3fa45fa36c78bf12adc61ca0a50',
-    viewer: '14a234b37c07c9e2c4153768c3d0722f00af65b5270f2cbc6d326edbdfb8cdcd',
+    admin:  '7b666d3d9835ac7fbdffb7fd30be401b4d79cdb34a8c36939f693f1f291122c1',
+    viewer: '', // disabled — single-passphrase setup
   };
 
   async function hashPassphrase(str) {
@@ -4755,9 +4755,9 @@ Return ONLY the 2-sentence analysis.`,
   // happen via responsive CSS (sidebar becomes an off-canvas drawer,
   // condensed topbar, single-column layouts).
   // Feature flag: when true, the passphrase gate + role-based UI hides
-  // are active. Currently disabled while we iterate on features — flip
-  // to true + commit when ready to re-enable auth.
-  const AUTH_ENABLED = false;
+  // are active. localStorage persists the role so users stay signed in
+  // across reloads — explicit Sign Out (role chip click) clears it.
+  const AUTH_ENABLED = true;
 
   async function init() {
     loadFonts();
