@@ -826,6 +826,11 @@
     const state = (p.state || '').toUpperCase();
     const county = (p.county || '').trim();
     if (state === 'VA' && county === 'Arlington County') return 'arlington';
+    // Fairfax County + Fairfax City both fall under Fairfax County's
+    // assessment jurisdiction in our scraping coverage. The backend uses
+    // zip + sqft for comp scoping since the source dataset doesn't always
+    // contain the subject foreclosure property.
+    if (state === 'VA' && (county === 'Fairfax County' || county === 'Fairfax City')) return 'fairfax';
     return null;
   }
 
@@ -835,7 +840,14 @@
     const token = getZillowSyncToken();
     if (!token) return { ok: false, reason: 'no-token' };
     try {
-      const qs = new URLSearchParams({ prop_id: p.id, address: p.address || '' });
+      const params = { prop_id: p.id, address: p.address || '' };
+      // Fairfax wants zip + sqft for comp scoping when subject isn't
+      // present in the public sales feed (most foreclosure properties).
+      if (jur === 'fairfax') {
+        if (p.zip || p.zip_code) params.zip = p.zip || p.zip_code;
+        if (p.sqft) params.sqft = p.sqft;
+      }
+      const qs = new URLSearchParams(params);
       const res = await fetch(`${ASSESSOR_BASE}/${jur}?${qs}`, {
         headers: { 'X-Nestscoop-Token': token },
       });
