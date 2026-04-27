@@ -1144,7 +1144,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=73"></script>
+<script src="fc-dashboard.js?v=74"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1453,6 +1453,16 @@ header,
           <div class="chip prefc" data-val="Pre-Foreclosure" onclick="toggleChip(this,'type')">Pre-Foreclosure</div>
           <div class="chip auction" data-val="Auction" onclick="toggleChip(this,'type')">Auction</div>
           <div class="chip short" data-val="Short Sale" onclick="toggleChip(this,'type')">Short Sale</div>
+        </div>
+
+        <span class="fs-label">Property Type</span>
+        <div class="chip-row" id="chips-property-type">
+          <div class="chip" data-val="Single Family" onclick="toggleChip(this,'propertyType')">Single Family</div>
+          <div class="chip" data-val="Townhouse" onclick="toggleChip(this,'propertyType')">Townhouse</div>
+          <div class="chip" data-val="Condo" onclick="toggleChip(this,'propertyType')">Condo</div>
+          <div class="chip" data-val="Multi-Family" onclick="toggleChip(this,'propertyType')">Multi-Family</div>
+          <div class="chip" data-val="Mobile Home" onclick="toggleChip(this,'propertyType')">Mobile Home</div>
+          <div class="chip" data-val="Land" onclick="toggleChip(this,'propertyType')">Land</div>
         </div>
 
         <span class="fs-label">Data Source</span>
@@ -1781,7 +1791,7 @@ const GMAPS_KEY = window.GOOGLE_MAPS_API_KEY;
 
 // ── filterState must be declared first — used by applyFilters() ───────────
 const filterState = {
-  types: new Set(), sources: new Set(), states: new Set(),
+  types: new Set(), sources: new Set(), states: new Set(), propertyTypes: new Set(),
   price: 750000, cf: -500, beds: 0,
   court: '', chapter: '', filedDays: 90, courtName: '', courtOpenOnly: true,
   noiCounty: '', noiLevel: 'all', noiMap: false,
@@ -2753,6 +2763,7 @@ function applyFilters(){
     if(filterState.types.size && !filterState.types.has(p.listingType)) return false;
     if(filterState.states.size && !filterState.states.has(p.state)) return false;
     if(filterState.sources.size && !filterState.sources.has(p.source)) return false;
+    if(filterState.propertyTypes.size && !filterState.propertyTypes.has(p.property_type)) return false;
     if(filterState.price < 750000 && p.price > filterState.price) return false;
     if(filterState.cf > -490 && p.cashFlow < filterState.cf) return false;
     if(filterState.beds > 0 && p.beds < filterState.beds) return false;
@@ -3143,6 +3154,11 @@ function syncFilterState(){
   filterState.states = new Set(
     [...document.querySelectorAll('#chips-state .chip.active')].map(c => c.dataset.val)
   );
+  // Property type chips (Single Family / Townhouse / Condo / Multi-Family /
+  // Mobile Home / Land — distinct from listingType which is the auction format)
+  filterState.propertyTypes = new Set(
+    [...document.querySelectorAll('#chips-property-type .chip.active')].map(c => c.dataset.val)
+  );
   // Beds
   const bedsActive = document.querySelector('#chips-beds .chip.active');
   filterState.beds = bedsActive ? parseInt(bedsActive.dataset.val) : 0;
@@ -3309,6 +3325,7 @@ function updateFilterTags(){
   if(filterState.types.size) [...filterState.types].forEach(t => tags.push({label: t, remove: ()=>{ document.querySelector(`#chips-type .chip[data-val="${t}"]`)?.classList.remove('active'); syncFilterState(); updateFilterTags(); }}));
   if(filterState.states.size) [...filterState.states].forEach(s => tags.push({label: '📍 '+s, remove: ()=>{ document.querySelector(`#chips-state .chip[data-val="${s}"]`)?.classList.remove('active'); syncFilterState(); updateFilterTags(); }}));
   if(filterState.sources.size) [...filterState.sources].forEach(s => tags.push({label: s, remove: ()=>{ document.querySelector(`#chips-source .chip[data-val="${s}"]`)?.classList.remove('active'); syncFilterState(); updateFilterTags(); }}));
+  if(filterState.propertyTypes.size) [...filterState.propertyTypes].forEach(t => tags.push({label: '🏠 '+t, remove: ()=>{ document.querySelector(`#chips-property-type .chip[data-val="${t}"]`)?.classList.remove('active'); syncFilterState(); updateFilterTags(); }}));
   if(filterState.price < 750000) tags.push({label: 'Under $'+Math.round(filterState.price/1000)+'K', remove: ()=>{ document.getElementById('sf-price').value=750000; updateRangeLabel('sf-price','sf-price-val','$','K',1000); }});
   if(filterState.cf > -490) tags.push({label: 'CF $'+filterState.cf+'+', remove: ()=>{ document.getElementById('sf-cf').value=-500; updateRangeLabel('sf-cf','sf-cf-val','$','',1,true); }});
   if(filterState.beds > 0) tags.push({label: filterState.beds+'+ beds', remove: ()=>{ document.querySelector('#chips-beds .chip[data-val="0"]')?.click(); }});
@@ -3326,7 +3343,7 @@ function removeFilterTag(i){
 }
 
 function updateActiveFilterCount(){
-  const count = (filterState.types.size + filterState.states.size + filterState.sources.size +
+  const count = (filterState.types.size + filterState.states.size + filterState.sources.size + filterState.propertyTypes.size +
     (filterState.price < 750000 ? 1 : 0) + (filterState.cf > -490 ? 1 : 0) + (filterState.beds > 0 ? 1 : 0));
   const el = document.getElementById('activeFilterCount');
   el.style.display = count > 0 ? 'inline' : 'none';
