@@ -956,6 +956,127 @@
   // Kick off an initial sync — don't block, UI uses localStorage immediately.
   syncZillowFromServer();
 
+  // ─── AI roof check (Gemini Vision over Google Maps satellite) ────────────
+  // Frontend fetches the satellite tile (cheap, browser already has the
+  // Maps API key + referrer matches the key's restriction), converts to
+  // base64, posts to /api/roof/analyze. Worker calls Gemini Vision with
+  // a structured prompt and caches the result 90d in D1. Per-property cost
+  // is one Static Maps call (~free at our volume) + one Gemini Vision call
+  // (~$0.001 per drawer open, capped by the 90d cache).
+  const ROOF_API = 'https://nestscoop-api.ajbb705.workers.dev/api/roof/analyze';
+
+  function buildSatelliteUrl(lat, lng, zoom = 20, size = 600) {
+    const key = window.GOOGLE_MAPS_API_KEY || '';
+    if (!key || !lat || !lng) return null;
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}x${size}&maptype=satellite&key=${key}`;
+  }
+
+  async function fetchRoofIntel(p) {
+    const lat = p.lat || p.latitude;
+    const lng = p.lng || p.longitude;
+    if (!lat || !lng) return { ok: false, reason: 'no-coords' };
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+
+    const satUrl = buildSatelliteUrl(lat, lng);
+    if (!satUrl) return { ok: false, reason: 'no-maps-key' };
+
+    try {
+      // Fetch the satellite tile, convert to base64. Maps Static API
+      // serves with permissive CORS, so direct fetch + arrayBuffer works.
+      const tile = await fetch(satUrl);
+      if (!tile.ok) return { ok: false, reason: `tile-${tile.status}` };
+      const buf = await tile.arrayBuffer();
+      // ArrayBuffer → base64 in chunks (large buffers blow the call stack
+      // when passed via spread to String.fromCharCode).
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      const b64 = btoa(bin);
+
+      const res = await fetch(ROOF_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': token },
+        body: JSON.stringify({ prop_id: p.id, image_base64: b64 }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, reason: err.error || `http-${res.status}` };
+      }
+      const body = await res.json();
+      return { ok: true, cached: body.cached, data: body.data, satUrl };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+
+  function roofIntelSection(p) {
+    const lat = p.lat || p.latitude;
+    const lng = p.lng || p.longitude;
+    if (!lat || !lng) return ''; // no coords → silently skip the section
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    return section('Roof check (AI)', `
+      <div id="fc-roof-${sid}" style="font-family:var(--f-mono);font-size:12px;color:var(--muted);min-height:40px">
+        Analyzing roof from satellite imagery…
+      </div>
+    `);
+  }
+
+  function renderRoofIntel(container, p, res) {
+    if (!res.ok) {
+      container.innerHTML = `<span style="color:var(--muted)">Roof analysis unavailable: ${escapeHtml(res.reason || 'unknown')}</span>`;
+      return;
+    }
+    const d = res.data || {};
+    const condColor = {
+      excellent: 'sage', good: 'sage', fair: 'gold', poor: 'coral', unknown: 'muted',
+    }[d.condition] || 'muted';
+    const confLabel = d.confidence === 'high' ? '' : ` · ${d.confidence} confidence`;
+
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:start">
+        <div>
+          ${res.satUrl ? `<img src="${escapeAttr(res.satUrl)}" alt="Satellite view" style="width:100%;border-radius:6px;border:1px solid var(--hair)">` : ''}
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:center">
+            Google Maps · zoom 20
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+            <span class="fc-pill ${condColor}" style="font-size:11px;font-weight:600;text-transform:capitalize">
+              ${escapeHtml(d.condition || 'unknown')}${confLabel}
+            </span>
+            ${(d.materials || []).map(m => `<span class="fc-pill" style="font-size:10px">${escapeHtml(m)}</span>`).join('')}
+          </div>
+          ${(d.flags || []).length ? `
+            <div style="margin-bottom:10px">
+              <div class="fc-eyebrow" style="margin-bottom:4px">Flags</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                ${d.flags.map(f => `<span class="fc-pill coral" style="font-size:10px">⚠ ${escapeHtml(f)}</span>`).join('')}
+              </div>
+            </div>` : ''}
+          <div style="font-size:13px;color:var(--ink-2);line-height:1.5">${escapeHtml(d.summary || '')}</div>
+          ${res.cached ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;font-family:var(--f-mono)">Cached (${res.ageHours || ''}h ago)</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  async function wireDrawerRoof(p) {
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const container = document.getElementById(`fc-roof-${sid}`);
+    if (!container) return;
+    if (!getZillowSyncToken()) {
+      container.innerHTML = '<span style="color:var(--muted)">Paste sync token in Settings to enable AI roof analysis.</span>';
+      return;
+    }
+    const res = await fetchRoofIntel(p);
+    renderRoofIntel(container, p, res);
+  }
+
   // ─── Liens (manual title-search findings) ───────────────────────────────
   // User clicks deep-links to county recorder / land-records portals from
   // the drawer, does the title check manually, and records what they find
@@ -3252,6 +3373,9 @@
 
     // Fire-and-forget fetch of county assessor data (renders when ready).
     wireDrawerAssessor(p);
+
+    // Fire-and-forget AI roof analysis from satellite imagery.
+    wireDrawerRoof(p);
   }
 
   function wireDrawerShareButtons(p) {
@@ -3662,6 +3786,8 @@ Return ONLY the 2-sentence analysis.`,
         ${ownershipSection(p)}
 
         ${assessorIntelSection(p)}
+
+        ${roofIntelSection(p)}
 
         ${liensSection(p)}
 
