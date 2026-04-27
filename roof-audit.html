@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roof check audit · Nestscoop</title>
+<style>
+  :root {
+    --bg:#f4f1eb; --surface:#ffffff; --surface2:#ede9e1; --border:#d6d0c4;
+    --ink:#1a1a18; --ink2:#4a4a44; --muted:#8a8880;
+    --accent:#c84b2f; --accent2:#2a6496; --gold:#b8860b; --green:#2d6a4f; --red:#c84b2f;
+    --shadow:0 2px 12px rgba(26,26,24,0.08);
+    --f-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --f-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--f-sans); font-size: 14px; line-height: 1.5;
+  }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; position: sticky; top: 0; z-index: 10;
+    box-shadow: var(--shadow);
+  }
+  h1 { margin: 0 0 8px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 12px; font-family: var(--f-mono); margin-bottom: 12px; }
+  .controls {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  }
+  .controls label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--ink2); }
+  select, input[type="number"] {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--ink);
+    padding: 6px 10px; border-radius: 4px; font-family: inherit; font-size: 13px;
+  }
+  button {
+    background: var(--ink); color: var(--surface);
+    border: 0; padding: 8px 16px; border-radius: 4px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+  button.ghost:hover { background: var(--surface2); color: var(--ink); }
+  button.tiny { padding: 4px 8px; font-size: 11px; }
+  .summary {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-family: var(--f-mono); font-size: 12px;
+  }
+  .summary-stat { color: var(--ink2); }
+  .summary-stat strong { color: var(--ink); }
+  main { padding: 24px; }
+  .grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card.flagged { border-color: var(--accent); border-width: 2px; }
+  .card-img-wrap { position: relative; aspect-ratio: 1 / 1; background: var(--surface2); }
+  .card-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-img-wrap .skeleton {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-family: var(--f-mono); font-size: 11px;
+  }
+  .card-body { padding: 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card-addr {
+    font-weight: 500; font-size: 13px; color: var(--ink); line-height: 1.3;
+  }
+  .card-meta { color: var(--muted); font-size: 11px; font-family: var(--f-mono); }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 500; line-height: 1.5;
+    background: var(--surface2); color: var(--ink2); border: 1px solid var(--border);
+    text-transform: capitalize;
+  }
+  .pill.cond-excellent, .pill.cond-good { background: rgba(45,106,79,0.12); color: var(--green); border-color: var(--green); }
+  .pill.cond-fair { background: rgba(184,134,11,0.12); color: var(--gold); border-color: var(--gold); }
+  .pill.cond-poor { background: rgba(200,75,47,0.12); color: var(--red); border-color: var(--red); }
+  .pill.cond-unknown { background: var(--surface2); color: var(--muted); }
+  .pill.flag { background: rgba(200,75,47,0.08); color: var(--red); border-color: rgba(200,75,47,0.3); text-transform: none; }
+  .summary-text { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+  .card-actions {
+    display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .card-actions button { flex: 1; }
+  .empty {
+    text-align: center; padding: 80px 24px; color: var(--muted); font-family: var(--f-mono);
+  }
+  .auth-gate {
+    text-align: center; padding: 80px 24px;
+  }
+  .auth-gate input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--ink);
+    padding: 10px 14px; border-radius: 4px; font-family: var(--f-mono); width: 320px;
+    margin: 8px;
+  }
+  .error { color: var(--red); font-family: var(--f-mono); font-size: 12px; }
+  .agree-hint { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  details.disagreement-note { margin-top: 6px; }
+  details.disagreement-note summary { cursor: pointer; font-size: 11px; color: var(--accent); }
+  details.disagreement-note textarea {
+    width: 100%; min-height: 60px; margin-top: 6px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px; font-family: inherit; font-size: 12px; resize: vertical;
+  }
+  a.address-link { color: inherit; text-decoration: none; }
+  a.address-link:hover { color: var(--accent2); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Roof check audit</h1>
+  <div class="subtitle">Quick-scan AI roof analysis across many properties to find prompt failures</div>
+  <div class="controls">
+    <label>Sample
+      <select id="sample-mode">
+        <option value="random">Random</option>
+        <option value="topscore">Top by score</option>
+        <option value="bycounty">Diverse by county</option>
+      </select>
+    </label>
+    <label>Count
+      <input type="number" id="sample-count" value="20" min="1" max="100" step="1">
+    </label>
+    <label>State
+      <select id="state-filter">
+        <option value="">All</option>
+        <option value="VA">VA</option>
+        <option value="MD">MD</option>
+        <option value="DC">DC</option>
+      </select>
+    </label>
+    <button id="run-btn">Run audit</button>
+    <button id="export-btn" class="ghost" disabled>Export flagged</button>
+    <button id="clear-flags-btn" class="ghost" disabled>Clear flags</button>
+  </div>
+  <div class="summary" id="summary"></div>
+</header>
+
+<main>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty">Pick options above and click "Run audit" to start.</div>
+</main>
+
+<script>
+  const ROOF_API = 'https://nestscoop-api.ajbb705.workers.dev/api/roof/analyze';
+  const DATA_URL = 'data/foreclosures_va.json';
+  const GMAPS_KEY = 'AIzaSyCQ30TJv7O3hfNmbSS9GWVpmNBbx1WS6po';
+  const TOKEN_LS = 'fs_zillow_sync_token';
+  const FLAGS_LS = 'roof_audit_flags';
+  const CONCURRENCY = 4;
+
+  const $ = (id) => document.getElementById(id);
+  const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_LS) || '';
+  }
+
+  function getFlags() {
+    try { return JSON.parse(localStorage.getItem(FLAGS_LS) || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  function setFlag(propId, entry) {
+    const flags = getFlags();
+    if (entry === null) delete flags[propId];
+    else flags[propId] = { ...entry, updated_at: new Date().toISOString() };
+    localStorage.setItem(FLAGS_LS, JSON.stringify(flags));
+    refreshSummary();
+    $('export-btn').disabled = Object.keys(flags).length === 0;
+    $('clear-flags-btn').disabled = Object.keys(flags).length === 0;
+  }
+
+  function buildSatelliteUrl(lat, lng, zoom = 20, size = 600) {
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}x${size}&maptype=satellite&key=${GMAPS_KEY}`;
+  }
+
+  async function fetchSatelliteAsBase64(lat, lng) {
+    const url = buildSatelliteUrl(lat, lng);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`tile-${res.status}`);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return { b64: btoa(bin), satUrl: url };
+  }
+
+  async function analyzeRoof(prop, force = false) {
+    const lat = prop.lat || prop.latitude;
+    const lng = prop.lng || prop.longitude;
+    if (!lat || !lng) return { ok: false, reason: 'no-coords' };
+
+    try {
+      const { b64, satUrl } = await fetchSatelliteAsBase64(lat, lng);
+      const res = await fetch(ROOF_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': getToken() },
+        body: JSON.stringify({ prop_id: prop.id, image_base64: b64, force }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, reason: err.error || `http-${res.status}`, detail: err.detail, satUrl };
+      }
+      const body = await res.json();
+      return { ok: true, cached: body.cached, ageHours: body.ageHours, data: body.data, satUrl };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+
+  function pickSample(allProps, mode, count, state) {
+    let pool = allProps.filter(p => (p.lat || p.latitude) && (p.lng || p.longitude));
+    if (state) pool = pool.filter(p => (p.state || '').toUpperCase() === state);
+
+    if (mode === 'topscore') {
+      return pool.slice().sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, count);
+    }
+    if (mode === 'bycounty') {
+      const byCounty = {};
+      for (const p of pool) {
+        const c = p.county || 'Unknown';
+        if (!byCounty[c]) byCounty[c] = [];
+        byCounty[c].push(p);
+      }
+      const counties = Object.keys(byCounty);
+      const out = [];
+      let i = 0;
+      while (out.length < count && counties.length) {
+        const c = counties[i % counties.length];
+        const bucket = byCounty[c];
+        if (bucket.length) out.push(bucket.shift());
+        if (!bucket.length) counties.splice(counties.indexOf(c), 1);
+        else i++;
+      }
+      return out;
+    }
+    // random
+    const shuffled = pool.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, count);
+  }
+
+  function renderCardSkeleton(prop) {
+    const flags = getFlags();
+    const flagged = !!flags[prop.id];
+    const card = document.createElement('div');
+    card.className = 'card' + (flagged ? ' flagged' : '');
+    card.id = `card-${prop.id}`;
+    card.innerHTML = `
+      <div class="card-img-wrap">
+        <div class="skeleton">Loading…</div>
+      </div>
+      <div class="card-body">
+        <div class="card-addr">
+          <a class="address-link" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + ', ' + (prop.city || '') + ', ' + (prop.state || ''))}">
+            ${escapeHtml(prop.address || prop.id)}
+          </a>
+        </div>
+        <div class="card-meta">
+          ${escapeHtml(prop.county || '')} · ${escapeHtml(prop.state || '')} ·
+          ${prop.year_built || prop.yearBuilt || '?'} ·
+          ${prop.sqft ? prop.sqft.toLocaleString() + ' sqft' : '?'} ·
+          score ${prop.score ?? '?'}
+        </div>
+        <div class="result"></div>
+      </div>
+      <div class="card-actions">
+        <button class="ghost tiny rerun-btn">Re-run (force)</button>
+        <button class="ghost tiny flag-btn">${flagged ? '✓ Flagged' : 'Flag as wrong'}</button>
+      </div>
+    `;
+    return card;
+  }
+
+  function renderCardResult(card, prop, res) {
+    const imgWrap = card.querySelector('.card-img-wrap');
+    const result = card.querySelector('.result');
+    if (res.satUrl) {
+      imgWrap.innerHTML = `<img src="${res.satUrl}" alt="Satellite view of ${escapeHtml(prop.address)}" loading="lazy">`;
+    }
+    if (!res.ok) {
+      result.innerHTML = `<div class="error">${escapeHtml(res.reason || 'unknown error')}${res.detail ? '<br>' + escapeHtml(String(res.detail).slice(0, 200)) : ''}</div>`;
+      return;
+    }
+    const d = res.data || {};
+    const condClass = `cond-${d.condition || 'unknown'}`;
+    result.innerHTML = `
+      <div class="pills">
+        <span class="pill ${condClass}">${escapeHtml(d.condition || 'unknown')}${d.confidence && d.confidence !== 'high' ? ' · ' + escapeHtml(d.confidence) : ''}</span>
+        ${(d.materials || []).map(m => `<span class="pill">${escapeHtml(m)}</span>`).join('')}
+      </div>
+      ${(d.flags || []).length ? `
+        <div class="pills">
+          ${d.flags.map(f => `<span class="pill flag">⚠ ${escapeHtml(f)}</span>`).join('')}
+        </div>` : ''}
+      <div class="summary-text">${escapeHtml(d.summary || '')}</div>
+      <div class="card-meta">${res.cached ? `cached (${res.ageHours || 0}h ago)` : 'fresh'}</div>
+    `;
+  }
+
+  function refreshSummary() {
+    const flags = getFlags();
+    const flaggedCount = Object.keys(flags).length;
+    const cards = document.querySelectorAll('.card');
+    const conds = { excellent: 0, good: 0, fair: 0, poor: 0, unknown: 0, error: 0, pending: 0 };
+    cards.forEach(card => {
+      const pill = card.querySelector('.pill[class*="cond-"]');
+      if (!pill) {
+        if (card.querySelector('.error')) conds.error++;
+        else conds.pending++;
+        return;
+      }
+      for (const k of Object.keys(conds)) {
+        if (pill.classList.contains(`cond-${k}`)) { conds[k]++; break; }
+      }
+    });
+    $('summary').innerHTML = `
+      <span class="summary-stat"><strong>${cards.length}</strong> properties</span>
+      <span class="summary-stat">excellent: <strong>${conds.excellent}</strong></span>
+      <span class="summary-stat">good: <strong>${conds.good}</strong></span>
+      <span class="summary-stat">fair: <strong>${conds.fair}</strong></span>
+      <span class="summary-stat">poor: <strong>${conds.poor}</strong></span>
+      <span class="summary-stat">unknown: <strong>${conds.unknown}</strong></span>
+      ${conds.error ? `<span class="summary-stat" style="color:var(--red)">errors: <strong>${conds.error}</strong></span>` : ''}
+      ${conds.pending ? `<span class="summary-stat">pending: <strong>${conds.pending}</strong></span>` : ''}
+      ${flaggedCount ? `<span class="summary-stat" style="color:var(--accent)"><strong>${flaggedCount}</strong> flagged as wrong</span>` : ''}
+    `;
+  }
+
+  async function runWithConcurrency(items, fn, limit) {
+    const queue = items.slice();
+    const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        await fn(item);
+      }
+    });
+    await Promise.all(workers);
+  }
+
+  let allProps = [];
+
+  async function init() {
+    if (!getToken()) {
+      $('grid').innerHTML = `
+        <div class="auth-gate" style="grid-column: 1/-1">
+          <p>Paste your Nestscoop sync token to enable the audit.</p>
+          <input id="token-input" type="password" placeholder="sync token" autocomplete="off">
+          <br><button id="token-save">Save</button>
+        </div>`;
+      $('empty').style.display = 'none';
+      $('token-save').onclick = () => {
+        const v = $('token-input').value.trim();
+        if (v) { localStorage.setItem(TOKEN_LS, v); location.reload(); }
+      };
+      return;
+    }
+
+    try {
+      const res = await fetch(DATA_URL);
+      const data = await res.json();
+      allProps = data.foreclosures || data.properties || [];
+      $('empty').textContent = `Loaded ${allProps.length} properties. Pick options above and click "Run audit".`;
+    } catch (err) {
+      $('empty').innerHTML = `<span class="error">Failed to load property data: ${escapeHtml(err.message)}</span>`;
+    }
+
+    refreshSummary();
+  }
+
+  $('run-btn').onclick = async () => {
+    const mode = $('sample-mode').value;
+    const count = parseInt($('sample-count').value, 10) || 20;
+    const state = $('state-filter').value;
+    const sample = pickSample(allProps, mode, count, state);
+    if (!sample.length) {
+      $('empty').textContent = 'No properties matched the filters.';
+      return;
+    }
+    $('empty').style.display = 'none';
+    $('grid').innerHTML = '';
+    sample.forEach(p => $('grid').appendChild(renderCardSkeleton(p)));
+    refreshSummary();
+    $('run-btn').disabled = true;
+    $('run-btn').textContent = 'Running…';
+
+    await runWithConcurrency(sample, async (prop) => {
+      const card = $(`card-${prop.id}`);
+      const res = await analyzeRoof(prop);
+      if (card) {
+        renderCardResult(card, prop, res);
+        refreshSummary();
+      }
+    }, CONCURRENCY);
+
+    $('run-btn').disabled = false;
+    $('run-btn').textContent = 'Run audit';
+  };
+
+  // Per-card actions (delegated)
+  $('grid').addEventListener('click', async (e) => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const propId = card.id.replace(/^card-/, '');
+    const prop = allProps.find(p => p.id === propId);
+    if (!prop) return;
+
+    if (e.target.classList.contains('rerun-btn')) {
+      const result = card.querySelector('.result');
+      result.innerHTML = '<div class="card-meta">Re-running…</div>';
+      const res = await analyzeRoof(prop, true);
+      renderCardResult(card, prop, res);
+      refreshSummary();
+    }
+
+    if (e.target.classList.contains('flag-btn')) {
+      const flags = getFlags();
+      if (flags[propId]) {
+        setFlag(propId, null);
+        card.classList.remove('flagged');
+        e.target.textContent = 'Flag as wrong';
+      } else {
+        const note = prompt('Why is the AI wrong here? (e.g., "called metal roof asphalt", "missed obvious tarp")') || '';
+        setFlag(propId, {
+          address: prop.address,
+          ai_data: card.querySelector('.summary-text')?.textContent || '',
+          ai_condition: card.querySelector('.pill[class*="cond-"]')?.textContent || '',
+          note,
+        });
+        card.classList.add('flagged');
+        e.target.textContent = '✓ Flagged';
+      }
+    }
+  });
+
+  $('export-btn').onclick = () => {
+    const flags = getFlags();
+    const blob = new Blob([JSON.stringify(flags, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `roof-audit-flags-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+  };
+
+  $('clear-flags-btn').onclick = () => {
+    if (confirm('Clear all flagged disagreements?')) {
+      localStorage.removeItem(FLAGS_LS);
+      document.querySelectorAll('.card.flagged').forEach(c => {
+        c.classList.remove('flagged');
+        const btn = c.querySelector('.flag-btn');
+        if (btn) btn.textContent = 'Flag as wrong';
+      });
+      refreshSummary();
+      $('export-btn').disabled = true;
+      $('clear-flags-btn').disabled = true;
+    }
+  };
+
+  // Update button states on load
+  refreshSummary();
+  if (Object.keys(getFlags()).length) {
+    $('export-btn').disabled = false;
+    $('clear-flags-btn').disabled = false;
+  }
+
+  init();
+</script>
+
+</body>
+</html>
