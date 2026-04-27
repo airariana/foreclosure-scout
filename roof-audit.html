@@ -210,7 +210,15 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        return { ok: false, reason: err.error || `http-${res.status}`, detail: err.detail, satUrl };
+        return {
+          ok: false,
+          reason: err.error || `http-${res.status}`,
+          detail: err.detail,
+          raw: err.raw,
+          finishReason: err.finishReason,
+          blockReason: err.blockReason,
+          satUrl,
+        };
       }
       const body = await res.json();
       return { ok: true, cached: body.cached, ageHours: body.ageHours, data: body.data, satUrl };
@@ -293,7 +301,12 @@
       imgWrap.innerHTML = `<img src="${res.satUrl}" alt="Satellite view of ${escapeHtml(prop.address)}" loading="lazy">`;
     }
     if (!res.ok) {
-      result.innerHTML = `<div class="error">${escapeHtml(res.reason || 'unknown error')}${res.detail ? '<br>' + escapeHtml(String(res.detail).slice(0, 200)) : ''}</div>`;
+      const bits = [escapeHtml(res.reason || 'unknown error')];
+      if (res.finishReason) bits.push(`<span class="card-meta">finish: ${escapeHtml(res.finishReason)}</span>`);
+      if (res.blockReason) bits.push(`<span class="card-meta">blocked: ${escapeHtml(res.blockReason)}</span>`);
+      if (res.raw) bits.push(`<details><summary class="card-meta">raw output</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;background:var(--surface2);padding:6px;border-radius:4px;margin-top:4px">${escapeHtml(String(res.raw).slice(0, 800))}</pre></details>`);
+      if (res.detail) bits.push(`<details><summary class="card-meta">detail</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;background:var(--surface2);padding:6px;border-radius:4px;margin-top:4px">${escapeHtml(String(res.detail).slice(0, 600))}</pre></details>`);
+      result.innerHTML = `<div class="error">${bits.join('<br>')}</div>`;
       return;
     }
     const d = res.data || {};
@@ -435,10 +448,17 @@
         e.target.textContent = 'Flag as wrong';
       } else {
         const note = prompt('Why is the AI wrong here? (e.g., "called metal roof asphalt", "missed obvious tarp")') || '';
+        const errEl = card.querySelector('.error');
+        const rawEl = card.querySelector('details pre');
         setFlag(propId, {
           address: prop.address,
+          county: prop.county,
+          state: prop.state,
           ai_data: card.querySelector('.summary-text')?.textContent || '',
           ai_condition: card.querySelector('.pill[class*="cond-"]')?.textContent || '',
+          ai_flags: Array.from(card.querySelectorAll('.pill.flag')).map(p => p.textContent.replace(/^⚠\s*/, '')),
+          error: errEl ? errEl.textContent.slice(0, 200) : '',
+          raw_output: rawEl ? rawEl.textContent.slice(0, 800) : '',
           note,
         });
         card.classList.add('flagged');
