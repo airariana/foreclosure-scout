@@ -1004,7 +1004,10 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        return { ok: false, reason: err.error || `http-${res.status}` };
+        const reason = err.detail
+          ? `${err.error || `http-${res.status}`} — ${err.detail}`
+          : (err.error || `http-${res.status}`);
+        return { ok: false, reason };
       }
       const body = await res.json();
       return { ok: true, cached: body.cached, data: body.data, satUrl };
