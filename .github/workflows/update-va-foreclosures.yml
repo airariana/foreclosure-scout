@@ -37,7 +37,7 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add data/foreclosures_va.json data/enrichment_cache.json data/enrichment_retry.json
+        git add data/foreclosures_va.json
 
         # Only commit if there are changes
         if git diff --staged --quiet; then
