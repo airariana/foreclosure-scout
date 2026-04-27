@@ -4321,6 +4321,11 @@ Return ONLY the 2-sentence analysis.`,
     }
   }
 
+  // Module-level cache so the Judgment-search button can read the owner
+  // name even though the lien section renders before the assessor section
+  // resolves (assessor is an async fetch).
+  const assessorIntelCache = new Map();
+
   async function wireDrawerAssessor(p) {
     if (!assessorJurisdiction(p)) return;
     const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
@@ -4337,8 +4342,28 @@ Return ONLY the 2-sentence analysis.`,
       container.innerHTML = `<span style="color:var(--muted)">Assessor data unavailable: ${escapeHtml(res.reason)}</span>`;
       return;
     }
+    assessorIntelCache.set(p.id, res.data);
+    // Refresh the judgment-search hint now that we know the owner.
+    const hintEl = document.getElementById(`fc-judgment-hint-${sid}`);
+    if (hintEl && res.data && res.data.owner_name) {
+      hintEl.textContent = `Search owner: ${res.data.owner_name}`;
+      hintEl.dataset.owner = res.data.owner_name;
+    }
     renderAssessorIntel(container, p, res.data);
   }
+
+  // Click handler for the Judgment search button. Opens the state-specific
+  // court portal in a new tab AND copies the property owner's name to the
+  // clipboard (when available from assessor cache) so the user can paste
+  // straight into the search form instead of typing it.
+  window.fcOpenJudgmentSearch = function(propId, portalUrl) {
+    const intel = assessorIntelCache.get(propId);
+    const ownerName = (intel && intel.owner_name) ? String(intel.owner_name).trim() : '';
+    if (ownerName && navigator.clipboard) {
+      navigator.clipboard.writeText(ownerName).catch(() => {});
+    }
+    window.open(portalUrl, '_blank', 'noopener');
+  };
 
   // ── Title & Liens: deep-links + manually-entered findings ─────────────
   // Surfaces the county deeds/land-records URL + a Google search for
@@ -4352,8 +4377,17 @@ Return ONLY the 2-sentence analysis.`,
     const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
     const sid = sanitizedId; // shorthand for id template keys
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
-    const q = encodeURIComponent(fullAddress);
-    const judgmentSearch = `https://www.google.com/search?q=${q}+site:courtlistener.com+OR+"judgment"+OR+"lien"`;
+    // Per-state court portal where civil judgments + tax-lien dockets live.
+    // Generic Google search was useless — it scattergun-matched any page with
+    // "judgment" or "lien" anywhere on it. These are the actual systems of
+    // record. All three have CAPTCHAs so we can't pre-fill the search; the
+    // best we can do is open the portal + copy the owner name to clipboard.
+    const stateUp = (p.state || '').toUpperCase();
+    const judgmentPortal =
+      stateUp === 'VA' ? 'https://eapps.courts.state.va.us/ocis/' :
+      stateUp === 'DC' ? 'https://eaccess.dccourts.gov/eaccess/' :
+      stateUp === 'MD' ? 'https://casesearch.courts.state.md.us/casesearch/' :
+      null;
     const taxSearchDC = p.state === 'DC' ? `https://mytax.dc.gov/_/` : null;
     const taxSearchMD = p.state === 'MD' ? `https://sdat.dat.maryland.gov/RealProperty/` : null;
 
@@ -4393,14 +4427,37 @@ Return ONLY the 2-sentence analysis.`,
         </div>
       </div>` : '';
 
+    // Judgment search: state-aware portal + auto-copies owner name to
+    // clipboard at click time (read from assessorIntelCache when available).
+    // The hint line below the button row updates from wireDrawerAssessor
+    // once the owner name is known so the user knows what was copied.
+    const judgmentBtnHtml = judgmentPortal
+      ? `<button class="fc-btn fc-btn-sm" type="button"
+                 onclick="window.fcOpenJudgmentSearch('${escapeAttr(p.id)}', '${escapeAttr(judgmentPortal)}')">
+           Judgment search ↗
+         </button>`
+      : '';
+    const judgmentLabelText = stateUp === 'VA'
+      ? 'VA OCIS · Circuit Court · search by name'
+      : stateUp === 'DC'
+        ? 'DC Courts eAccess · search by name'
+        : stateUp === 'MD'
+          ? 'MD Casesearch · search by name'
+          : '';
+    const judgmentHintHtml = judgmentPortal ? `
+      <div id="fc-judgment-hint-${sid}" style="font-size:11px;color:var(--muted);margin:-6px 0 12px 0;font-family:var(--f-mono)">
+        ${escapeHtml(judgmentLabelText)} — owner name auto-copies on click.
+      </div>` : '';
+
     const links = `
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
         ${isArlington ? '' : linkBtn('Deeds / Land records', portals.deeds)}
         ${linkBtn('Assessor', portals.assessor)}
-        ${linkBtn('Judgment search', judgmentSearch)}
+        ${judgmentBtnHtml}
         ${taxSearchDC ? linkBtn('DC tax liens', taxSearchDC) : ''}
         ${taxSearchMD ? linkBtn('MD SDAT tax', taxSearchMD) : ''}
       </div>
+      ${judgmentHintHtml}
       ${arlingtonNote}
     `;
 
