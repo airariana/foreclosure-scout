@@ -1251,6 +1251,19 @@ def run(gmaps_key: str = "") -> dict:
     import os
     api_key = gmaps_key or os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
+    # Load previous output once — used for both the new/updated diff and the
+    # safety guard that aborts on suspicious property-count collapses.
+    previous: dict = {}
+    prev_by_id: dict[str, dict] = {}
+    if OUTPUT_PATH.exists():
+        try:
+            previous = json.loads(OUTPUT_PATH.read_text())
+            prev_by_id = {p.get("id"): p for p in previous.get("foreclosures", []) if p.get("id")}
+        except Exception as e:
+            log.warning(f"Could not parse previous output for diff: {e}")
+            previous = {}
+            prev_by_id = {}
+
     # Scrape all sources
     all_props = []
     all_props.extend(scrape_siw())
@@ -1338,6 +1351,44 @@ def run(gmaps_key: str = "") -> dict:
         if p.get("sqft") is None:  p["sqft"] = 0
         if p.get("yearBuilt") is None: p["yearBuilt"] = p.get("year_built")
 
+    # ── New / updated tracking ─────────────────────────────────────────────
+    # Persist first_seen_at and last_changed_at so the frontend can highlight
+    # listings that newly entered the inventory or whose key fields shifted
+    # since the prior run. Server-authoritative (same answer on every device).
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    # Fields whose change implies "this listing changed materially". Sale-date
+    # shifts, status flips, and price signals are the meaningful diffs;
+    # scraped_at obviously updates every run and is excluded.
+    DIFF_FIELDS = (
+        "sale_date", "sale_date_raw", "sale_time", "sale_location",
+        "status", "listingType", "address", "city", "zip_code",
+    )
+    PRICING_DIFF_FIELDS = ("opening_bid", "original_loan", "eav", "arv")
+
+    new_count = 0
+    updated_count = 0
+    for p in all_props:
+        prev = prev_by_id.get(p.get("id"))
+        if prev is None:
+            p["first_seen_at"] = now_iso
+            p["last_changed_at"] = now_iso
+            new_count += 1
+            continue
+        # Existing property — preserve first_seen, decide if anything changed
+        p["first_seen_at"] = prev.get("first_seen_at") or now_iso
+        changed = any(p.get(f) != prev.get(f) for f in DIFF_FIELDS)
+        if not changed:
+            cur_pr = p.get("pricing") or {}
+            old_pr = prev.get("pricing") or {}
+            changed = any(cur_pr.get(f) != old_pr.get(f) for f in PRICING_DIFF_FIELDS)
+        if changed:
+            p["last_changed_at"] = now_iso
+            updated_count += 1
+        else:
+            p["last_changed_at"] = prev.get("last_changed_at") or p["first_seen_at"]
+    log.info(f"Diff vs prior run: {new_count} new, {updated_count} updated, "
+             f"{len(all_props) - new_count - updated_count} unchanged")
+
     # Build output
     high_conf = sum(1 for p in all_props if "HIGH" in p["pricing"]["confidence"])
     med_conf  = sum(1 for p in all_props if "MEDIUM" in p["pricing"]["confidence"])
@@ -1360,6 +1411,8 @@ def run(gmaps_key: str = "") -> dict:
         "metadata": {
             "total_properties":     len(all_props),
             "scraped_at":           datetime.utcnow().isoformat() + "Z",
+            "new_this_run":         new_count,
+            "updated_this_run":     updated_count,
             "sources":              sources,
             "states":               states,
             "counties_covered":     len(counties),
@@ -1380,29 +1433,23 @@ def run(gmaps_key: str = "") -> dict:
     }
 
     # Safety guard: refuse to clobber existing data on a suspicious collapse.
-    # A real scrape should produce a similar order-of-magnitude count week to week;
-    # a sudden drop to 0 (or below half) almost always means a source broke, not
-    # that foreclosures stopped happening.
-    if OUTPUT_PATH.exists():
-        try:
-            previous = json.loads(OUTPUT_PATH.read_text())
-            prev_total = previous.get("metadata", {}).get("total_properties", 0)
-        except Exception:
-            prev_total = 0
-
-        if len(all_props) == 0 and prev_total > 0:
-            log.error(
-                f"ABORT: scrape returned 0 properties but previous run had {prev_total}. "
-                "Refusing to overwrite data. Investigate the source scrapers."
-            )
-            return previous
-        if prev_total >= 10 and len(all_props) < prev_total * 0.5:
-            log.error(
-                f"ABORT: scrape returned {len(all_props)} properties, "
-                f"a >50% drop from previous {prev_total}. Refusing to overwrite. "
-                "Investigate the source scrapers."
-            )
-            return previous
+    # A real scrape should produce a similar order-of-magnitude count week to
+    # week; a sudden drop to 0 (or below half) almost always means a source
+    # broke, not that foreclosures stopped happening.
+    prev_total = previous.get("metadata", {}).get("total_properties", 0)
+    if len(all_props) == 0 and prev_total > 0:
+        log.error(
+            f"ABORT: scrape returned 0 properties but previous run had {prev_total}. "
+            "Refusing to overwrite data. Investigate the source scrapers."
+        )
+        return previous
+    if prev_total >= 10 and len(all_props) < prev_total * 0.5:
+        log.error(
+            f"ABORT: scrape returned {len(all_props)} properties, "
+            f"a >50% drop from previous {prev_total}. Refusing to overwrite. "
+            "Investigate the source scrapers."
+        )
+        return previous
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(output, indent=2, default=str))

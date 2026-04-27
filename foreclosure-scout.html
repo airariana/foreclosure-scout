@@ -221,6 +221,11 @@ header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-i
 .list-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2);}
 .list-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2);}
 .sort-select{padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink2);cursor:pointer;outline:none;}
+.whats-new-chip{padding:4px 9px;background:var(--bg);border:1px solid var(--green);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--green);cursor:pointer;outline:none;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-right:4px;transition:background 0.15s,color 0.15s;}
+.whats-new-chip:hover{background:rgba(45,106,79,0.08);}
+.whats-new-chip.active{background:var(--green);color:#fff;}
+.whats-new-chip span{margin-left:4px;padding:1px 5px;background:rgba(0,0,0,0.08);border-radius:8px;font-weight:700;}
+.whats-new-chip.active span{background:rgba(255,255,255,0.25);}
 .list-scroll{flex:1;overflow-y:auto;padding:10px;}
 .list-scroll::-webkit-scrollbar{width:4px;}
 .list-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
@@ -230,7 +235,11 @@ header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-i
 @keyframes cardIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
 .prop-card:hover{border-color:var(--accent2);box-shadow:0 2px 8px rgba(42,100,150,0.1);}
 .prop-card.selected{border-color:var(--accent);border-left:3px solid var(--accent);background:#fff8f6;}
+.prop-card.new-listing{border-left:3px solid var(--green);}
 .prop-card.new-listing::after{content:'NEW';position:absolute;top:10px;right:10px;background:var(--green);color:white;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 6px;border-radius:2px;letter-spacing:1px;}
+.prop-card.updated-listing{border-left:3px solid var(--gold);}
+.prop-card.updated-listing::after{content:'UPDATED';position:absolute;top:10px;right:10px;background:var(--gold);color:white;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 6px;border-radius:2px;letter-spacing:1px;}
+.prop-card.new-listing.selected,.prop-card.updated-listing.selected{border-left-color:var(--accent);}
 .card-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
 .card-price{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.5px;color:var(--ink);line-height:1;}
 .card-source{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--muted);}
@@ -1135,7 +1144,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=72"></script>
+<script src="fc-dashboard.js?v=73"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1225,6 +1234,7 @@ header,
   <div class="list-panel">
     <div class="list-header">
       <span class="list-title" id="listCount">0 Properties</span>
+      <button id="whatsNewChip" onclick="toggleWhatsNew()" class="whats-new-chip" style="display:none">What's new <span id="whatsNewCount">0</span></button>
       <button onclick="exportCSV()" class="export-btn export-csv" style="font-size:9px;padding:4px 10px;margin-right:4px">↓ CSV</button>
       <select class="sort-select" onchange="sortAndRender(this.value)">
         <option value="score">Best Score</option><option value="price-asc">Price ↑</option>
@@ -2684,13 +2694,24 @@ Example: [{"id":"prop-1","address":"123 Main St","city":"Baltimore","state":"MD"
       const refiLoan=Math.round(p.arv*0.75);
       const cashLeft=Math.max(0,(p.price+p.rehabEstimate)-refiLoan);
       const coc=cashLeft>0?((cashFlow*12/cashLeft)*100).toFixed(0):'∞';
-      const isNew=!SEEN_IDS.has(p.id);
-      const base={...p,cashFlow,capRate,discount,refiLoan,cashLeft,coc,isNew,enriched:false,rentSource:'AI',taxSource:'AI'};
+      // Server-authoritative recency: scrape stamps first_seen_at and
+      // last_changed_at per property. Anything seen <=NEW_WINDOW_DAYS ago is
+      // "new"; anything changed in that window (and not brand-new) is
+      // "updated". Falls back to per-device SEEN_IDS for old data files.
+      const NEW_WINDOW_MS=7*24*3600*1000;
+      const fsAt=p.first_seen_at?Date.parse(p.first_seen_at):NaN;
+      const lcAt=p.last_changed_at?Date.parse(p.last_changed_at):NaN;
+      const ageNew=isFinite(fsAt)?(Date.now()-fsAt):Infinity;
+      const ageChg=isFinite(lcAt)?(Date.now()-lcAt):Infinity;
+      const isNew=isFinite(fsAt)?(ageNew<=NEW_WINDOW_MS):!SEEN_IDS.has(p.id);
+      const isUpdated=isFinite(lcAt)&&!isNew&&(ageChg<=NEW_WINDOW_MS);
+      const base={...p,cashFlow,capRate,discount,refiLoan,cashLeft,coc,isNew,isUpdated,enriched:false,rentSource:'AI',taxSource:'AI'};
       base.score=recalcDealScore(base);
       return base;
     });
 
     allProperties.forEach(p=>SEEN_IDS.add(p.id));
+    refreshWhatsNewChip();
     localStorage.setItem('fs_seen',JSON.stringify([...SEEN_IDS]));
     applyFilters(); checkAlerts();
 
@@ -2735,6 +2756,7 @@ function applyFilters(){
     if(filterState.price < 750000 && p.price > filterState.price) return false;
     if(filterState.cf > -490 && p.cashFlow < filterState.cf) return false;
     if(filterState.beds > 0 && p.beds < filterState.beds) return false;
+    if(window.onlyWhatsNew && !p.isNew && !p.isUpdated) return false;
     if(bool)return boolMatch(p,bool); return true;
   });
   sortAndRender('score'); updateStats(); renderMarkers();
@@ -2747,13 +2769,34 @@ function boolMatch(prop,query){
 
 function sortAndRender(by){
   const arr=[...filteredProperties];
-  if(by==='score')arr.sort((a,b)=>b.score-a.score);
-  else if(by==='price-asc')arr.sort((a,b)=>a.price-b.price);
-  else if(by==='price-desc')arr.sort((a,b)=>b.price-a.price);
-  else if(by==='cf')arr.sort((a,b)=>b.cashFlow-a.cashFlow);
-  else if(by==='cap')arr.sort((a,b)=>parseFloat(b.capRate)-parseFloat(a.capRate));
-  else if(by==='new')arr.sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
+  // Always pre-bias new+updated to the top regardless of secondary sort —
+  // the scrape just landed and these are the actionable changes. Tie-breaks
+  // by the user-selected sort below.
+  const _changeRank=(p)=>p.isNew?2:(p.isUpdated?1:0);
+  if(by==='score')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(b.score-a.score));
+  else if(by==='price-asc')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(a.price-b.price));
+  else if(by==='price-desc')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(b.price-a.price));
+  else if(by==='cf')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(b.cashFlow-a.cashFlow));
+  else if(by==='cap')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(parseFloat(b.capRate)-parseFloat(a.capRate)));
+  else if(by==='new')arr.sort((a,b)=>(_changeRank(b)-_changeRank(a))||(b.score-a.score));
   renderList(arr);
+}
+
+// "What's new" filter chip — counts isNew + isUpdated and toggles
+// `window.onlyWhatsNew`. Hidden when there's nothing new this week.
+function refreshWhatsNewChip(){
+  const chip=document.getElementById('whatsNewChip');
+  if(!chip)return;
+  const n=allProperties.filter(p=>p.isNew||p.isUpdated).length;
+  if(!n){chip.style.display='none';window.onlyWhatsNew=false;chip.classList.remove('active');return;}
+  chip.style.display='';
+  document.getElementById('whatsNewCount').textContent=n;
+  chip.classList.toggle('active',!!window.onlyWhatsNew);
+}
+function toggleWhatsNew(){
+  window.onlyWhatsNew=!window.onlyWhatsNew;
+  refreshWhatsNewChip();
+  if(typeof applyFilters==='function')applyFilters();
 }
 
 function renderList(arr){
@@ -2769,7 +2812,7 @@ function renderList(arr){
       p.taxSource==='Estated'?'<span class="eb eb-estated">ESTATED</span>':'',
       p.courtFilings?'<span class="eb eb-court">COURT</span>':''
     ].filter(Boolean).join('');
-    return`<div class="prop-card ${selectedId===p.id?'selected':''} ${p.isNew?'new-listing':''}" onclick="selectProperty('${p.id}')" style="animation-delay:${i*0.04}s">
+    return`<div class="prop-card ${selectedId===p.id?'selected':''} ${p.isNew?'new-listing':p.isUpdated?'updated-listing':''}" onclick="selectProperty('${p.id}')" style="animation-delay:${i*0.04}s">
       <div class="card-row1"><div class="card-price">$${p.price.toLocaleString()}</div><div class="card-source">${p.source}</div></div>
       <div class="card-address">${p.address}</div>
       <div class="card-city">${p.city}, ${p.state} ${p.zip} · ${p.beds}bd/${p.baths}ba · ${(p.sqft||0).toLocaleString()}sf</div>
