@@ -4451,10 +4451,25 @@ Return ONLY the 2-sentence analysis.`,
     // entry points; deeper county-specific links could be added later.
     const taxSearchDC = p.state === 'DC' ? `https://mytax.dc.gov/_/` : null;
     const taxSearchMD = p.state === 'MD' ? `https://sdat.dat.maryland.gov/RealProperty/` : null;
+    // Per-county direct treasurer / RE tax portals when known. Falls back
+    // to a Google query for unmapped counties so the button still works.
+    const VA_TREASURER_URLS = {
+      'Arlington County':       'https://taxes.arlingtonva.us/RealEstate/Search',
+      'Fairfax County':         'https://icare.fairfaxcounty.gov/ffxcare/search/CommonSearch.aspx?mode=realtaxes',
+      'Fairfax City':           'https://www.fairfaxva.gov/government/finance/real-estate-tax-rates-due-dates',
+      'Loudoun County':         'https://www.loudoun.gov/2153/Pay-Real-Estate-Tax-Online',
+      'Prince William County':  'https://www.pwcva.gov/department/finance/real-estate-assessments',
+      'Stafford County':        'https://www.staffordcountyva.gov/186/Treasurer',
+      'Spotsylvania County':    'https://www.spotsylvania.va.us/171/Treasurer',
+      'Alexandria City':        'https://www.alexandriava.gov/Finance',
+      'Manassas City':          'https://www.manassascity.org/169/Real-Estate-Assessment',
+      'Manassas Park City':     'https://www.cityofmanassaspark.us/180/Treasurer',
+      'Falls Church City':      'https://www.fallschurchva.gov/1078/Treasurer',
+      'Fauquier County':        'https://www.fauquiercounty.gov/government/departments-h-z/treasurer',
+    };
     const taxSearchVA = stateUp === 'VA'
-      ? (p.county === 'Arlington County' ? 'https://taxes.arlingtonva.us/RealEstate/Search'
-        : p.county === 'Fairfax County'  ? 'https://icare.fairfaxcounty.gov/ffxcare/search/CommonSearch.aspx?mode=realtaxes'
-        : `https://www.google.com/search?q=${encodeURIComponent((p.county || '') + ' VA real estate tax payment portal')}`)
+      ? (VA_TREASURER_URLS[p.county]
+          || `https://www.google.com/search?q=${encodeURIComponent((p.county || '') + ' VA real estate tax payment portal')}`)
       : null;
 
     const v = (k, def='') => saved[k] != null ? saved[k] : def;
