@@ -221,6 +221,10 @@ header{background:var(--ink);color:var(--bg);padding:0 32px;display:flex;align-i
 .list-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2);}
 .list-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2);}
 .sort-select{padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink2);cursor:pointer;outline:none;}
+.list-quickfilters{display:flex;gap:6px;padding:8px 14px 8px;border-bottom:1px solid var(--border);background:var(--surface2);flex-wrap:wrap;}
+.qf-select{flex:1 1 100px;min-width:100px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink2);cursor:pointer;outline:none;}
+.qf-select:focus{border-color:var(--accent2);}
+.qf-select.active{border-color:var(--accent);background:#fff8f6;color:var(--accent);font-weight:600;}
 .whats-new-chip{padding:4px 9px;background:var(--bg);border:1px solid var(--green);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--green);cursor:pointer;outline:none;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-right:4px;transition:background 0.15s,color 0.15s;}
 .whats-new-chip:hover{background:rgba(45,106,79,0.08);}
 .whats-new-chip.active{background:var(--green);color:#fff;}
@@ -1144,7 +1148,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=83"></script>
+<script src="fc-dashboard.js?v=84"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1240,6 +1244,32 @@ header,
         <option value="score">Best Score</option><option value="price-asc">Price ↑</option>
         <option value="price-desc">Price ↓</option><option value="cf">Cash Flow ↓</option>
         <option value="cap">Cap Rate ↓</option><option value="new">Newest</option>
+      </select>
+    </div>
+    <!-- Quick-filter row: single-select shortcuts mirroring the sidebar chips
+         for the three most-used filter dimensions. Single dropdown change
+         REPLACES the matching chip selection; the sidebar chips remain the
+         multi-select power tool. -->
+    <div class="list-quickfilters">
+      <select class="qf-select" id="qfListingType" onchange="quickFilterChange('types', this.value)">
+        <option value="">All Listing Types</option>
+        <option value="Auction">Auction</option>
+        <option value="REO/Bank-Owned">REO / Bank-Owned</option>
+        <option value="HUD Home">HUD Home</option>
+        <option value="Pre-Foreclosure">Pre-Foreclosure</option>
+        <option value="Short Sale">Short Sale</option>
+      </select>
+      <select class="qf-select" id="qfPropertyType" onchange="quickFilterChange('propertyTypes', this.value)">
+        <option value="">All Property Types</option>
+        <option value="Single Family">Single Family</option>
+        <option value="Townhouse">Townhouse</option>
+        <option value="Condo">Condo</option>
+        <option value="Multi-Family">Multi-Family</option>
+        <option value="Mobile Home">Mobile Home</option>
+        <option value="Land">Land</option>
+      </select>
+      <select class="qf-select" id="qfSource" onchange="quickFilterChange('sources', this.value)">
+        <option value="">All Sources</option>
       </select>
     </div>
     <div class="list-scroll" id="propList">
@@ -2723,6 +2753,7 @@ Example: [{"id":"prop-1","address":"123 Main St","city":"Baltimore","state":"MD"
 
     allProperties.forEach(p=>SEEN_IDS.add(p.id));
     refreshWhatsNewChip();
+    refreshSourceQuickFilter();
     localStorage.setItem('fs_seen',JSON.stringify([...SEEN_IDS]));
     applyFilters(); checkAlerts();
 
@@ -2805,6 +2836,48 @@ function refreshWhatsNewChip(){
   document.getElementById('whatsNewCount').textContent=n;
   chip.classList.toggle('active',!!window.onlyWhatsNew);
 }
+// ── Quick-filter dropdowns (top of list panel) ──────────────────────────
+// Each dropdown is a single-select shortcut for the three most-used
+// filter dimensions. Selecting a value REPLACES the matching filterState
+// set with just that one value (or clears it on "All"). The sidebar chips
+// remain the multi-select power tool.
+function quickFilterChange(group, value){
+  const setName = group; // 'types' / 'propertyTypes' / 'sources'
+  if(!filterState[setName]) filterState[setName] = new Set();
+  filterState[setName].clear();
+  if(value) filterState[setName].add(value);
+
+  // Mirror to chip UI so opening the sidebar shows consistent state.
+  const chipRowId = group === 'types' ? 'chips-type'
+                  : group === 'propertyTypes' ? 'chips-property-type'
+                  : group === 'sources' ? 'chips-source' : null;
+  if(chipRowId){
+    document.querySelectorAll(`#${chipRowId} .chip`).forEach(c => {
+      c.classList.toggle('active', value && c.dataset.val === value);
+    });
+  }
+  // Visual emphasis on the dropdown when a filter is active.
+  const sel = document.getElementById(group === 'types' ? 'qfListingType'
+                                  : group === 'propertyTypes' ? 'qfPropertyType'
+                                  : 'qfSource');
+  if(sel) sel.classList.toggle('active', !!value);
+
+  if(typeof updateActiveFilterCount === 'function') updateActiveFilterCount();
+  if(typeof updateFilterTags === 'function') updateFilterTags();
+  if(allProperties.length) applyFilters();
+}
+
+// Populate the Source dropdown from whatever sources actually exist in
+// the loaded data — keeps the menu accurate as new sources land.
+function refreshSourceQuickFilter(){
+  const sel = document.getElementById('qfSource');
+  if(!sel) return;
+  const current = sel.value;
+  const sources = [...new Set(allProperties.map(p => p.source).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All Sources</option>'
+    + sources.map(s => `<option value="${s.replace(/"/g,'&quot;')}"${s===current?' selected':''}>${s}</option>`).join('');
+}
+
 function toggleWhatsNew(){
   window.onlyWhatsNew=!window.onlyWhatsNew;
   refreshWhatsNewChip();
