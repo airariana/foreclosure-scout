@@ -189,7 +189,10 @@ def _to_property(a: dict) -> dict | None:
         tags.append("Tenant Occupied")
 
     reo_id = a.get("reoId") or ""
-    detail_url = f"https://homepath.fanniemae.com/property-details/{a.get('propertyUuid','')}" if a.get("propertyUuid") else "https://homepath.fanniemae.com/property-finder"
+    # HomePath's SPA does not expose stable per-property permalinks —
+    # /property-details/{uuid} silently redirects to /404. Save the search
+    # page as the source URL so the frontend deep-link doesn't break.
+    detail_url = "https://homepath.fanniemae.com/property-finder"
 
     return {
         "id":               _make_id(reo_id, address, state),

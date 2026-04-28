@@ -4599,6 +4599,17 @@ Return ONLY the 2-sentence analysis.`,
   // court portal in a new tab AND copies the property owner's name to the
   // clipboard (when available from assessor cache) so the user can paste
   // straight into the search form instead of typing it.
+  // Open a URL in a new tab AND copy a string to the clipboard. Used by the
+  // HomePath cross-platform deep-link, since HomePath has no stable per-
+  // property URLs — we open the search page and pre-load the user's
+  // clipboard with the address so they can paste straight into the search.
+  window.fcOpenWithAddressCopy = function(url, address) {
+    if (address && navigator.clipboard) {
+      navigator.clipboard.writeText(address).catch(() => {});
+    }
+    window.open(url, '_blank', 'noopener');
+  };
+
   window.fcOpenJudgmentSearch = function(propId, portalUrl) {
     const intel = assessorIntelCache.get(propId);
     const ownerName = (intel && intel.owner_name) ? String(intel.owner_name).trim() : '';
@@ -4932,9 +4943,13 @@ Return ONLY the 2-sentence analysis.`,
         key: 'homepath',
         name: 'HomePath',
         original: source === 'homepath',
-        url: source === 'homepath' && p.source_url
-          ? p.source_url
-          : 'https://homepath.fanniemae.com/property-finder',
+        // HomePath's SPA does NOT expose stable per-property permalinks —
+        // /property-details/{uuid} silently 404s. Always send users to the
+        // search page, even for properties we scraped directly from
+        // HomePath. The click handler also copies the full address to
+        // clipboard so user can paste straight into HomePath's search.
+        url: 'https://homepath.fanniemae.com/property-finder',
+        copyAddress: true,
         bidding: false,
       },
       {
@@ -4972,13 +4987,24 @@ Return ONLY the 2-sentence analysis.`,
       const cls = plat.original
         ? 'fc-btn fc-btn-sm'
         : 'fc-btn fc-btn-sm fc-btn-ghost';
+      // HomePath gets a clipboard-copy hint since the link goes to a generic
+      // search page (no stable detail URL) — user pastes address to search.
+      const copyHint = plat.copyAddress ? ' · address copied' : '';
       const label = plat.original
-        ? `View on ${plat.name} ↗`
-        : `${plat.name} ↗`;
-      const title = plat.original
-        ? `Open the original ${plat.name} listing for this property`
-        : `Search ${plat.name} for this property — useful for cross-checking ${plat.bidding ? 'bid status' : 'list price + photos + days on market'}`;
-      return `<a href="${escapeAttr(plat.url)}" target="_blank" rel="noopener" class="${cls}" title="${escapeAttr(title)}">${escapeHtml(label)}</a>`;
+        ? `View on ${plat.name}${copyHint} ↗`
+        : `${plat.name}${copyHint} ↗`;
+      const title = plat.copyAddress
+        ? `${plat.name} doesn't have stable per-property URLs — opens their search page and copies the full address to your clipboard so you can paste-and-search.`
+        : (plat.original
+            ? `Open the original ${plat.name} listing for this property`
+            : `Search ${plat.name} for this property — useful for cross-checking ${plat.bidding ? 'bid status' : 'list price + photos + days on market'}`);
+      // copyAddress buttons get an onclick handler that copies to clipboard
+      // before the link opens.
+      const onclick = plat.copyAddress
+        ? `event.preventDefault(); window.fcOpenWithAddressCopy('${escapeAttr(plat.url)}', '${escapeAttr(fullAddress)}');`
+        : '';
+      const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+      return `<a href="${escapeAttr(plat.url)}" target="_blank" rel="noopener" class="${cls}" title="${escapeAttr(title)}"${onclickAttr}>${escapeHtml(label)}</a>`;
     }).join('');
 
     return section('Cross-platform check', `
