@@ -2194,9 +2194,12 @@
       const days = p.days_to_sale;
       const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
       const saleUrgent = days != null && days >= 0 && days <= 3;
+      const photoCell = p.primary_photo_url
+        ? `<div class="fc-prop-init fc-prop-photo"><img src="${escapeAttr(p.primary_photo_url)}" alt="${escapeAttr(p.address || '')}" loading="lazy" onerror="this.parentNode.innerHTML='${escapeAttr(initials)}';this.parentNode.classList.remove('fc-prop-photo')"></div>`
+        : `<div class="fc-prop-init">${escapeHtml(initials)}</div>`;
       return `
         <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
-          <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
+          <td>${photoCell}</td>
           <td>
             <div class="fc-prop-addr">${escapeHtml(p.address || '—')}${p._zillowValidated ? ' <span class="fc-z-badge" title="Zillow-validated">Z ✓</span>' : ''}</div>
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')}</div>
@@ -3306,9 +3309,12 @@
       const saleLabel = days == null ? '—' : (days <= 0 ? 'Today' : days === 1 ? 'Tmrw' : `${days}d`);
       const saleUrgent = days != null && days >= 0 && days <= 3;
       const initials = (p.city || p.address || '??').slice(0, 2).toUpperCase();
+      const photoCell = p.primary_photo_url
+        ? `<div class="fc-prop-init fc-prop-photo"><img src="${escapeAttr(p.primary_photo_url)}" alt="${escapeAttr(p.address || '')}" loading="lazy" onerror="this.parentNode.innerHTML='${escapeAttr(initials)}';this.parentNode.classList.remove('fc-prop-photo')"></div>`
+        : `<div class="fc-prop-init">${escapeHtml(initials)}</div>`;
       return `
         <tr data-prop-id="${escapeAttr(p.id || '')}" class="fc-row-clickable">
-          <td><div class="fc-prop-init">${escapeHtml(initials)}</div></td>
+          <td>${photoCell}</td>
           <td>
             <div class="fc-prop-addr">${escapeHtml(p.address || '—')}${p._zillowValidated ? ' <span class="fc-z-badge" title="Zillow-validated">Z ✓</span>' : ''}</div>
             <div class="fc-prop-meta">${escapeHtml(p.city || '')}, ${escapeHtml(p.state || 'VA')} ${escapeHtml(p.zip || '')} · ${escapeHtml(sourceTag)}</div>
@@ -6507,12 +6513,22 @@ Return ONLY the 2-sentence analysis.`,
   .fc-table tr:hover td { background: var(--paper-2); }
 
   .fc-prop-init {
-    width: 28px; height: 28px;
+    width: 32px; height: 32px;
     background: var(--paper-3); color: var(--ink);
     display: grid; place-items: center;
     border-radius: 4px;
     font-family: var(--f-serif);
     font-size: 11px; font-weight: 600;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .fc-prop-init.fc-prop-photo {
+    background: var(--paper-2);  /* lighter fallback while img loads */
+  }
+  .fc-prop-init.fc-prop-photo img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
   }
   .fc-prop-addr {
     font-weight: 500; color: var(--ink);

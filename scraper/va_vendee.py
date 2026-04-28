@@ -148,6 +148,15 @@ def _parse_card(card, state_filter: str) -> dict | None:
     status_el = card.select_one(".property-status")
     status = status_el.get_text(strip=True) if status_el else "For Sale"
 
+    # Photo from <img class="img-fit"> (or <img> inside the wrapper)
+    photo_url = None
+    img = card.select_one("img.img-fit") or card.select_one(".img-ratio img")
+    if img and img.get("src"):
+        src = img["src"]
+        # Skip the placeholder fallback that's set via onerror
+        if "featured-listing-house" not in src:
+            photo_url = src
+
     arv_estimate = int(round(price * 1.05))  # REO list price ≈ market
     monthly_rent_estimate = int(round(arv_estimate * 0.007)) if arv_estimate else 0
     mortgage_monthly = int(round(price * 0.006))
@@ -201,6 +210,7 @@ def _parse_card(card, state_filter: str) -> dict | None:
         "id":               _make_id(detail_id, address, state_code),
         "source":           "VA Vendee",
         "source_url":       detail_url,
+        "primary_photo_url": photo_url,
         "firm_file_number": detail_id,
         "address":          address,
         "city":             city,

@@ -198,6 +198,7 @@ def _to_property(a: dict) -> dict | None:
         "id":               _make_id(reo_id, address, state),
         "source":           "HomePath",
         "source_url":       detail_url,
+        "primary_photo_url": a.get("primHiResImageUrl") or None,
         "firm_file_number": reo_id or a.get("mlsId") or None,
         "address":          address.title(),
         "city":             city,

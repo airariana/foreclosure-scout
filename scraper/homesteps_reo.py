@@ -77,6 +77,19 @@ def _parse_listings(html: str, state_filter: str) -> list[dict]:
     out: list[dict] = []
     seen_urls: set[str] = set()
 
+    # Build a {detail_url -> photo_url} map by scanning the visible card
+    # markup. Each <a id="node-XXXX" href="/listingdetails/..."> wraps an
+    # <img src="https://rbimages.blob.core.windows.net/...">. The JSON-LD
+    # blocks have the same /listingdetails URL but no photo, so we join
+    # them by URL when building the property dict.
+    photo_by_url: dict[str, str] = {}
+    for a in soup.select("a[href^='/listingdetails/']"):
+        img = a.find("img")
+        if img and img.get("src"):
+            href = a.get("href", "")
+            full = f"https://www.homesteps.com{href}" if href.startswith("/") else href
+            photo_by_url[full] = img["src"]
+
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         try:
             data = json.loads(tag.string or "")
@@ -88,6 +101,10 @@ def _parse_listings(html: str, state_filter: str) -> list[dict]:
         prop = _build_property(data, state_filter)
         if prop and prop["source_url"] not in seen_urls:
             seen_urls.add(prop["source_url"])
+            # Attach the photo URL we extracted from the card HTML.
+            photo = photo_by_url.get(prop["source_url"])
+            if photo:
+                prop["primary_photo_url"] = photo
             out.append(prop)
 
     return out
@@ -188,6 +205,7 @@ def _build_property(d: dict, state_filter: str) -> dict | None:
         "id":               _make_id(detail_id, street, state),
         "source":           "HomeSteps",
         "source_url":       detail_url,
+        "primary_photo_url": None,  # filled in by _parse_listings via card HTML
         "firm_file_number": detail_id,
         "address":          street,
         "city":             city,
