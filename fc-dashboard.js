@@ -1017,10 +1017,24 @@
   }
 
   function roofIntelSection(p) {
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
     const lat = p.lat || p.latitude;
     const lng = p.lng || p.longitude;
-    if (!lat || !lng) return ''; // no coords → silently skip the section
-    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    // Render the section header in either case so the user understands the
+    // feature exists; surface a clear reason when coords are missing rather
+    // than silently disappearing the section. The roof check needs a Static
+    // Maps satellite tile, which requires lat/lng.
+    if (!lat || !lng) {
+      return section('Roof check (AI)', `
+        <div style="font-family:var(--f-mono);font-size:12px;color:var(--muted);line-height:1.5">
+          ⚠ No GPS coordinates for this property — roof analysis needs a satellite tile to inspect.
+          <div style="margin-top:6px;font-size:11px">
+            Geocoding will retry on the next weekly scrape.
+            If this persists, check Workers logs and the Maps API key restrictions.
+          </div>
+        </div>
+      `);
+    }
     return section('Roof check (AI)', `
       <div id="fc-roof-${sid}" style="font-family:var(--f-mono);font-size:12px;color:var(--muted);min-height:40px">
         Analyzing roof from satellite imagery…

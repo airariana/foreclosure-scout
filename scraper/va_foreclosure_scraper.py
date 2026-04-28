@@ -322,21 +322,29 @@ def build_pricing(
 # ── Geocoding ─────────────────────────────────────────────────────────────────
 
 def geocode(address: str, api_key: str) -> tuple[float | None, float | None]:
-    """Return (lat, lng) for a given address string."""
+    """Return (lat, lng) for a given address string. Caller passes the
+    full address including state/zip — do NOT hardcode a state here, the
+    project covers DC + MD + VA."""
     if not api_key:
         return None, None
     try:
         r = requests.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": f"{address}, Virginia", "key": api_key},
+            params={"address": address, "key": api_key},
             timeout=5,
         )
         data = r.json()
-        if data.get("status") == "OK":
+        status = data.get("status")
+        if status == "OK":
             loc = data["results"][0]["geometry"]["location"]
             return loc["lat"], loc["lng"]
+        # Surface non-OK responses so we can tell the difference between
+        # "API key rejected" (REQUEST_DENIED), "rate-limited" (OVER_QUERY_LIMIT),
+        # "address didn't resolve" (ZERO_RESULTS), and other failure modes.
+        err_msg = data.get("error_message") or ''
+        log.warning(f"Geocode {status} for '{address}': {err_msg[:200]}")
     except Exception as e:
-        log.warning(f"Geocode failed for '{address}': {e}")
+        log.warning(f"Geocode exception for '{address}': {e}")
     return None, None
 
 
@@ -1231,17 +1239,28 @@ def deduplicate(properties: list[dict]) -> list[dict]:
 
 
 def geocode_missing(properties: list[dict], api_key: str) -> list[dict]:
-    """Geocode any property missing lat/lng."""
+    """Geocode any property missing lat/lng. Builds the full
+    address-with-state from each property's own state/city/zip — DO NOT
+    hardcode VA, this project covers DC + MD + VA."""
     missing = [p for p in properties if not p.get("lat")]
     log.info(f"Geocoding {len(missing)} properties ...")
+    success = 0
+    failed_status_counts: dict[str, int] = {}
     for prop in missing:
-        address_str = f"{prop['address']}, {prop['city']}, VA {prop['zip_code']}"
+        state = (prop.get("state") or "VA").upper()
+        zip_code = prop.get("zip_code") or ""
+        city = prop.get("city") or ""
+        # Compose the cleanest possible string. Fall back through what we have.
+        parts = [prop.get("address") or "", city, state, zip_code]
+        address_str = ", ".join(p for p in parts if p)
         lat, lng = geocode(address_str, api_key)
         prop["lat"] = lat
         prop["lng"] = lng
         if lat:
+            success += 1
             log.debug(f"  ✓ {prop['address']} → {lat:.4f}, {lng:.4f}")
         time.sleep(0.1)  # rate limit
+    log.info(f"Geocoded {success}/{len(missing)} successfully")
     return properties
 
 
