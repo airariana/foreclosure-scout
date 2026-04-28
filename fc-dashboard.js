@@ -3998,6 +3998,8 @@ Return ONLY the 2-sentence analysis.`,
 
         ${roofIntelSection(p)}
 
+        ${crossPlatformSection(p)}
+
         ${auctionSection(p)}
 
         ${liensSection(p)}
@@ -4897,6 +4899,98 @@ Return ONLY the 2-sentence analysis.`,
   // assessed value when available, BWW original loan amount when available,
   // rehab estimate, rent estimate). All math is documented in
   // computeAuctionMetrics().
+  // ─── Cross-platform listing check ────────────────────────────────────────
+  // Compact row of deep-link buttons for the major REO + auction platforms.
+  // For each platform, if the property's source IS that platform we open the
+  // original listing URL directly (saved by the scraper); otherwise we open
+  // that platform's search/listings page so the user can match by address.
+  function crossPlatformSection(p) {
+    const source = (p.source || '').toLowerCase();
+    const stateLow = (p.state || '').toLowerCase();
+    const citySlug = (p.city || '').toLowerCase().trim()
+      .replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+    const stateUp = (p.state || '').toUpperCase();
+
+    // Per-platform URL builder. Returns { url, isOriginal, label } where
+    // isOriginal=true means we're linking to the actual listing page, not a
+    // search; label adapts ("View on" vs "Cross-check on").
+    const platforms = [
+      {
+        key: 'auction',
+        name: 'auction.com',
+        original: source.includes('auction.com'),
+        // No saved direct URL for auction.com — always falls back to search.
+        url: stateLow && citySlug
+          ? `https://www.auction.com/residential/${stateLow}/${citySlug}_ct/`
+          : stateLow
+            ? `https://www.auction.com/residential/${stateLow}/`
+            : 'https://www.auction.com/',
+        bidding: true,
+      },
+      {
+        key: 'homepath',
+        name: 'HomePath',
+        original: source === 'homepath',
+        url: source === 'homepath' && p.source_url
+          ? p.source_url
+          : 'https://homepath.fanniemae.com/property-finder',
+        bidding: false,
+      },
+      {
+        key: 'homesteps',
+        name: 'HomeSteps',
+        original: source === 'homesteps',
+        url: source === 'homesteps' && p.source_url
+          ? p.source_url
+          : (fullAddress
+              ? `https://www.homesteps.com/listing/search?search=${encodeURIComponent(fullAddress)}`
+              : 'https://www.homesteps.com/listing/search'),
+        bidding: false,
+      },
+      {
+        key: 'vendee',
+        name: 'VA Vendee',
+        original: source === 'va vendee' || source === 'vendee',
+        url: (source.includes('vendee')) && p.source_url
+          ? p.source_url
+          : (stateUp
+              ? `https://www.vrmproperties.com/Properties-For-Sale?state=${stateUp}`
+              : 'https://www.vrmproperties.com/'),
+        bidding: false,
+      },
+      {
+        key: 'hud',
+        name: 'HUD HomeStore',
+        original: source.includes('hud'),
+        url: 'https://www.hudhomestore.gov/Listing/PropertySearch.aspx',
+        bidding: true,  // HUD uses sealed-bid system w/ deadlines
+      },
+    ];
+
+    const btns = platforms.map(plat => {
+      const cls = plat.original
+        ? 'fc-btn fc-btn-sm'
+        : 'fc-btn fc-btn-sm fc-btn-ghost';
+      const label = plat.original
+        ? `View on ${plat.name} ↗`
+        : `${plat.name} ↗`;
+      const title = plat.original
+        ? `Open the original ${plat.name} listing for this property`
+        : `Search ${plat.name} for this property — useful for cross-checking ${plat.bidding ? 'bid status' : 'list price + photos + days on market'}`;
+      return `<a href="${escapeAttr(plat.url)}" target="_blank" rel="noopener" class="${cls}" title="${escapeAttr(title)}">${escapeHtml(label)}</a>`;
+    }).join('');
+
+    return section('Cross-platform check', `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--f-mono)">
+        Verify this property on other listing platforms. Bold buttons link to the original source listing; ghost buttons search by address/city.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${btns}
+      </div>
+    `);
+  }
+
   function auctionSection(p) {
     const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
     const saved = getAuction(p.id) || {};
