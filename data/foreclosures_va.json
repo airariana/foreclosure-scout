@@ -1,8 +1,8 @@
 {
   "metadata": {
     "total_properties": 525,
-    "scraped_at": "2026-04-28T01:45:33.294597Z",
-    "new_this_run": 3,
+    "scraped_at": "2026-04-28T01:53:02.728705Z",
+    "new_this_run": 0,
     "updated_this_run": 0,
     "sources": {
       "HUD HomeStore": 46,
@@ -78,7 +78,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-07-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.688937Z",
+      "scraped_at": "2026-04-28T01:52:24.367071Z",
       "days_to_sale": -6,
       "price": 643500,
       "arv": 707850,
@@ -148,7 +148,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-04-23",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689046Z",
+      "scraped_at": "2026-04-28T01:52:24.367211Z",
       "days_to_sale": -6,
       "price": 419000,
       "arv": 460900,
@@ -218,7 +218,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-18",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689093Z",
+      "scraped_at": "2026-04-28T01:52:24.367272Z",
       "days_to_sale": -6,
       "price": 355000,
       "arv": 390500,
@@ -288,7 +288,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-04",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689140Z",
+      "scraped_at": "2026-04-28T01:52:24.367333Z",
       "days_to_sale": -6,
       "price": 342000,
       "arv": 376200,
@@ -358,7 +358,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-06-20",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689184Z",
+      "scraped_at": "2026-04-28T01:52:24.367391Z",
       "days_to_sale": -6,
       "price": 337500,
       "arv": 371250,
@@ -428,7 +428,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-25",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689227Z",
+      "scraped_at": "2026-04-28T01:52:24.367448Z",
       "days_to_sale": -6,
       "price": 336000,
       "arv": 369600,
@@ -498,7 +498,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-04-21",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689269Z",
+      "scraped_at": "2026-04-28T01:52:24.367505Z",
       "days_to_sale": -6,
       "price": 335000,
       "arv": 368500,
@@ -568,7 +568,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-07",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689357Z",
+      "scraped_at": "2026-04-28T01:52:24.367617Z",
       "days_to_sale": -6,
       "price": 277000,
       "arv": 304700,
@@ -638,7 +638,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-04-23",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689440Z",
+      "scraped_at": "2026-04-28T01:52:24.367741Z",
       "days_to_sale": -6,
       "price": 264000,
       "arv": 290400,
@@ -708,7 +708,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-04",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689481Z",
+      "scraped_at": "2026-04-28T01:52:24.367795Z",
       "days_to_sale": -6,
       "price": 255000,
       "arv": 280500,
@@ -778,7 +778,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-06-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689523Z",
+      "scraped_at": "2026-04-28T01:52:24.367848Z",
       "days_to_sale": -6,
       "price": 252000,
       "arv": 277200,
@@ -848,7 +848,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-08",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689563Z",
+      "scraped_at": "2026-04-28T01:52:24.367901Z",
       "days_to_sale": -6,
       "price": 221000,
       "arv": 243100,
@@ -918,7 +918,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2999-12-31",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689605Z",
+      "scraped_at": "2026-04-28T01:52:24.367955Z",
       "days_to_sale": -6,
       "price": 209000,
       "arv": 229900,
@@ -988,7 +988,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-07-31",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689645Z",
+      "scraped_at": "2026-04-28T01:52:24.368009Z",
       "days_to_sale": -6,
       "price": 205000,
       "arv": 225500,
@@ -1058,7 +1058,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-06",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689686Z",
+      "scraped_at": "2026-04-28T01:52:24.368062Z",
       "days_to_sale": -6,
       "price": 193000,
       "arv": 212300,
@@ -1128,7 +1128,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-16",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689748Z",
+      "scraped_at": "2026-04-28T01:52:24.368115Z",
       "days_to_sale": -6,
       "price": 189900,
       "arv": 208890,
@@ -1198,7 +1198,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-02",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689793Z",
+      "scraped_at": "2026-04-28T01:52:24.368168Z",
       "days_to_sale": -6,
       "price": 189000,
       "arv": 207900,
@@ -1268,7 +1268,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689835Z",
+      "scraped_at": "2026-04-28T01:52:24.368221Z",
       "days_to_sale": -6,
       "price": 178000,
       "arv": 195800,
@@ -1338,7 +1338,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-06-27",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689878Z",
+      "scraped_at": "2026-04-28T01:52:24.368273Z",
       "days_to_sale": -6,
       "price": 177500,
       "arv": 195250,
@@ -1408,7 +1408,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-12",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689959Z",
+      "scraped_at": "2026-04-28T01:52:24.368379Z",
       "days_to_sale": -6,
       "price": 147000,
       "arv": 161700,
@@ -1478,7 +1478,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-07-25",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.690000Z",
+      "scraped_at": "2026-04-28T01:52:24.368433Z",
       "days_to_sale": -6,
       "price": 146700,
       "arv": 161370,
@@ -1548,7 +1548,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-04-21",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.690041Z",
+      "scraped_at": "2026-04-28T01:52:24.368486Z",
       "days_to_sale": -6,
       "price": 108000,
       "arv": 118800,
@@ -1618,7 +1618,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-11",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.690081Z",
+      "scraped_at": "2026-04-28T01:52:24.368538Z",
       "days_to_sale": -6,
       "price": 107500,
       "arv": 118250,
@@ -1688,7 +1688,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-13",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.690122Z",
+      "scraped_at": "2026-04-28T01:52:24.368590Z",
       "days_to_sale": -6,
       "price": 87000,
       "arv": 95700,
@@ -1758,7 +1758,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-07-02",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.695930Z",
+      "scraped_at": "2026-04-28T01:52:24.376078Z",
       "days_to_sale": -6,
       "price": 696600,
       "arv": 766260,
@@ -1828,7 +1828,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-31",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.695986Z",
+      "scraped_at": "2026-04-28T01:52:24.376151Z",
       "days_to_sale": -6,
       "price": 364000,
       "arv": 400400,
@@ -1898,7 +1898,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-27",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696033Z",
+      "scraped_at": "2026-04-28T01:52:24.376215Z",
       "days_to_sale": -6,
       "price": 341000,
       "arv": 375100,
@@ -1968,7 +1968,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-11",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696078Z",
+      "scraped_at": "2026-04-28T01:52:24.376272Z",
       "days_to_sale": -6,
       "price": 322000,
       "arv": 354200,
@@ -2038,7 +2038,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-20",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696165Z",
+      "scraped_at": "2026-04-28T01:52:24.376384Z",
       "days_to_sale": -6,
       "price": 249000,
       "arv": 273900,
@@ -2108,7 +2108,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-07-06",
       "hud_fha": "UI (Uninsured)",
-      "scraped_at": "2026-04-28T01:44:50.696208Z",
+      "scraped_at": "2026-04-28T01:52:24.376440Z",
       "days_to_sale": -6,
       "price": 210500,
       "arv": 231550,
@@ -2178,7 +2178,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-06",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.696249Z",
+      "scraped_at": "2026-04-28T01:52:24.376494Z",
       "days_to_sale": -6,
       "price": 201000,
       "arv": 221100,
@@ -2248,7 +2248,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-29",
       "hud_fha": "UI (Uninsured)",
-      "scraped_at": "2026-04-28T01:44:50.696289Z",
+      "scraped_at": "2026-04-28T01:52:24.376547Z",
       "days_to_sale": -6,
       "price": 199000,
       "arv": 218900,
@@ -2318,7 +2318,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-01",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696330Z",
+      "scraped_at": "2026-04-28T01:52:24.376601Z",
       "days_to_sale": -6,
       "price": 155000,
       "arv": 170500,
@@ -2388,7 +2388,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-08-13",
       "hud_fha": "UI (Uninsured)",
-      "scraped_at": "2026-04-28T01:44:50.696371Z",
+      "scraped_at": "2026-04-28T01:52:24.376674Z",
       "days_to_sale": -6,
       "price": 135000,
       "arv": 148500,
@@ -2458,7 +2458,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-18",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696412Z",
+      "scraped_at": "2026-04-28T01:52:24.376730Z",
       "days_to_sale": -6,
       "price": 87000,
       "arv": 95700,
@@ -2528,7 +2528,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-06-04",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696453Z",
+      "scraped_at": "2026-04-28T01:52:24.376782Z",
       "days_to_sale": -6,
       "price": 66500,
       "arv": 73150,
@@ -2598,7 +2598,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-09-09",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.700863Z",
+      "scraped_at": "2026-04-28T01:52:24.382486Z",
       "days_to_sale": -6,
       "price": 345000,
       "arv": 379500,
@@ -2668,7 +2668,7 @@
       "hud_bid_open": "2026-04-22",
       "hud_deadline": "2026-06-23",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.700954Z",
+      "scraped_at": "2026-04-28T01:52:24.382607Z",
       "days_to_sale": -6,
       "price": 291500,
       "arv": 320650,
@@ -2738,7 +2738,7 @@
       "hud_bid_open": "2026-04-24",
       "hud_deadline": "2026-04-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.688997Z",
+      "scraped_at": "2026-04-28T01:52:24.367147Z",
       "days_to_sale": -4,
       "price": 574000,
       "arv": 631400,
@@ -2808,7 +2808,7 @@
       "hud_bid_open": "2026-04-24",
       "hud_deadline": "2026-04-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689312Z",
+      "scraped_at": "2026-04-28T01:52:24.367560Z",
       "days_to_sale": -4,
       "price": 296000,
       "arv": 325600,
@@ -2878,7 +2878,7 @@
       "hud_bid_open": "2026-04-24",
       "hud_deadline": "2026-04-28",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.700807Z",
+      "scraped_at": "2026-04-28T01:52:24.382413Z",
       "days_to_sale": -4,
       "price": 1040000,
       "arv": 1144000,
@@ -2948,7 +2948,7 @@
       "hud_bid_open": "2026-04-27",
       "hud_deadline": "2026-04-29",
       "hud_fha": "IN (Insured)",
-      "scraped_at": "2026-04-28T01:44:50.689399Z",
+      "scraped_at": "2026-04-28T01:52:24.367686Z",
       "days_to_sale": -1,
       "price": 277000,
       "arv": 304700,
@@ -3018,7 +3018,7 @@
       "hud_bid_open": "2026-04-27",
       "hud_deadline": "2026-05-01",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.696122Z",
+      "scraped_at": "2026-04-28T01:52:24.376328Z",
       "days_to_sale": -1,
       "price": 260000,
       "arv": 286000,
@@ -3088,7 +3088,7 @@
       "hud_bid_open": "2026-04-27",
       "hud_deadline": "2026-04-25",
       "hud_fha": "UI (Uninsured)",
-      "scraped_at": "2026-04-28T01:44:50.696493Z",
+      "scraped_at": "2026-04-28T01:52:24.376836Z",
       "days_to_sale": -1,
       "price": 40000,
       "arv": 44000,
@@ -3158,7 +3158,7 @@
       "hud_bid_open": "2026-04-27",
       "hud_deadline": "2026-04-30",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.700910Z",
+      "scraped_at": "2026-04-28T01:52:24.382548Z",
       "days_to_sale": -1,
       "price": 330000,
       "arv": 363000,
@@ -3223,7 +3223,7 @@
         "Petersburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561856Z",
+      "scraped_at": "2026-04-28T01:52:07.394077Z",
       "days_to_sale": 0,
       "price": 133200,
       "arv": 185000,
@@ -3289,7 +3289,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713016Z",
+      "scraped_at": "2026-04-28T01:52:07.592071Z",
       "days_to_sale": 0,
       "price": 298800,
       "arv": 415000,
@@ -3356,7 +3356,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.384109Z",
+      "scraped_at": "2026-04-28T01:52:11.888263Z",
       "days_to_sale": 0,
       "price": 428040,
       "arv": 594500,
@@ -3423,7 +3423,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.387290Z",
+      "scraped_at": "2026-04-28T01:52:11.893026Z",
       "days_to_sale": 0,
       "price": 428040,
       "arv": 594500,
@@ -3490,7 +3490,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.392934Z",
+      "scraped_at": "2026-04-28T01:52:11.901885Z",
       "days_to_sale": 0,
       "price": 522000,
       "arv": 725000,
@@ -3557,7 +3557,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.399344Z",
+      "scraped_at": "2026-04-28T01:52:11.911828Z",
       "days_to_sale": 0,
       "price": 354960,
       "arv": 493000,
@@ -3623,7 +3623,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.644988Z",
+      "scraped_at": "2026-04-28T01:52:07.503475Z",
       "days_to_sale": 1,
       "price": 169200,
       "arv": 235000,
@@ -3689,7 +3689,7 @@
         "Richmond City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645113Z",
+      "scraped_at": "2026-04-28T01:52:07.503637Z",
       "days_to_sale": 1,
       "price": 168264,
       "arv": 233700,
@@ -3756,7 +3756,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.413262Z",
+      "scraped_at": "2026-04-28T01:52:11.936000Z",
       "days_to_sale": 1,
       "price": 252000,
       "arv": 350000,
@@ -3823,7 +3823,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.415929Z",
+      "scraped_at": "2026-04-28T01:52:11.941598Z",
       "days_to_sale": 1,
       "price": 219600,
       "arv": 305000,
@@ -3889,7 +3889,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645148Z",
+      "scraped_at": "2026-04-28T01:52:07.503698Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -3955,7 +3955,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645179Z",
+      "scraped_at": "2026-04-28T01:52:07.503738Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -4021,7 +4021,7 @@
         "Roanoke City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645209Z",
+      "scraped_at": "2026-04-28T01:52:07.503775Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -4088,7 +4088,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.421051Z",
+      "scraped_at": "2026-04-28T01:52:11.951440Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -4155,7 +4155,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248376Z",
+      "scraped_at": "2026-04-28T01:52:23.032500Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -4222,7 +4222,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248494Z",
+      "scraped_at": "2026-04-28T01:52:23.032667Z",
       "days_to_sale": 2,
       "price": 198000,
       "arv": 275000,
@@ -4293,7 +4293,7 @@
       "hud_bid_open": "2026-04-30",
       "hud_deadline": "2026-05-04",
       "hud_fha": "IE (Insured Escrow)",
-      "scraped_at": "2026-04-28T01:44:50.689919Z",
+      "scraped_at": "2026-04-28T01:52:24.368326Z",
       "days_to_sale": 2,
       "price": 163000,
       "arv": 179300,
@@ -4359,7 +4359,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.561686Z",
+      "scraped_at": "2026-04-28T01:52:23.256684Z",
       "days_to_sale": 3,
       "price": 236160,
       "arv": 328000,
@@ -4425,7 +4425,7 @@
         "Bristol City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561581Z",
+      "scraped_at": "2026-04-28T01:52:07.393752Z",
       "days_to_sale": 6,
       "price": 198000,
       "arv": 275000,
@@ -4491,7 +4491,7 @@
         "Grayson County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645342Z",
+      "scraped_at": "2026-04-28T01:52:07.503939Z",
       "days_to_sale": 6,
       "price": 198000,
       "arv": 275000,
@@ -4557,7 +4557,7 @@
         "Sussex County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713141Z",
+      "scraped_at": "2026-04-28T01:52:07.592232Z",
       "days_to_sale": 6,
       "price": 198000,
       "arv": 275000,
@@ -4624,7 +4624,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.428621Z",
+      "scraped_at": "2026-04-28T01:52:11.964417Z",
       "days_to_sale": 6,
       "price": 172800,
       "arv": 240000,
@@ -4691,7 +4691,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.431394Z",
+      "scraped_at": "2026-04-28T01:52:11.969098Z",
       "days_to_sale": 6,
       "price": 183600,
       "arv": 255000,
@@ -4758,7 +4758,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.435015Z",
+      "scraped_at": "2026-04-28T01:52:11.974842Z",
       "days_to_sale": 6,
       "price": 150552,
       "arv": 209100,
@@ -4825,7 +4825,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.443029Z",
+      "scraped_at": "2026-04-28T01:52:11.986962Z",
       "days_to_sale": 6,
       "price": 190800,
       "arv": 265000,
@@ -4892,7 +4892,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.445498Z",
+      "scraped_at": "2026-04-28T01:52:11.990935Z",
       "days_to_sale": 6,
       "price": 190800,
       "arv": 265000,
@@ -4959,7 +4959,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.448125Z",
+      "scraped_at": "2026-04-28T01:52:11.995149Z",
       "days_to_sale": 6,
       "price": 169200,
       "arv": 235000,
@@ -5026,7 +5026,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.451052Z",
+      "scraped_at": "2026-04-28T01:52:11.999556Z",
       "days_to_sale": 6,
       "price": 284700,
       "arv": 365000,
@@ -5093,7 +5093,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.453609Z",
+      "scraped_at": "2026-04-28T01:52:12.003792Z",
       "days_to_sale": 6,
       "price": 284700,
       "arv": 365000,
@@ -5160,7 +5160,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.456150Z",
+      "scraped_at": "2026-04-28T01:52:12.007709Z",
       "days_to_sale": 6,
       "price": 284700,
       "arv": 365000,
@@ -5226,7 +5226,7 @@
         "Arlington County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561224Z",
+      "scraped_at": "2026-04-28T01:52:07.393282Z",
       "days_to_sale": 7,
       "price": 546000,
       "arv": 700000,
@@ -5292,7 +5292,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561466Z",
+      "scraped_at": "2026-04-28T01:52:07.393586Z",
       "days_to_sale": 7,
       "price": 237600,
       "arv": 330000,
@@ -5358,7 +5358,7 @@
         "Chesterfield County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561506Z",
+      "scraped_at": "2026-04-28T01:52:07.393637Z",
       "days_to_sale": 7,
       "price": 194832,
       "arv": 270600,
@@ -5424,7 +5424,7 @@
         "Alexandria City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561545Z",
+      "scraped_at": "2026-04-28T01:52:07.393706Z",
       "days_to_sale": 7,
       "price": 304980,
       "arv": 391000,
@@ -5490,7 +5490,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561649Z",
+      "scraped_at": "2026-04-28T01:52:07.393838Z",
       "days_to_sale": 7,
       "price": 172800,
       "arv": 240000,
@@ -5556,7 +5556,7 @@
         "Hampton City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561677Z",
+      "scraped_at": "2026-04-28T01:52:07.393875Z",
       "days_to_sale": 7,
       "price": 172800,
       "arv": 240000,
@@ -5622,7 +5622,7 @@
         "Henrico County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645378Z",
+      "scraped_at": "2026-04-28T01:52:07.503982Z",
       "days_to_sale": 7,
       "price": 253500,
       "arv": 325000,
@@ -5688,7 +5688,7 @@
         "Shenandoah County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713081Z",
+      "scraped_at": "2026-04-28T01:52:07.592155Z",
       "days_to_sale": 7,
       "price": 198000,
       "arv": 275000,
@@ -5755,7 +5755,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.458716Z",
+      "scraped_at": "2026-04-28T01:52:12.011539Z",
       "days_to_sale": 7,
       "price": 306000,
       "arv": 425000,
@@ -5822,7 +5822,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.461401Z",
+      "scraped_at": "2026-04-28T01:52:12.015931Z",
       "days_to_sale": 7,
       "price": 450000,
       "arv": 625000,
@@ -5889,7 +5889,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.464098Z",
+      "scraped_at": "2026-04-28T01:52:12.019790Z",
       "days_to_sale": 7,
       "price": 198000,
       "arv": 275000,
@@ -5956,7 +5956,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.468935Z",
+      "scraped_at": "2026-04-28T01:52:12.027289Z",
       "days_to_sale": 7,
       "price": 198000,
       "arv": 275000,
@@ -6023,7 +6023,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.561814Z",
+      "scraped_at": "2026-04-28T01:52:23.256822Z",
       "days_to_sale": 7,
       "price": 259200,
       "arv": 360000,
@@ -6089,7 +6089,7 @@
         "Lynchburg City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561715Z",
+      "scraped_at": "2026-04-28T01:52:07.393923Z",
       "days_to_sale": 8,
       "price": 198000,
       "arv": 275000,
@@ -6155,7 +6155,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561796Z",
+      "scraped_at": "2026-04-28T01:52:07.394002Z",
       "days_to_sale": 8,
       "price": 190800,
       "arv": 265000,
@@ -6221,7 +6221,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645041Z",
+      "scraped_at": "2026-04-28T01:52:07.503543Z",
       "days_to_sale": 8,
       "price": 169200,
       "arv": 235000,
@@ -6288,7 +6288,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.475039Z",
+      "scraped_at": "2026-04-28T01:52:12.036279Z",
       "days_to_sale": 8,
       "price": 252000,
       "arv": 350000,
@@ -6355,7 +6355,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.480259Z",
+      "scraped_at": "2026-04-28T01:52:12.043938Z",
       "days_to_sale": 8,
       "price": 252000,
       "arv": 350000,
@@ -6422,7 +6422,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.485200Z",
+      "scraped_at": "2026-04-28T01:52:12.051304Z",
       "days_to_sale": 8,
       "price": 259200,
       "arv": 360000,
@@ -6489,7 +6489,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.487660Z",
+      "scraped_at": "2026-04-28T01:52:12.055008Z",
       "days_to_sale": 8,
       "price": 212544,
       "arv": 295200,
@@ -6556,7 +6556,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.490134Z",
+      "scraped_at": "2026-04-28T01:52:12.058542Z",
       "days_to_sale": 8,
       "price": 259200,
       "arv": 360000,
@@ -6623,7 +6623,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.497366Z",
+      "scraped_at": "2026-04-28T01:52:12.069444Z",
       "days_to_sale": 8,
       "price": 259200,
       "arv": 360000,
@@ -6690,7 +6690,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.499786Z",
+      "scraped_at": "2026-04-28T01:52:12.073351Z",
       "days_to_sale": 8,
       "price": 259200,
       "arv": 360000,
@@ -6757,7 +6757,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.502184Z",
+      "scraped_at": "2026-04-28T01:52:12.077071Z",
       "days_to_sale": 8,
       "price": 259200,
       "arv": 360000,
@@ -6823,7 +6823,7 @@
         "Martinsville City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561764Z",
+      "scraped_at": "2026-04-28T01:52:07.393962Z",
       "days_to_sale": 9,
       "price": 198000,
       "arv": 275000,
@@ -6889,7 +6889,7 @@
         "Orange County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.712942Z",
+      "scraped_at": "2026-04-28T01:52:07.591977Z",
       "days_to_sale": 9,
       "price": 198000,
       "arv": 275000,
@@ -6955,7 +6955,7 @@
         "Pittsylvania County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.712981Z",
+      "scraped_at": "2026-04-28T01:52:07.592026Z",
       "days_to_sale": 9,
       "price": 198000,
       "arv": 275000,
@@ -7022,7 +7022,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.518647Z",
+      "scraped_at": "2026-04-28T01:52:12.100068Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7089,7 +7089,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.521064Z",
+      "scraped_at": "2026-04-28T01:52:12.103723Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7156,7 +7156,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.523463Z",
+      "scraped_at": "2026-04-28T01:52:12.107472Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7223,7 +7223,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.525902Z",
+      "scraped_at": "2026-04-28T01:52:12.111231Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7290,7 +7290,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.530581Z",
+      "scraped_at": "2026-04-28T01:52:12.118274Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7357,7 +7357,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.532984Z",
+      "scraped_at": "2026-04-28T01:52:12.121789Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7424,7 +7424,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.535358Z",
+      "scraped_at": "2026-04-28T01:52:12.125228Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7491,7 +7491,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.537812Z",
+      "scraped_at": "2026-04-28T01:52:12.128640Z",
       "days_to_sale": 9,
       "price": 88128,
       "arv": 122400,
@@ -7558,7 +7558,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.542550Z",
+      "scraped_at": "2026-04-28T01:52:12.135507Z",
       "days_to_sale": 9,
       "price": 106272,
       "arv": 147600,
@@ -7625,7 +7625,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.544990Z",
+      "scraped_at": "2026-04-28T01:52:12.138951Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7692,7 +7692,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.547466Z",
+      "scraped_at": "2026-04-28T01:52:12.142497Z",
       "days_to_sale": 9,
       "price": 129600,
       "arv": 180000,
@@ -7759,7 +7759,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.551444Z",
+      "scraped_at": "2026-04-28T01:52:12.147969Z",
       "days_to_sale": 9,
       "price": 88128,
       "arv": 122400,
@@ -7826,7 +7826,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.553932Z",
+      "scraped_at": "2026-04-28T01:52:12.151633Z",
       "days_to_sale": 9,
       "price": 88128,
       "arv": 122400,
@@ -7893,7 +7893,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.556331Z",
+      "scraped_at": "2026-04-28T01:52:12.155217Z",
       "days_to_sale": 9,
       "price": 237600,
       "arv": 330000,
@@ -7960,7 +7960,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.558696Z",
+      "scraped_at": "2026-04-28T01:52:12.158733Z",
       "days_to_sale": 9,
       "price": 237600,
       "arv": 330000,
@@ -8027,7 +8027,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248592Z",
+      "scraped_at": "2026-04-28T01:52:23.032796Z",
       "days_to_sale": 9,
       "price": 172800,
       "arv": 240000,
@@ -8094,7 +8094,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248684Z",
+      "scraped_at": "2026-04-28T01:52:23.032908Z",
       "days_to_sale": 9,
       "price": 172800,
       "arv": 240000,
@@ -8161,7 +8161,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.561903Z",
+      "scraped_at": "2026-04-28T01:52:23.256935Z",
       "days_to_sale": 9,
       "price": 208800,
       "arv": 290000,
@@ -8228,7 +8228,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.561985Z",
+      "scraped_at": "2026-04-28T01:52:23.257052Z",
       "days_to_sale": 9,
       "price": 237600,
       "arv": 330000,
@@ -8295,7 +8295,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.561091Z",
+      "scraped_at": "2026-04-28T01:52:12.162291Z",
       "days_to_sale": 10,
       "price": 198000,
       "arv": 275000,
@@ -8362,7 +8362,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562063Z",
+      "scraped_at": "2026-04-28T01:52:23.257156Z",
       "days_to_sale": 10,
       "price": 288000,
       "arv": 400000,
@@ -8429,7 +8429,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.566003Z",
+      "scraped_at": "2026-04-28T01:52:12.169449Z",
       "days_to_sale": 13,
       "price": 187200,
       "arv": 260000,
@@ -8496,7 +8496,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.568486Z",
+      "scraped_at": "2026-04-28T01:52:12.173039Z",
       "days_to_sale": 13,
       "price": 304980,
       "arv": 391000,
@@ -8563,7 +8563,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.573958Z",
+      "scraped_at": "2026-04-28T01:52:12.180308Z",
       "days_to_sale": 13,
       "price": 198000,
       "arv": 275000,
@@ -8630,7 +8630,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.576403Z",
+      "scraped_at": "2026-04-28T01:52:12.183872Z",
       "days_to_sale": 13,
       "price": 298800,
       "arv": 415000,
@@ -8696,7 +8696,7 @@
         "Fairfax County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645309Z",
+      "scraped_at": "2026-04-28T01:52:07.503899Z",
       "days_to_sale": 14,
       "price": 487500,
       "arv": 625000,
@@ -8763,7 +8763,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.583507Z",
+      "scraped_at": "2026-04-28T01:52:12.192328Z",
       "days_to_sale": 14,
       "price": 354960,
       "arv": 493000,
@@ -8830,7 +8830,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.586110Z",
+      "scraped_at": "2026-04-28T01:52:12.198433Z",
       "days_to_sale": 14,
       "price": 354960,
       "arv": 493000,
@@ -8897,7 +8897,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.588889Z",
+      "scraped_at": "2026-04-28T01:52:12.203997Z",
       "days_to_sale": 14,
       "price": 522000,
       "arv": 725000,
@@ -8964,7 +8964,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.592910Z",
+      "scraped_at": "2026-04-28T01:52:12.209510Z",
       "days_to_sale": 14,
       "price": 522000,
       "arv": 725000,
@@ -9031,7 +9031,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.612050Z",
+      "scraped_at": "2026-04-28T01:52:12.237306Z",
       "days_to_sale": 14,
       "price": 198000,
       "arv": 275000,
@@ -9098,7 +9098,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562149Z",
+      "scraped_at": "2026-04-28T01:52:23.257257Z",
       "days_to_sale": 14,
       "price": 309600,
       "arv": 430000,
@@ -9164,7 +9164,7 @@
         "Chesapeake City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561617Z",
+      "scraped_at": "2026-04-28T01:52:07.393796Z",
       "days_to_sale": 15,
       "price": 248400,
       "arv": 345000,
@@ -9230,7 +9230,7 @@
         "James City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645412Z",
+      "scraped_at": "2026-04-28T01:52:07.504025Z",
       "days_to_sale": 15,
       "price": 198000,
       "arv": 275000,
@@ -9296,7 +9296,7 @@
         "Lancaster County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.712881Z",
+      "scraped_at": "2026-04-28T01:52:07.591897Z",
       "days_to_sale": 15,
       "price": 198000,
       "arv": 275000,
@@ -9362,7 +9362,7 @@
         "York County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713171Z",
+      "scraped_at": "2026-04-28T01:52:07.592276Z",
       "days_to_sale": 15,
       "price": 198000,
       "arv": 275000,
@@ -9429,7 +9429,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.614679Z",
+      "scraped_at": "2026-04-28T01:52:12.241123Z",
       "days_to_sale": 16,
       "price": 198000,
       "arv": 275000,
@@ -9496,7 +9496,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562229Z",
+      "scraped_at": "2026-04-28T01:52:23.257361Z",
       "days_to_sale": 16,
       "price": 129600,
       "arv": 180000,
@@ -9563,7 +9563,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562306Z",
+      "scraped_at": "2026-04-28T01:52:23.257459Z",
       "days_to_sale": 16,
       "price": 129600,
       "arv": 180000,
@@ -9630,7 +9630,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.622197Z",
+      "scraped_at": "2026-04-28T01:52:12.251674Z",
       "days_to_sale": 17,
       "price": 288000,
       "arv": 400000,
@@ -9697,7 +9697,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562383Z",
+      "scraped_at": "2026-04-28T01:52:23.257553Z",
       "days_to_sale": 17,
       "price": 288000,
       "arv": 400000,
@@ -9763,7 +9763,7 @@
         "Craig County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645276Z",
+      "scraped_at": "2026-04-28T01:52:07.503859Z",
       "days_to_sale": 20,
       "price": 198000,
       "arv": 275000,
@@ -9829,7 +9829,7 @@
         "Prince William County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713046Z",
+      "scraped_at": "2026-04-28T01:52:07.592110Z",
       "days_to_sale": 21,
       "price": 298800,
       "arv": 415000,
@@ -9896,7 +9896,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562461Z",
+      "scraped_at": "2026-04-28T01:52:23.257646Z",
       "days_to_sale": 21,
       "price": 302400,
       "arv": 420000,
@@ -9962,7 +9962,7 @@
         "Norfolk City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.561824Z",
+      "scraped_at": "2026-04-28T01:52:07.394037Z",
       "days_to_sale": 22,
       "price": 190800,
       "arv": 265000,
@@ -10029,7 +10029,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248788Z",
+      "scraped_at": "2026-04-28T01:52:23.033024Z",
       "days_to_sale": 22,
       "price": 546000,
       "arv": 700000,
@@ -10096,7 +10096,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248876Z",
+      "scraped_at": "2026-04-28T01:52:23.033141Z",
       "days_to_sale": 22,
       "price": 198000,
       "arv": 275000,
@@ -10163,7 +10163,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.248965Z",
+      "scraped_at": "2026-04-28T01:52:23.033250Z",
       "days_to_sale": 22,
       "price": 198000,
       "arv": 275000,
@@ -10230,7 +10230,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562535Z",
+      "scraped_at": "2026-04-28T01:52:23.257797Z",
       "days_to_sale": 22,
       "price": 93600,
       "arv": 130000,
@@ -10296,7 +10296,7 @@
         "Virginia Beach City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645243Z",
+      "scraped_at": "2026-04-28T01:52:07.503817Z",
       "days_to_sale": 23,
       "price": 193596,
       "arv": 248200,
@@ -10363,7 +10363,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249048Z",
+      "scraped_at": "2026-04-28T01:52:23.033365Z",
       "days_to_sale": 23,
       "price": 183600,
       "arv": 255000,
@@ -10430,7 +10430,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249134Z",
+      "scraped_at": "2026-04-28T01:52:23.033552Z",
       "days_to_sale": 23,
       "price": 169200,
       "arv": 235000,
@@ -10497,7 +10497,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249216Z",
+      "scraped_at": "2026-04-28T01:52:23.033758Z",
       "days_to_sale": 23,
       "price": 190800,
       "arv": 265000,
@@ -10564,7 +10564,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562608Z",
+      "scraped_at": "2026-04-28T01:52:23.257898Z",
       "days_to_sale": 23,
       "price": 129600,
       "arv": 180000,
@@ -10631,7 +10631,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562684Z",
+      "scraped_at": "2026-04-28T01:52:23.258000Z",
       "days_to_sale": 23,
       "price": 208800,
       "arv": 290000,
@@ -10698,7 +10698,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249299Z",
+      "scraped_at": "2026-04-28T01:52:23.033938Z",
       "days_to_sale": 24,
       "price": 234000,
       "arv": 325000,
@@ -10765,7 +10765,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562769Z",
+      "scraped_at": "2026-04-28T01:52:23.258095Z",
       "days_to_sale": 24,
       "price": 450000,
       "arv": 625000,
@@ -10832,7 +10832,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.627010Z",
+      "scraped_at": "2026-04-28T01:52:12.258870Z",
       "days_to_sale": 28,
       "price": 522000,
       "arv": 725000,
@@ -10899,7 +10899,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.629521Z",
+      "scraped_at": "2026-04-28T01:52:12.262533Z",
       "days_to_sale": 28,
       "price": 522000,
       "arv": 725000,
@@ -10966,7 +10966,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.633328Z",
+      "scraped_at": "2026-04-28T01:52:12.268272Z",
       "days_to_sale": 28,
       "price": 354960,
       "arv": 493000,
@@ -11033,7 +11033,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.635820Z",
+      "scraped_at": "2026-04-28T01:52:12.272371Z",
       "days_to_sale": 28,
       "price": 354960,
       "arv": 493000,
@@ -11100,7 +11100,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.638239Z",
+      "scraped_at": "2026-04-28T01:52:12.276333Z",
       "days_to_sale": 28,
       "price": 198000,
       "arv": 275000,
@@ -11167,7 +11167,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.640644Z",
+      "scraped_at": "2026-04-28T01:52:12.280202Z",
       "days_to_sale": 28,
       "price": 83160,
       "arv": 115500,
@@ -11234,7 +11234,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.643118Z",
+      "scraped_at": "2026-04-28T01:52:12.283992Z",
       "days_to_sale": 28,
       "price": 133200,
       "arv": 185000,
@@ -11301,7 +11301,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562842Z",
+      "scraped_at": "2026-04-28T01:52:23.258188Z",
       "days_to_sale": 28,
       "price": 144000,
       "arv": 200000,
@@ -11368,7 +11368,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.650240Z",
+      "scraped_at": "2026-04-28T01:52:12.295088Z",
       "days_to_sale": 29,
       "price": 298800,
       "arv": 415000,
@@ -11435,7 +11435,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.652673Z",
+      "scraped_at": "2026-04-28T01:52:12.298772Z",
       "days_to_sale": 29,
       "price": 234000,
       "arv": 325000,
@@ -11502,7 +11502,7 @@
         "Orlans"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:38.657358Z",
+      "scraped_at": "2026-04-28T01:52:12.306066Z",
       "days_to_sale": 29,
       "price": 277200,
       "arv": 385000,
@@ -11569,7 +11569,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562914Z",
+      "scraped_at": "2026-04-28T01:52:23.258284Z",
       "days_to_sale": 30,
       "price": 129600,
       "arv": 180000,
@@ -11636,7 +11636,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.562985Z",
+      "scraped_at": "2026-04-28T01:52:23.258376Z",
       "days_to_sale": 30,
       "price": 208800,
       "arv": 290000,
@@ -11703,7 +11703,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.563061Z",
+      "scraped_at": "2026-04-28T01:52:23.258467Z",
       "days_to_sale": 30,
       "price": 208800,
       "arv": 290000,
@@ -11770,7 +11770,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249379Z",
+      "scraped_at": "2026-04-28T01:52:23.034050Z",
       "days_to_sale": 35,
       "price": 69300,
       "arv": 96250,
@@ -11837,7 +11837,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249458Z",
+      "scraped_at": "2026-04-28T01:52:23.034163Z",
       "days_to_sale": 38,
       "price": 219600,
       "arv": 305000,
@@ -11904,7 +11904,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249538Z",
+      "scraped_at": "2026-04-28T01:52:23.034283Z",
       "days_to_sale": 38,
       "price": 248400,
       "arv": 345000,
@@ -11971,7 +11971,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249617Z",
+      "scraped_at": "2026-04-28T01:52:23.034394Z",
       "days_to_sale": 38,
       "price": 190800,
       "arv": 265000,
@@ -12038,7 +12038,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249698Z",
+      "scraped_at": "2026-04-28T01:52:23.034525Z",
       "days_to_sale": 42,
       "price": 198000,
       "arv": 275000,
@@ -12104,7 +12104,7 @@
         "Portsmouth City"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.645077Z",
+      "scraped_at": "2026-04-28T01:52:07.503591Z",
       "days_to_sale": 44,
       "price": 169200,
       "arv": 235000,
@@ -12171,7 +12171,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249795Z",
+      "scraped_at": "2026-04-28T01:52:23.034638Z",
       "days_to_sale": 49,
       "price": 198000,
       "arv": 275000,
@@ -12238,7 +12238,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249876Z",
+      "scraped_at": "2026-04-28T01:52:23.034782Z",
       "days_to_sale": 49,
       "price": 198000,
       "arv": 275000,
@@ -12305,7 +12305,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.563140Z",
+      "scraped_at": "2026-04-28T01:52:23.258560Z",
       "days_to_sale": 49,
       "price": 156672,
       "arv": 217600,
@@ -12372,7 +12372,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.249955Z",
+      "scraped_at": "2026-04-28T01:52:23.034893Z",
       "days_to_sale": 55,
       "price": 219600,
       "arv": 305000,
@@ -12439,7 +12439,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250069Z",
+      "scraped_at": "2026-04-28T01:52:23.035039Z",
       "days_to_sale": 55,
       "price": 172800,
       "arv": 240000,
@@ -12505,7 +12505,7 @@
         "Shenandoah County"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:33.713110Z",
+      "scraped_at": "2026-04-28T01:52:07.592193Z",
       "days_to_sale": 56,
       "price": 198000,
       "arv": 275000,
@@ -12572,7 +12572,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250157Z",
+      "scraped_at": "2026-04-28T01:52:23.035146Z",
       "days_to_sale": 57,
       "price": 198000,
       "arv": 275000,
@@ -12639,7 +12639,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250238Z",
+      "scraped_at": "2026-04-28T01:52:23.035247Z",
       "days_to_sale": 57,
       "price": 69300,
       "arv": 96250,
@@ -12706,7 +12706,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250318Z",
+      "scraped_at": "2026-04-28T01:52:23.035355Z",
       "days_to_sale": 57,
       "price": 198000,
       "arv": 275000,
@@ -12773,7 +12773,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250402Z",
+      "scraped_at": "2026-04-28T01:52:23.035460Z",
       "days_to_sale": 57,
       "price": 198000,
       "arv": 275000,
@@ -12840,7 +12840,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250487Z",
+      "scraped_at": "2026-04-28T01:52:23.035567Z",
       "days_to_sale": 57,
       "price": 198000,
       "arv": 275000,
@@ -12907,7 +12907,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.563216Z",
+      "scraped_at": "2026-04-28T01:52:23.258671Z",
       "days_to_sale": 58,
       "price": 106272,
       "arv": 147600,
@@ -12974,7 +12974,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.568408Z",
+      "scraped_at": "2026-04-28T01:52:20.743843Z",
       "days_to_sale": 64,
       "price": 106250,
       "arv": 275000,
@@ -13041,7 +13041,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250570Z",
+      "scraped_at": "2026-04-28T01:52:23.035699Z",
       "days_to_sale": 64,
       "price": 198000,
       "arv": 275000,
@@ -13108,7 +13108,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250655Z",
+      "scraped_at": "2026-04-28T01:52:23.035811Z",
       "days_to_sale": 64,
       "price": 198000,
       "arv": 275000,
@@ -13175,7 +13175,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.515309Z",
+      "scraped_at": "2026-04-28T01:52:20.680940Z",
       "days_to_sale": 65,
       "price": 118514,
       "arv": 275000,
@@ -13242,7 +13242,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.517765Z",
+      "scraped_at": "2026-04-28T01:52:20.684134Z",
       "days_to_sale": 65,
       "price": 204478,
       "arv": 275000,
@@ -13309,7 +13309,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.523284Z",
+      "scraped_at": "2026-04-28T01:52:20.693052Z",
       "days_to_sale": 65,
       "price": 176800,
       "arv": 275000,
@@ -13376,7 +13376,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.525670Z",
+      "scraped_at": "2026-04-28T01:52:20.697896Z",
       "days_to_sale": 65,
       "price": 98651,
       "arv": 275000,
@@ -13443,7 +13443,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.533505Z",
+      "scraped_at": "2026-04-28T01:52:20.708393Z",
       "days_to_sale": 65,
       "price": 259675,
       "arv": 275000,
@@ -13510,7 +13510,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.539884Z",
+      "scraped_at": "2026-04-28T01:52:20.719251Z",
       "days_to_sale": 65,
       "price": 200018,
       "arv": 275000,
@@ -13577,7 +13577,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.551127Z",
+      "scraped_at": "2026-04-28T01:52:20.729911Z",
       "days_to_sale": 65,
       "price": 298732,
       "arv": 96250,
@@ -13644,7 +13644,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.560367Z",
+      "scraped_at": "2026-04-28T01:52:20.733754Z",
       "days_to_sale": 65,
       "price": 100326,
       "arv": 275000,
@@ -13711,7 +13711,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.563331Z",
+      "scraped_at": "2026-04-28T01:52:20.737177Z",
       "days_to_sale": 65,
       "price": 64388,
       "arv": 275000,
@@ -13778,7 +13778,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.565965Z",
+      "scraped_at": "2026-04-28T01:52:20.740527Z",
       "days_to_sale": 65,
       "price": 102184,
       "arv": 275000,
@@ -13845,7 +13845,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250751Z",
+      "scraped_at": "2026-04-28T01:52:23.035923Z",
       "days_to_sale": 65,
       "price": 198000,
       "arv": 275000,
@@ -13912,7 +13912,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250837Z",
+      "scraped_at": "2026-04-28T01:52:23.036026Z",
       "days_to_sale": 65,
       "price": 198000,
       "arv": 275000,
@@ -13979,7 +13979,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.505258Z",
+      "scraped_at": "2026-04-28T01:52:20.667625Z",
       "days_to_sale": 69,
       "price": 50405,
       "arv": 275000,
@@ -14046,7 +14046,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.512546Z",
+      "scraped_at": "2026-04-28T01:52:20.677534Z",
       "days_to_sale": 69,
       "price": 131837,
       "arv": 275000,
@@ -14113,7 +14113,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.520861Z",
+      "scraped_at": "2026-04-28T01:52:20.687339Z",
       "days_to_sale": 69,
       "price": 153000,
       "arv": 275000,
@@ -14180,7 +14180,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.489534Z",
+      "scraped_at": "2026-04-28T01:52:20.647179Z",
       "days_to_sale": 70,
       "price": 183699,
       "arv": 365000,
@@ -14247,7 +14247,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.492335Z",
+      "scraped_at": "2026-04-28T01:52:20.651217Z",
       "days_to_sale": 70,
       "price": 104380,
       "arv": 400000,
@@ -14314,7 +14314,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.494924Z",
+      "scraped_at": "2026-04-28T01:52:20.654574Z",
       "days_to_sale": 70,
       "price": 317475,
       "arv": 325000,
@@ -14381,7 +14381,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.497705Z",
+      "scraped_at": "2026-04-28T01:52:20.658085Z",
       "days_to_sale": 70,
       "price": 289000,
       "arv": 385000,
@@ -14448,7 +14448,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.500159Z",
+      "scraped_at": "2026-04-28T01:52:20.661217Z",
       "days_to_sale": 70,
       "price": 230945,
       "arv": 275000,
@@ -14515,7 +14515,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.502723Z",
+      "scraped_at": "2026-04-28T01:52:20.664473Z",
       "days_to_sale": 70,
       "price": 185300,
       "arv": 225500,
@@ -14582,7 +14582,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.507866Z",
+      "scraped_at": "2026-04-28T01:52:20.671289Z",
       "days_to_sale": 70,
       "price": 160630,
       "arv": 400000,
@@ -14649,7 +14649,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.510185Z",
+      "scraped_at": "2026-04-28T01:52:20.674412Z",
       "days_to_sale": 70,
       "price": 519554,
       "arv": 385000,
@@ -14716,7 +14716,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.483823Z",
+      "scraped_at": "2026-04-28T01:52:20.640007Z",
       "days_to_sale": 71,
       "price": 263500,
       "arv": 575000,
@@ -14783,7 +14783,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.486594Z",
+      "scraped_at": "2026-04-28T01:52:20.643520Z",
       "days_to_sale": 71,
       "price": 359049,
       "arv": 575000,
@@ -14850,7 +14850,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.250928Z",
+      "scraped_at": "2026-04-28T01:52:23.036133Z",
       "days_to_sale": 71,
       "price": 219600,
       "arv": 305000,
@@ -14917,7 +14917,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.251010Z",
+      "scraped_at": "2026-04-28T01:52:23.036235Z",
       "days_to_sale": 71,
       "price": 248400,
       "arv": 345000,
@@ -14984,7 +14984,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.251093Z",
+      "scraped_at": "2026-04-28T01:52:23.036360Z",
       "days_to_sale": 71,
       "price": 198000,
       "arv": 275000,
@@ -15051,7 +15051,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.251175Z",
+      "scraped_at": "2026-04-28T01:52:23.036465Z",
       "days_to_sale": 71,
       "price": 169200,
       "arv": 235000,
@@ -15118,7 +15118,7 @@
         "Aldridge Pite"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:46.480933Z",
+      "scraped_at": "2026-04-28T01:52:20.636435Z",
       "days_to_sale": 78,
       "price": 350279,
       "arv": 625000,
@@ -15185,7 +15185,7 @@
         "McCabe"
       ],
       "status": "active",
-      "scraped_at": "2026-04-28T01:44:49.251255Z",
+      "scraped_at": "2026-04-28T01:52:23.036564Z",
       "days_to_sale": 80,
       "price": 198000,
       "arv": 275000,
@@ -15253,7 +15253,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804848Z",
+      "scraped_at": "2026-04-28T01:52:24.911862Z",
       "days_to_sale": null,
       "owner_name": "BANKS, ANTOINE",
       "owner_address": "7920 16TH ST NW, WASHINGTON DC 20012-1210",
@@ -15327,7 +15327,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804872Z",
+      "scraped_at": "2026-04-28T01:52:24.911893Z",
       "days_to_sale": null,
       "owner_name": "LEVINE, JULIUS S",
       "owner_address": "1344 LOCUST RD NW, WASHINGTON DC 20012-1319",
@@ -15401,7 +15401,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804888Z",
+      "scraped_at": "2026-04-28T01:52:24.911914Z",
       "days_to_sale": null,
       "owner_name": "COCROFT, HARACE E",
       "owner_address": "7805 MORNINGSIDE DR NW, WASHINGTON DC 20012-1448",
@@ -15475,7 +15475,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804902Z",
+      "scraped_at": "2026-04-28T01:52:24.911931Z",
       "days_to_sale": null,
       "owner_name": "LUCAS, JOHNSIE L",
       "owner_address": "1314 KALMIA RD NW, WASHINGTON DC 20012-1445",
@@ -15549,7 +15549,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804915Z",
+      "scraped_at": "2026-04-28T01:52:24.911947Z",
       "days_to_sale": null,
       "owner_name": "RHIZOMEDC INC",
       "owner_address": "6950 MAPLE ST NW, WASHINGTON DC 20012-2014",
@@ -15623,7 +15623,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804929Z",
+      "scraped_at": "2026-04-28T01:52:24.911964Z",
       "days_to_sale": null,
       "owner_name": "AHAHU LLC",
       "owner_address": "180 HIGH PARK LN, SILVER SPRING MD 20910-5834",
@@ -15698,7 +15698,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804941Z",
+      "scraped_at": "2026-04-28T01:52:24.911980Z",
       "days_to_sale": null,
       "owner_name": "EBENEZER BEAUTY, LLC",
       "owner_address": "7851 EASTERN AVE, SILVER SPRING MD 20910-4829",
@@ -15773,7 +15773,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804954Z",
+      "scraped_at": "2026-04-28T01:52:24.911996Z",
       "days_to_sale": null,
       "owner_name": "EBENEZER BEAUTY, LLC",
       "owner_address": "7851 EASTERN AVE, SILVER SPRING MD 20910-4829",
@@ -15848,7 +15848,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804966Z",
+      "scraped_at": "2026-04-28T01:52:24.912012Z",
       "days_to_sale": null,
       "owner_name": "SHOKES, URSULA",
       "owner_address": "403 LLOYD ST S, AHOSKIE NC 27910-4109",
@@ -15923,7 +15923,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804978Z",
+      "scraped_at": "2026-04-28T01:52:24.912027Z",
       "days_to_sale": null,
       "owner_name": "7538 13TH LLC",
       "owner_address": "5801 NICHOLSON LN APT 1011, ROCKVILLE MD 20852-5725",
@@ -15998,7 +15998,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.804991Z",
+      "scraped_at": "2026-04-28T01:52:24.912043Z",
       "days_to_sale": null,
       "owner_name": "STONEBRIDGE DC LLC",
       "owner_address": "700 12TH ST NW, WASHINGTON DC 20005-3945",
@@ -16072,7 +16072,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805004Z",
+      "scraped_at": "2026-04-28T01:52:24.912059Z",
       "days_to_sale": null,
       "owner_name": "6600 LLC CATHERINE W H MAO HSU",
       "owner_address": "6600 SANDY SPRINGS RD NW, WASHINGTON DC 20012-2143",
@@ -16146,7 +16146,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805016Z",
+      "scraped_at": "2026-04-28T01:52:24.912075Z",
       "days_to_sale": null,
       "owner_name": "6600 LLC CATHERINE W H MAO HSU",
       "owner_address": "6600 SANDY SPRINGS RD NW, WASHINGTON DC 20012-2143",
@@ -16220,7 +16220,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805028Z",
+      "scraped_at": "2026-04-28T01:52:24.912090Z",
       "days_to_sale": null,
       "owner_name": "6600 LLC CATHERINE W H MAO HSU",
       "owner_address": "6600 SANDY SPRINGS RD NW, WASHINGTON DC 20012-2143",
@@ -16294,7 +16294,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805041Z",
+      "scraped_at": "2026-04-28T01:52:24.912105Z",
       "days_to_sale": null,
       "owner_name": "MIRAS, WILLIAM R",
       "owner_address": "801 VAN BUREN ST NW, WASHINGTON DC 20012-2609",
@@ -16368,7 +16368,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805053Z",
+      "scraped_at": "2026-04-28T01:52:24.912120Z",
       "days_to_sale": null,
       "owner_name": "SIMEGN, DEREJE A",
       "owner_address": "110 VAN BUREN ST NW, WASHINGTON DC 20012-2149",
@@ -16442,7 +16442,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805065Z",
+      "scraped_at": "2026-04-28T01:52:24.912134Z",
       "days_to_sale": null,
       "owner_name": "VIOLA M TOLAR REVOCABLE LIVING TRUST",
       "owner_address": "6513 13TH ST NW, WASHINGTON DC 20012-2903",
@@ -16516,7 +16516,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805078Z",
+      "scraped_at": "2026-04-28T01:52:24.912150Z",
       "days_to_sale": null,
       "owner_name": "ROBINSON, C W",
       "owner_address": "2908 SPRIGGS REQUEST WAY, MITCHELLVILLE MD 20721-2582",
@@ -16591,7 +16591,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805092Z",
+      "scraped_at": "2026-04-28T01:52:24.912166Z",
       "days_to_sale": null,
       "owner_name": "HAASTRUP-AKINTUNDE, LORIELLE M",
       "owner_address": "1367 UNDERWOOD ST NW, WASHINGTON DC 20012-2925",
@@ -16665,7 +16665,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805104Z",
+      "scraped_at": "2026-04-28T01:52:24.912181Z",
       "days_to_sale": null,
       "owner_name": "THE HYSONG REALTY COMPANY",
       "owner_address": "6510 16TH ST NW, WASHINGTON DC 20012-2810",
@@ -16739,7 +16739,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805115Z",
+      "scraped_at": "2026-04-28T01:52:24.912195Z",
       "days_to_sale": null,
       "owner_name": "GILLIS, EVELYN",
       "owner_address": "6341 16TH ST NW, WASHINGTON DC 20011-8014",
@@ -16813,7 +16813,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805128Z",
+      "scraped_at": "2026-04-28T01:52:24.912212Z",
       "days_to_sale": null,
       "owner_name": "HUSBAND AND WIFE LLC",
       "owner_address": "3857 FARRAGUT AVE, KENSINGTON MD 20895-2004",
@@ -16888,7 +16888,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805140Z",
+      "scraped_at": "2026-04-28T01:52:24.912227Z",
       "days_to_sale": null,
       "owner_name": "NIXON, GLORIA B",
       "owner_address": "6333 16TH ST NW, WASHINGTON DC 20011-8014",
@@ -16962,7 +16962,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805153Z",
+      "scraped_at": "2026-04-28T01:52:24.912244Z",
       "days_to_sale": null,
       "owner_name": "EMORY BEACON OF LIGHT INC",
       "owner_address": "6100 GEORGIA AVE NW, WASHINGTON DC 20011-5110",
@@ -17036,7 +17036,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805165Z",
+      "scraped_at": "2026-04-28T01:52:24.912260Z",
       "days_to_sale": null,
       "owner_name": "HOWARD, ANGIE L",
       "owner_address": "23 TUCKERMAN ST NE, WASHINGTON DC 20011-1415",
@@ -17110,7 +17110,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805178Z",
+      "scraped_at": "2026-04-28T01:52:24.912276Z",
       "days_to_sale": null,
       "owner_name": "ALAMGIR, MOHAMMED",
       "owner_address": "600 TUCKERMAN ST NW, WASHINGTON DC 20011-1251",
@@ -17184,7 +17184,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805190Z",
+      "scraped_at": "2026-04-28T01:52:24.912292Z",
       "days_to_sale": null,
       "owner_name": "BROWN, KIRK O",
       "owner_address": "1315 SOMERSET PL NW, WASHINGTON DC 20011-1134",
@@ -17258,7 +17258,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805203Z",
+      "scraped_at": "2026-04-28T01:52:24.912307Z",
       "days_to_sale": null,
       "owner_name": "BROWN, PAULA E",
       "owner_address": "6310 PINEY BRANCH RD NW, WASHINGTON DC 20011-1123",
@@ -17332,7 +17332,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805216Z",
+      "scraped_at": "2026-04-28T01:52:24.912323Z",
       "days_to_sale": null,
       "owner_name": "CAR, MARGARET",
       "owner_address": "726 SOMERSET PL NW, WASHINGTON DC 20011-1220",
@@ -17406,7 +17406,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805227Z",
+      "scraped_at": "2026-04-28T01:52:24.912338Z",
       "days_to_sale": null,
       "owner_name": "ANDERSON, T G",
       "owner_address": "6300 N CAPITOL ST NW, WASHINGTON DC 20011-1410",
@@ -17480,7 +17480,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805240Z",
+      "scraped_at": "2026-04-28T01:52:24.912353Z",
       "days_to_sale": null,
       "owner_name": "MARTIN, BETTY",
       "owner_address": "38 SHERIDAN ST NE, WASHINGTON DC 20011-1412",
@@ -17554,7 +17554,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805254Z",
+      "scraped_at": "2026-04-28T01:52:24.912370Z",
       "days_to_sale": null,
       "owner_name": "BEYENE, SELAMAWIT",
       "owner_address": "1018 CRESTHAVEN DR, SILVER SPRING MD 20903-1601",
@@ -17629,7 +17629,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805266Z",
+      "scraped_at": "2026-04-28T01:52:24.912384Z",
       "days_to_sale": null,
       "owner_name": "CRAWFORD, DERRICK J",
       "owner_address": "603 SHERIDAN ST NW, WASHINGTON DC 20011-1242",
@@ -17703,7 +17703,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805278Z",
+      "scraped_at": "2026-04-28T01:52:24.912400Z",
       "days_to_sale": null,
       "owner_name": "DENNIS, LISA P",
       "owner_address": "922 SHERIDAN ST NW, WASHINGTON DC 20011-1129",
@@ -17777,7 +17777,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805291Z",
+      "scraped_at": "2026-04-28T01:52:24.912416Z",
       "days_to_sale": null,
       "owner_name": "ASFAW, TIRSIT S",
       "owner_address": "401 E 86TH ST APT 11J, NEW YORK NY 10028-6416",
@@ -17852,7 +17852,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805302Z",
+      "scraped_at": "2026-04-28T01:52:24.912431Z",
       "days_to_sale": null,
       "owner_name": "ARASH RAZNAHAN TRUSTEE",
       "owner_address": "3459 VIRGINIA OAKS DR, OAKTON VA 22124-2429",
@@ -17927,7 +17927,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805315Z",
+      "scraped_at": "2026-04-28T01:52:24.912446Z",
       "days_to_sale": null,
       "owner_name": "ALEXANDER, IRENE V",
       "owner_address": "714 ROXBORO PL NW, WASHINGTON DC 20011-1216",
@@ -18001,7 +18001,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805326Z",
+      "scraped_at": "2026-04-28T01:52:24.912462Z",
       "days_to_sale": null,
       "owner_name": "METMAR LLC",
       "owner_address": "6039 BURNETT ST, ALEXANDRIA VA 22310-2633",
@@ -18076,7 +18076,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805340Z",
+      "scraped_at": "2026-04-28T01:52:24.912480Z",
       "days_to_sale": null,
       "owner_name": "CHINKHOTA, JOHN",
       "owner_address": "2300 WASHINGTON PL NE APT 437, WASHINGTON DC 20018-1061",
@@ -18150,7 +18150,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805352Z",
+      "scraped_at": "2026-04-28T01:52:24.912496Z",
       "days_to_sale": null,
       "owner_name": "JOHNSON, P",
       "owner_address": "13408 DONCASTER LN, SILVER SPRING MD 20904-1104",
@@ -18225,7 +18225,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805365Z",
+      "scraped_at": "2026-04-28T01:52:24.912512Z",
       "days_to_sale": null,
       "owner_name": "COLOMBO, ADRIANA",
       "owner_address": "726 ROXBORO PL NW, WASHINGTON DC 20011-1216",
@@ -18299,7 +18299,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805377Z",
+      "scraped_at": "2026-04-28T01:52:24.912527Z",
       "days_to_sale": null,
       "owner_name": "THIRTEENTH 202 LLC",
       "owner_address": "6108 13TH ST NW, WASHINGTON DC 20011-5008",
@@ -18373,7 +18373,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805391Z",
+      "scraped_at": "2026-04-28T01:52:24.912543Z",
       "days_to_sale": null,
       "owner_name": "ASHTON, PATRICIA L",
       "owner_address": "12911 FOX BOW DR, UPPER MARLBORO MD 20774-8600",
@@ -18448,7 +18448,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805404Z",
+      "scraped_at": "2026-04-28T01:52:24.912559Z",
       "days_to_sale": null,
       "owner_name": "BUTLER, LAUREEN J",
       "owner_address": "404 RITTENHOUSE ST NW, WASHINGTON DC 20011-1329",
@@ -18522,7 +18522,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805417Z",
+      "scraped_at": "2026-04-28T01:52:24.912574Z",
       "days_to_sale": null,
       "owner_name": "DELELEGNE, BEKELECH",
       "owner_address": "1680 WHITE OAK VISTA DR, SILVER SPRING MD 20904-4208",
@@ -18597,7 +18597,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805429Z",
+      "scraped_at": "2026-04-28T01:52:24.912589Z",
       "days_to_sale": null,
       "owner_name": "KC ONE DEVELOPMENTS LLC",
       "owner_address": "6002 MARQUETTE TER, BETHESDA MD 20817-1752",
@@ -18672,7 +18672,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805440Z",
+      "scraped_at": "2026-04-28T01:52:24.912604Z",
       "days_to_sale": null,
       "owner_name": "BLESSED M AHAGHOTU",
       "owner_address": "740 RITTENHOUSE ST NW, WASHINGTON DC 20011-1256",
@@ -18746,7 +18746,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805452Z",
+      "scraped_at": "2026-04-28T01:52:24.912619Z",
       "days_to_sale": null,
       "owner_name": "HILL, JOSHUA I",
       "owner_address": "37 JANNEY LN, FREDERICKSBURG VA 22406-4959",
@@ -18821,7 +18821,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805465Z",
+      "scraped_at": "2026-04-28T01:52:24.912634Z",
       "days_to_sale": null,
       "owner_name": "MORRA, FRANK",
       "owner_address": "3510 MCKINLEY ST NW, WASHINGTON DC 20015-2514",
@@ -18895,7 +18895,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805477Z",
+      "scraped_at": "2026-04-28T01:52:24.912649Z",
       "days_to_sale": null,
       "owner_name": "G.P. CARPENTRY INC",
       "owner_address": "511 ASHTON RD, ASHTON MD 20861-3311",
@@ -18970,7 +18970,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805488Z",
+      "scraped_at": "2026-04-28T01:52:24.912687Z",
       "days_to_sale": null,
       "owner_name": "CAIN, KENNETH",
       "owner_address": "6397 HAVILAND MILL RD, CLARKSVILLE MD 21029-1317",
@@ -19045,7 +19045,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805501Z",
+      "scraped_at": "2026-04-28T01:52:24.912701Z",
       "days_to_sale": null,
       "owner_name": "CATHCART, NELLIE L",
       "owner_address": "315 QUINTANA PL NE, WASHINGTON DC 20011-1657",
@@ -19119,7 +19119,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805513Z",
+      "scraped_at": "2026-04-28T01:52:24.912717Z",
       "days_to_sale": null,
       "owner_name": "DEADMAN, AARON",
       "owner_address": "259 QUACKENBOS ST NW, WASHINGTON DC 20011-1444",
@@ -19193,7 +19193,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805525Z",
+      "scraped_at": "2026-04-28T01:52:24.912732Z",
       "days_to_sale": null,
       "owner_name": "MACKLIN, WILLIAM",
       "owner_address": "717 QUINCY ST NW, WASHINGTON DC 20011-5935",
@@ -19267,7 +19267,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805537Z",
+      "scraped_at": "2026-04-28T01:52:24.912748Z",
       "days_to_sale": null,
       "owner_name": "GIES, JOHN R",
       "owner_address": "1341 QUINCY ST NW, WASHINGTON DC 20011-5525",
@@ -19341,7 +19341,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805549Z",
+      "scraped_at": "2026-04-28T01:52:24.912765Z",
       "days_to_sale": null,
       "owner_name": "SIUM, TSEHAINESH",
       "owner_address": "908 PERRY PL NE, WASHINGTON DC 20017-1837",
@@ -19415,7 +19415,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805560Z",
+      "scraped_at": "2026-04-28T01:52:24.912780Z",
       "days_to_sale": null,
       "owner_name": "3706 14TH STREET NW LLC",
       "owner_address": "3706 14TH ST NW, WASHINGTON DC 20010-1321",
@@ -19489,7 +19489,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805573Z",
+      "scraped_at": "2026-04-28T01:52:24.912796Z",
       "days_to_sale": null,
       "owner_name": "3210 QUESADA STREET LLC",
       "owner_address": "5605 32ND ST NW, WASHINGTON DC 20015-1622",
@@ -19563,7 +19563,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805585Z",
+      "scraped_at": "2026-04-28T01:52:24.912811Z",
       "days_to_sale": null,
       "owner_name": "EMBASSY OF THE REPUBLIC OF BOTSWANA",
       "owner_address": "1531 NEW HAMPSHIRE AVE NW, WASHINGTON DC 20036-1203",
@@ -19637,7 +19637,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805596Z",
+      "scraped_at": "2026-04-28T01:52:24.912825Z",
       "days_to_sale": null,
       "owner_name": "GHUMAN PROPERTIES LLC",
       "owner_address": "5611 BIRCHLEAF PARK CT, CENTREVILLE VA 20120-3426",
@@ -19712,7 +19712,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805607Z",
+      "scraped_at": "2026-04-28T01:52:24.912839Z",
       "days_to_sale": null,
       "owner_name": "MILES, M P",
       "owner_address": "6426 6TH ST NW, WASHINGTON DC 20012-2662",
@@ -19786,7 +19786,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805619Z",
+      "scraped_at": "2026-04-28T01:52:24.912855Z",
       "days_to_sale": null,
       "owner_name": "MOQUETE, FRANCESCA D",
       "tax_class": "3",
@@ -19859,7 +19859,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805631Z",
+      "scraped_at": "2026-04-28T01:52:24.912870Z",
       "days_to_sale": null,
       "owner_name": "FEILDS, CAROLE",
       "owner_address": "1342 TEWKESBURY PL NW, WASHINGTON DC 20012-2922",
@@ -19933,7 +19933,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805643Z",
+      "scraped_at": "2026-04-28T01:52:24.912885Z",
       "days_to_sale": null,
       "owner_name": "FLORENCE, KAMERON B",
       "owner_address": "4823 BLAGDEN AVE NW, WASHINGTON DC 20011-3715",
@@ -20007,7 +20007,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805655Z",
+      "scraped_at": "2026-04-28T01:52:24.912899Z",
       "days_to_sale": null,
       "owner_name": "NOBACH, JEFFERY A",
       "owner_address": "6411 7TH ST NW, WASHINGTON DC 20012-2619",
@@ -20081,7 +20081,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805666Z",
+      "scraped_at": "2026-04-28T01:52:24.912913Z",
       "days_to_sale": null,
       "owner_name": "NARNOR-MADISON, NIIYO",
       "owner_address": "6414 8TH ST NW, WASHINGTON DC 20012-2630",
@@ -20155,7 +20155,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805677Z",
+      "scraped_at": "2026-04-28T01:52:24.912927Z",
       "days_to_sale": null,
       "owner_name": "REPUBLIC OF UPPER VOLTA",
       "owner_address": "6338 16TH ST NW, WASHINGTON DC 20011-8010",
@@ -20229,7 +20229,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805689Z",
+      "scraped_at": "2026-04-28T01:52:24.912941Z",
       "days_to_sale": null,
       "owner_name": "7530 GEORGIA AVENUE NW PARTNERS LLC",
       "owner_address": "3401 8TH ST NE, WASHINGTON DC 20017-1747",
@@ -20303,7 +20303,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805700Z",
+      "scraped_at": "2026-04-28T01:52:24.912955Z",
       "days_to_sale": null,
       "owner_name": "U.S. BANK NATIONAL ASSOCIATION",
       "owner_address": "1 MORTGAGE WAY # SV-01, MOUNT LAUREL NJ 08054-4637",
@@ -20378,7 +20378,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805712Z",
+      "scraped_at": "2026-04-28T01:52:24.912969Z",
       "days_to_sale": null,
       "owner_name": "YOLKUT, ADIR N",
       "owner_address": "7435 8TH ST NW, WASHINGTON DC 20012-1811",
@@ -20452,7 +20452,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805724Z",
+      "scraped_at": "2026-04-28T01:52:24.912984Z",
       "days_to_sale": null,
       "owner_name": "CAPITAL BUILDING INC",
       "owner_address": "PO BOX 150607, ALEXANDRIA VA 22315-0607",
@@ -20527,7 +20527,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805745Z",
+      "scraped_at": "2026-04-28T01:52:24.912999Z",
       "days_to_sale": null,
       "owner_name": "CHO, HAN K",
       "owner_address": "794 PORTO MIO WAY, LAS VEGAS NV 89138-6016",
@@ -20602,7 +20602,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805757Z",
+      "scraped_at": "2026-04-28T01:52:24.913017Z",
       "days_to_sale": null,
       "owner_name": "MARKA LLC",
       "owner_address": "7321 GEORGIA AVE NW, WASHINGTON DC 20012-1719",
@@ -20676,7 +20676,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805769Z",
+      "scraped_at": "2026-04-28T01:52:24.913034Z",
       "days_to_sale": null,
       "owner_name": "HOBART VENTURES LLC",
       "owner_address": "7826 EASTERN AVE NW STE 307, WASHINGTON DC 20012-1332",
@@ -20750,7 +20750,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805781Z",
+      "scraped_at": "2026-04-28T01:52:24.913048Z",
       "days_to_sale": null,
       "owner_name": "IMBROSCIO, MICHAEL X",
       "owner_address": "7211 16TH ST NW, WASHINGTON DC 20012-1539",
@@ -20824,7 +20824,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805793Z",
+      "scraped_at": "2026-04-28T01:52:24.913065Z",
       "days_to_sale": null,
       "owner_name": "WINMAR INC",
       "owner_address": "1010 WISCONSIN AVE NW STE 560, WASHINGTON DC 20007-3678",
@@ -20898,7 +20898,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805805Z",
+      "scraped_at": "2026-04-28T01:52:24.913081Z",
       "days_to_sale": null,
       "owner_name": "MARACAS VU LLC",
       "owner_address": "1032 6TH ST NE, WASHINGTON DC 20002-3562",
@@ -20972,7 +20972,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805816Z",
+      "scraped_at": "2026-04-28T01:52:24.913095Z",
       "days_to_sale": null,
       "owner_name": "MANZUETA, VICTOR D",
       "owner_address": "7114 7TH ST NW, WASHINGTON DC 20012-1802",
@@ -21046,7 +21046,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805829Z",
+      "scraped_at": "2026-04-28T01:52:24.913109Z",
       "days_to_sale": null,
       "owner_name": "DAWSON, JERMAINE",
       "owner_address": "1609 CRITTENDEN ST NE, WASHINGTON DC 20017-3126",
@@ -21120,7 +21120,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805841Z",
+      "scraped_at": "2026-04-28T01:52:24.913125Z",
       "days_to_sale": null,
       "owner_name": "PAVIT STEPHEN GEOERGE FAMILY TRUST",
       "owner_address": "5022 WARREN ST NW, WASHINGTON DC 20016-4370",
@@ -21194,7 +21194,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805854Z",
+      "scraped_at": "2026-04-28T01:52:24.913139Z",
       "days_to_sale": null,
       "owner_name": "PAVIT STEPHEN GEOERGE FAMILY TRUST",
       "owner_address": "5022 WARREN ST NW, WASHINGTON DC 20016-4370",
@@ -21268,7 +21268,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805865Z",
+      "scraped_at": "2026-04-28T01:52:24.913153Z",
       "days_to_sale": null,
       "owner_name": "BABU STEPHEN TRUSTEE",
       "owner_address": "6819 5TH ST NW, WASHINGTON DC 20012-1905",
@@ -21342,7 +21342,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805878Z",
+      "scraped_at": "2026-04-28T01:52:24.913168Z",
       "days_to_sale": null,
       "owner_name": "IRINA P KALINICHENKO",
       "owner_address": "743 BUTTERNUT ST NW, WASHINGTON DC 20012-2419",
@@ -21416,7 +21416,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805889Z",
+      "scraped_at": "2026-04-28T01:52:24.913182Z",
       "days_to_sale": null,
       "owner_name": "BADU STEPHEN TRUSTEE",
       "owner_address": "5022 WARREN ST NW, WASHINGTON DC 20016-4370",
@@ -21490,7 +21490,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805902Z",
+      "scraped_at": "2026-04-28T01:52:24.913198Z",
       "days_to_sale": null,
       "owner_name": "MCK CONSTRUCTION GROUP, LLC",
       "owner_address": "12500 CONNECTICUT AVE, SILVER SPRING MD 20906-4307",
@@ -21565,7 +21565,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805914Z",
+      "scraped_at": "2026-04-28T01:52:24.913212Z",
       "days_to_sale": null,
       "owner_name": "GUILDED CONSULTING LLC",
       "owner_address": "3389 STEPHENSON PL NW, WASHINGTON DC 20015-2451",
@@ -21639,7 +21639,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805925Z",
+      "scraped_at": "2026-04-28T01:52:24.913226Z",
       "days_to_sale": null,
       "owner_name": "GEBEYEHU, YONATAN",
       "owner_address": "6718 14TH PL NW, WASHINGTON DC 20012-2806",
@@ -21713,7 +21713,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805937Z",
+      "scraped_at": "2026-04-28T01:52:24.913241Z",
       "days_to_sale": null,
       "owner_name": "BETZ-HORN, BIANCA",
       "owner_address": "3304 SHORTRIDGE LN, MITCHELLVILLE MD 20721-2576",
@@ -21788,7 +21788,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805950Z",
+      "scraped_at": "2026-04-28T01:52:24.913257Z",
       "days_to_sale": null,
       "owner_name": "COOPER, ANDREW L",
       "owner_address": "5718 3RD PL NW, WASHINGTON DC 20011-2105",
@@ -21862,7 +21862,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805962Z",
+      "scraped_at": "2026-04-28T01:52:24.913272Z",
       "days_to_sale": null,
       "owner_name": "NELSON, JOAN B",
       "owner_address": "5707 3RD ST NE, WASHINGTON DC 20011-2501",
@@ -21936,7 +21936,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805972Z",
+      "scraped_at": "2026-04-28T01:52:24.913286Z",
       "days_to_sale": null,
       "owner_name": "12FIGURE CONSULTATIONS INC",
       "owner_address": "911 5TH ST NE, WASHINGTON DC 20002-3511",
@@ -22010,7 +22010,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805985Z",
+      "scraped_at": "2026-04-28T01:52:24.913302Z",
       "days_to_sale": null,
       "owner_name": "ELEANOR G F DORE LIVING TRUST",
       "owner_address": "5300 41ST ST NW, WASHINGTON DC 20015-1904",
@@ -22084,7 +22084,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.805996Z",
+      "scraped_at": "2026-04-28T01:52:24.913316Z",
       "days_to_sale": null,
       "owner_name": "KIRKLAND, CAROLYN M",
       "owner_address": "1421 LAKE CHRISTOPHER DR, VIRGINIA BEACH VA 23464-7310",
@@ -22159,7 +22159,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806008Z",
+      "scraped_at": "2026-04-28T01:52:24.913330Z",
       "days_to_sale": null,
       "owner_name": "COOK, JULIUS",
       "owner_address": "5709 9TH ST NW, WASHINGTON DC 20011-8203",
@@ -22233,7 +22233,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806020Z",
+      "scraped_at": "2026-04-28T01:52:24.913345Z",
       "days_to_sale": null,
       "owner_name": "BHG VENTURES, LLC",
       "owner_address": "3919 NATIONAL DR STE 310, BURTONSVILLE MD 20866-1180",
@@ -22308,7 +22308,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806033Z",
+      "scraped_at": "2026-04-28T01:52:24.913361Z",
       "days_to_sale": null,
       "owner_name": "LIU, KUEI-YIN C",
       "owner_address": "PO BOX 59728, POTOMAC MD 20859-9728",
@@ -22383,7 +22383,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806044Z",
+      "scraped_at": "2026-04-28T01:52:24.913376Z",
       "days_to_sale": null,
       "owner_name": "JOHNSON, ELIZA E",
       "owner_address": "242 MADISON ST NW, WASHINGTON DC 20011-2223",
@@ -22457,7 +22457,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806057Z",
+      "scraped_at": "2026-04-28T01:52:24.913392Z",
       "days_to_sale": null,
       "owner_name": "ABEBE, METI",
       "owner_address": "1358 MADISON ST NW, WASHINGTON DC 20011-7841",
@@ -22531,7 +22531,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806070Z",
+      "scraped_at": "2026-04-28T01:52:24.913408Z",
       "days_to_sale": null,
       "owner_name": "POLLACK, JOSHUA D",
       "owner_address": "4113 INGOMAR ST NW, WASHINGTON DC 20015-1945",
@@ -22605,7 +22605,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806082Z",
+      "scraped_at": "2026-04-28T01:52:24.913424Z",
       "days_to_sale": null,
       "owner_name": "CARMICHAEL, I",
       "owner_address": "5599 CHILLUM PL NE, WASHINGTON DC 20011-6204",
@@ -22679,7 +22679,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806094Z",
+      "scraped_at": "2026-04-28T01:52:24.913439Z",
       "days_to_sale": null,
       "owner_name": "HENSON, M F",
       "owner_address": "626 KENSINGTON PL NE, WASHINGTON DC 20011-6217",
@@ -22753,7 +22753,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806105Z",
+      "scraped_at": "2026-04-28T01:52:24.913453Z",
       "days_to_sale": null,
       "owner_name": "JSR HOLDINGS LLC",
       "owner_address": "3917 MELVERN PL, ALEXANDRIA VA 22312-1150",
@@ -22828,7 +22828,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806118Z",
+      "scraped_at": "2026-04-28T01:52:24.913469Z",
       "days_to_sale": null,
       "owner_name": "TVC FUNDING IV REO LLC",
       "owner_address": "7550 WISCONSIN AVE # 10FLOOR, BETHESDA MD 20814-3559",
@@ -22903,7 +22903,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806130Z",
+      "scraped_at": "2026-04-28T01:52:24.913484Z",
       "days_to_sale": null,
       "owner_name": "POTOMAC ELECTRIC POWER COMPANY",
       "owner_address": "701 9TH ST NW # EP5607, WASHINGTON DC 20001-4572",
@@ -22977,7 +22977,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806142Z",
+      "scraped_at": "2026-04-28T01:52:24.913500Z",
       "days_to_sale": null,
       "owner_name": "133 LONGFELLOW ST NW LLC",
       "owner_address": "133 LONGFELLOW ST NW, WASHINGTON DC 20011-2348",
@@ -23051,7 +23051,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806153Z",
+      "scraped_at": "2026-04-28T01:52:24.913514Z",
       "days_to_sale": null,
       "owner_name": "135 LONGFELLOW STREET LLC",
       "owner_address": "13101 PINEY MEETINGHOUSE RD, POTOMAC MD 20854-6350",
@@ -23126,7 +23126,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806165Z",
+      "scraped_at": "2026-04-28T01:52:24.913530Z",
       "days_to_sale": null,
       "owner_name": "JOYNER, IRENE H",
       "owner_address": "5601 1ST ST NW, WASHINGTON DC 20011-2301",
@@ -23200,7 +23200,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806177Z",
+      "scraped_at": "2026-04-28T01:52:24.913546Z",
       "days_to_sale": null,
       "owner_name": "URBAN RETAIL LLC",
       "owner_address": "1701 PENN AVE NW STE 1050, WASHINGTON DC 20006-5805",
@@ -23274,7 +23274,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806189Z",
+      "scraped_at": "2026-04-28T01:52:24.913561Z",
       "days_to_sale": null,
       "owner_name": "URBAN RETAIL LLC",
       "owner_address": "1701 PENN AVE NW STE 1050, WASHINGTON DC 20006-5805",
@@ -23348,7 +23348,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806201Z",
+      "scraped_at": "2026-04-28T01:52:24.913577Z",
       "days_to_sale": null,
       "owner_name": "BASNAYAKE, SENA",
       "owner_address": "6516 SUNNY HILL CT, MC LEAN VA 22101-1639",
@@ -23423,7 +23423,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806213Z",
+      "scraped_at": "2026-04-28T01:52:24.913591Z",
       "days_to_sale": null,
       "owner_name": "FUQUA, JANICE E",
       "owner_address": "705 LONGFELLOW ST NW, WASHINGTON DC 20011-3033",
@@ -23497,7 +23497,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806225Z",
+      "scraped_at": "2026-04-28T01:52:24.913606Z",
       "days_to_sale": null,
       "owner_name": "BALBI, MIGUEL A",
       "owner_address": "11911 HOLLY SPRING DR, GREAT FALLS VA 22066-1212",
@@ -23572,7 +23572,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806237Z",
+      "scraped_at": "2026-04-28T01:52:24.913621Z",
       "days_to_sale": null,
       "owner_name": "NYANDEBO, SAA",
       "owner_address": "623 LONGFELLOW ST NW, WASHINGTON DC 20011-3015",
@@ -23646,7 +23646,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806249Z",
+      "scraped_at": "2026-04-28T01:52:24.913636Z",
       "days_to_sale": null,
       "owner_name": "AARONSON, DAVID E",
       "owner_address": "5272 RIVER RD STE 430, BETHESDA MD 20816-1439",
@@ -23721,7 +23721,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806261Z",
+      "scraped_at": "2026-04-28T01:52:24.913662Z",
       "days_to_sale": null,
       "owner_name": "LEFTWICH, WILLIE L",
       "owner_address": "2350 WASHINGTON PL NE, WASHINGTON DC 20018-1070",
@@ -23795,7 +23795,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806272Z",
+      "scraped_at": "2026-04-28T01:52:24.913678Z",
       "days_to_sale": null,
       "owner_name": "FADAYOMI, OLUSEYI",
       "owner_address": "1631 MONTELLO AVE NE # PH1, WASHINGTON DC 20002-2710",
@@ -23869,7 +23869,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806284Z",
+      "scraped_at": "2026-04-28T01:52:24.913693Z",
       "days_to_sale": null,
       "owner_name": "ROBINSON, ROBERT R",
       "owner_address": "4501 HARRISON ST NW, WASHINGTON DC 20015-2109",
@@ -23943,7 +23943,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806297Z",
+      "scraped_at": "2026-04-28T01:52:24.913708Z",
       "days_to_sale": null,
       "owner_name": "GHASHGHAI, KHASHAYAR",
       "owner_address": "500 LONGFELLOW ST NW, WASHINGTON DC 20011-3014",
@@ -24017,7 +24017,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806309Z",
+      "scraped_at": "2026-04-28T01:52:24.913724Z",
       "days_to_sale": null,
       "owner_name": "EMBASSY OF THE REPUBLIC OF ZAMBIA",
       "owner_address": "2419 MASSACHUSETTS AVE NW, WASHINGTON DC 20008-2851",
@@ -24091,7 +24091,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806321Z",
+      "scraped_at": "2026-04-28T01:52:24.913740Z",
       "days_to_sale": null,
       "owner_name": "FARRA, NADIA J",
       "owner_address": "1334 LONGFELLOW ST NW, WASHINGTON DC 20011-3518",
@@ -24165,7 +24165,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806334Z",
+      "scraped_at": "2026-04-28T01:52:24.913755Z",
       "days_to_sale": null,
       "owner_name": "MMPLP 1031 LLC SERIES E",
       "owner_address": "6326 ROCKY CREEK RD, LA GRANGE TX 78945-4457",
@@ -24240,7 +24240,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806347Z",
+      "scraped_at": "2026-04-28T01:52:24.913772Z",
       "days_to_sale": null,
       "owner_name": "GRIJALVA, EDVIN E",
       "owner_address": "835 KENNEDY ST NE, WASHINGTON DC 20011-2730",
@@ -24314,7 +24314,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806359Z",
+      "scraped_at": "2026-04-28T01:52:24.913789Z",
       "days_to_sale": null,
       "owner_name": "EQUILIBRIUM REALTY LLC",
       "owner_address": "4067 E GRANT RD STE 203, TUCSON AZ 85712-2566",
@@ -24389,7 +24389,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806371Z",
+      "scraped_at": "2026-04-28T01:52:24.913805Z",
       "days_to_sale": null,
       "owner_name": "WCP 433 KENNEDY ST NW LLC",
       "tax_class": "3",
@@ -24462,7 +24462,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806384Z",
+      "scraped_at": "2026-04-28T01:52:24.913820Z",
       "days_to_sale": null,
       "owner_name": "HARRIS, LLOYD W",
       "owner_address": "1795 VERBENA ST NW, WASHINGTON DC 20012-1048",
@@ -24536,7 +24536,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806395Z",
+      "scraped_at": "2026-04-28T01:52:24.913836Z",
       "days_to_sale": null,
       "owner_name": "BUTLER GROUP LLC",
       "owner_address": "2106 SPRUCE DR NW, WASHINGTON DC 20012-1029",
@@ -24610,7 +24610,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806406Z",
+      "scraped_at": "2026-04-28T01:52:24.913850Z",
       "days_to_sale": null,
       "owner_name": "BUTLER GROUP LLC",
       "owner_address": "2106 SPRUCE DR NW, WASHINGTON DC 20012-1029",
@@ -24684,7 +24684,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806417Z",
+      "scraped_at": "2026-04-28T01:52:24.913864Z",
       "days_to_sale": null,
       "owner_name": "MARGARET B STEWART TRUSTEE",
       "owner_address": "1639 N PORTAL DR NW, WASHINGTON DC 20012-1012",
@@ -24758,7 +24758,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806429Z",
+      "scraped_at": "2026-04-28T01:52:24.913879Z",
       "days_to_sale": null,
       "owner_name": "DANLEY, THERESA B",
       "owner_address": "8008 16TH ST NW, WASHINGTON DC 20012-1202",
@@ -24832,7 +24832,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806441Z",
+      "scraped_at": "2026-04-28T01:52:24.913895Z",
       "days_to_sale": null,
       "owner_name": "923 KENNEDY ST NW LLC",
       "owner_address": "PO BOX 99, WOODSTOCK MD 21163-0099",
@@ -24907,7 +24907,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806453Z",
+      "scraped_at": "2026-04-28T01:52:24.913910Z",
       "days_to_sale": null,
       "owner_name": "5501 7TH ST OZ LLC",
       "owner_address": "4201 GEORGIA AVE NW, WASHINGTON DC 20011-7244",
@@ -24981,7 +24981,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806465Z",
+      "scraped_at": "2026-04-28T01:52:24.913924Z",
       "days_to_sale": null,
       "owner_name": "5501 7TH ST OZ LLC",
       "owner_address": "4201 GEORGIA AVE NW, WASHINGTON DC 20011-7244",
@@ -25055,7 +25055,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806478Z",
+      "scraped_at": "2026-04-28T01:52:24.913939Z",
       "days_to_sale": null,
       "owner_name": "VARFIS, GUS",
       "owner_address": "1337 KENNEDY ST NW, WASHINGTON DC 20011-3515",
@@ -25129,7 +25129,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806490Z",
+      "scraped_at": "2026-04-28T01:52:24.913954Z",
       "days_to_sale": null,
       "owner_name": "HIVE EQUITY FUNDING, LLC",
       "owner_address": "1639 HOBART ST NW, WASHINGTON DC 20009-3704",
@@ -25203,7 +25203,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806502Z",
+      "scraped_at": "2026-04-28T01:52:24.913969Z",
       "days_to_sale": null,
       "owner_name": "PACIFIC RBLF REO LLC",
       "owner_address": "8401 GREENSBORO DR, MC LEAN VA 22102-3598",
@@ -25278,7 +25278,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806513Z",
+      "scraped_at": "2026-04-28T01:52:24.913983Z",
       "days_to_sale": null,
       "owner_name": "F SQUARED LLC",
       "owner_address": "912 SILVER SPRING AVE, SILVER SPRING MD 20910-4618",
@@ -25353,7 +25353,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806525Z",
+      "scraped_at": "2026-04-28T01:52:24.913998Z",
       "days_to_sale": null,
       "owner_name": "KAB WINS LLC",
       "owner_address": "12108 DEER HAVEN RD, MARRIOTTSVILLE MD 21104-1455",
@@ -25428,7 +25428,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806537Z",
+      "scraped_at": "2026-04-28T01:52:24.914012Z",
       "days_to_sale": null,
       "owner_name": "PHILLIPS, SOLON",
       "owner_address": "1213 KENNEDY ST NW, WASHINGTON DC 20011-3513",
@@ -25502,7 +25502,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806549Z",
+      "scraped_at": "2026-04-28T01:52:24.914027Z",
       "days_to_sale": null,
       "owner_name": "HILDA HOUSE LLC",
       "owner_address": "5107 DENMAR LN, BOWIE MD 20720-4835",
@@ -25577,7 +25577,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806561Z",
+      "scraped_at": "2026-04-28T01:52:24.914043Z",
       "days_to_sale": null,
       "owner_name": "WCP 5412 1ST STREET LLC",
       "owner_address": "2815 HARTLAND RD STE 200, FALLS CHURCH VA 22043-3548",
@@ -25652,7 +25652,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806573Z",
+      "scraped_at": "2026-04-28T01:52:24.914058Z",
       "days_to_sale": null,
       "owner_name": "1210 KENNEDY ST LLC",
       "owner_address": "202 TRENTON PL SE, WASHINGTON DC 20032-1556",
@@ -25726,7 +25726,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806585Z",
+      "scraped_at": "2026-04-28T01:52:24.914072Z",
       "days_to_sale": null,
       "owner_name": "ADVOQUATE HEALTH SERVICES LLC",
       "owner_address": "1014 9TH ST NE, WASHINGTON DC 20002-3716",
@@ -25800,7 +25800,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806597Z",
+      "scraped_at": "2026-04-28T01:52:24.914087Z",
       "days_to_sale": null,
       "owner_name": "ADVOQUATE HEALTH SERVICES LLC",
       "owner_address": "1014 9TH ST NE, WASHINGTON DC 20002-3716",
@@ -25874,7 +25874,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806609Z",
+      "scraped_at": "2026-04-28T01:52:24.914102Z",
       "days_to_sale": null,
       "owner_name": "BSCP LLC",
       "owner_address": "1202 KENNEDY ST NW, WASHINGTON DC 20011-3514",
@@ -25948,7 +25948,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806621Z",
+      "scraped_at": "2026-04-28T01:52:24.914117Z",
       "days_to_sale": null,
       "owner_name": "ISLAM, TAHANA",
       "owner_address": "7370 POHICK RIDGE CT, SPRINGFIELD VA 22153-1926",
@@ -26023,7 +26023,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806633Z",
+      "scraped_at": "2026-04-28T01:52:24.914132Z",
       "days_to_sale": null,
       "owner_name": "KENNEDY PARK LLC",
       "owner_address": "42395 RYAN RD # 112-618, ASHBURN VA 20148-4863",
@@ -26098,7 +26098,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806645Z",
+      "scraped_at": "2026-04-28T01:52:24.914147Z",
       "days_to_sale": null,
       "owner_name": "KESARI, CATHERINE A",
       "owner_address": "1440 KENNEDY ST NW, WASHINGTON DC 20011-6825",
@@ -26172,7 +26172,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806658Z",
+      "scraped_at": "2026-04-28T01:52:24.914164Z",
       "days_to_sale": null,
       "owner_name": "GOMEZ, MYRTLE R",
       "owner_address": "5408 COLORADO AVE NW, WASHINGTON DC 20011-3625",
@@ -26246,7 +26246,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806671Z",
+      "scraped_at": "2026-04-28T01:52:24.914179Z",
       "days_to_sale": null,
       "owner_name": "CHALI REAL ESTATE LLC",
       "owner_address": "8421 10TH AVE, SILVER SPRING MD 20903-3026",
@@ -26321,7 +26321,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806684Z",
+      "scraped_at": "2026-04-28T01:52:24.914195Z",
       "days_to_sale": null,
       "owner_name": "DOGWOOD RESTORATION LLC",
       "owner_address": "4506 GARRISON ST NW, WASHINGTON DC 20016-4058",
@@ -26395,7 +26395,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806695Z",
+      "scraped_at": "2026-04-28T01:52:24.914209Z",
       "days_to_sale": null,
       "owner_name": "DSK CONSTRUCTION GROUP LLC",
       "owner_address": "5413 7TH ST NW, WASHINGTON DC 20011-7709",
@@ -26469,7 +26469,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806709Z",
+      "scraped_at": "2026-04-28T01:52:24.914225Z",
       "days_to_sale": null,
       "owner_name": "CHAMPION, SAMUEL L",
       "owner_address": "409 KENNEDY ST NE, WASHINGTON DC 20011-2648",
@@ -26543,7 +26543,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806722Z",
+      "scraped_at": "2026-04-28T01:52:24.914241Z",
       "days_to_sale": null,
       "owner_name": "JB UNLIMITED HOLDINGS LLC",
       "owner_address": "1581 HUGO CIR, SILVER SPRING MD 20906-5921",
@@ -26618,7 +26618,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806748Z",
+      "scraped_at": "2026-04-28T01:52:24.914256Z",
       "days_to_sale": null,
       "owner_name": "VIGNESHA LLC",
       "owner_address": "27175 PADDOCK TRAIL PL, CHANTILLY VA 20152-6364",
@@ -26693,7 +26693,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806761Z",
+      "scraped_at": "2026-04-28T01:52:24.914271Z",
       "days_to_sale": null,
       "owner_name": "WARE, FATMATA K",
       "owner_address": "5414 2ND ST NW, WASHINGTON DC 20011-6624",
@@ -26767,7 +26767,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806773Z",
+      "scraped_at": "2026-04-28T01:52:24.914286Z",
       "days_to_sale": null,
       "owner_name": "BSCP LLC",
       "owner_address": "1202 KENNEDY ST NW, WASHINGTON DC 20011-3514",
@@ -26841,7 +26841,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806786Z",
+      "scraped_at": "2026-04-28T01:52:24.914301Z",
       "days_to_sale": null,
       "owner_name": "SPRINGWATER CAPITAL LLC",
       "owner_address": "341 34TH PL NE, WASHINGTON DC 20019-1407",
@@ -26915,7 +26915,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806797Z",
+      "scraped_at": "2026-04-28T01:52:24.914315Z",
       "days_to_sale": null,
       "owner_name": "ANGEL & SON LLC",
       "owner_address": "1112 K ST SE, WASHINGTON DC 20003-4112",
@@ -26989,7 +26989,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806810Z",
+      "scraped_at": "2026-04-28T01:52:24.914331Z",
       "days_to_sale": null,
       "owner_name": "BACK, CHARLES",
       "owner_address": "88 BUSH ST UNIT 2162, SAN JOSE CA 95126-4869",
@@ -27064,7 +27064,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806822Z",
+      "scraped_at": "2026-04-28T01:52:24.914344Z",
       "days_to_sale": null,
       "owner_name": "ALBRECHT, CODY",
       "owner_address": "5407 13TH ST NW, WASHINGTON DC 20011-3609",
@@ -27138,7 +27138,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806834Z",
+      "scraped_at": "2026-04-28T01:52:24.914359Z",
       "days_to_sale": null,
       "owner_name": "HOSSAIN, SHAFIN M",
       "owner_address": "114 JEFFERSON ST NW, WASHINGTON DC 20011-6628",
@@ -27212,7 +27212,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806846Z",
+      "scraped_at": "2026-04-28T01:52:24.914375Z",
       "days_to_sale": null,
       "owner_name": "CASH, PAMELA",
       "owner_address": "1211 JEFFERSON ST NW, WASHINGTON DC 20011-3628",
@@ -27286,7 +27286,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806858Z",
+      "scraped_at": "2026-04-28T01:52:24.914390Z",
       "days_to_sale": null,
       "owner_name": "825 QUACKENBOS ST NW LLC",
       "owner_address": "825 QUACKENBOS ST NW, WASHINGTON DC 20011-1912",
@@ -27360,7 +27360,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806870Z",
+      "scraped_at": "2026-04-28T01:52:24.914406Z",
       "days_to_sale": null,
       "owner_name": "WELLINGTON VALUE LLC",
       "owner_address": "850 SHADES CREEK PKWY STE 200, BIRMINGHAM AL 35209-4463",
@@ -27435,7 +27435,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806882Z",
+      "scraped_at": "2026-04-28T01:52:24.914421Z",
       "days_to_sale": null,
       "owner_name": "BROWN, R C",
       "owner_address": "6259 OXON HILL RD APT 202, OXON HILL MD 20745-3058",
@@ -27510,7 +27510,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806895Z",
+      "scraped_at": "2026-04-28T01:52:24.914436Z",
       "days_to_sale": null,
       "owner_name": "XO7 PROPERTIES LLC",
       "owner_address": "11101 UNIVERSITY BLVD, MANASSAS VA 20110-2208",
@@ -27585,7 +27585,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806905Z",
+      "scraped_at": "2026-04-28T01:52:24.914450Z",
       "days_to_sale": null,
       "owner_name": "KARRIEM, NAZIM A",
       "owner_address": "6015 8TH ST NW, WASHINGTON DC 20011-1918",
@@ -27659,7 +27659,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806918Z",
+      "scraped_at": "2026-04-28T01:52:24.914465Z",
       "days_to_sale": null,
       "owner_name": "EDWARDS-BROWN, DONNA A",
       "owner_address": "1902 W 48TH ST, LOS ANGELES CA 90062-2101",
@@ -27734,7 +27734,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806930Z",
+      "scraped_at": "2026-04-28T01:52:24.914480Z",
       "days_to_sale": null,
       "owner_name": "ALLIPOUR, BEHROOZ",
       "owner_address": "12201 WAPLES MILL RD, OAKTON VA 22124-2121",
@@ -27809,7 +27809,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806943Z",
+      "scraped_at": "2026-04-28T01:52:24.914494Z",
       "days_to_sale": null,
       "owner_name": "RICKS, OMARI J",
       "owner_address": "325 OGLETHORPE ST NW, WASHINGTON DC 20011-2110",
@@ -27883,7 +27883,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806954Z",
+      "scraped_at": "2026-04-28T01:52:24.914508Z",
       "days_to_sale": null,
       "owner_name": "FRIDY, MOHAMMAD",
       "owner_address": "810 RHODE ISLAND AVE NW, WASHINGTON DC 20001-3172",
@@ -27957,7 +27957,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806966Z",
+      "scraped_at": "2026-04-28T01:52:24.914523Z",
       "days_to_sale": null,
       "owner_name": "CANNON, INEZ S",
       "owner_address": "205 OGLETHORPE ST NW, WASHINGTON DC 20011-2209",
@@ -28031,7 +28031,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806978Z",
+      "scraped_at": "2026-04-28T01:52:24.914538Z",
       "days_to_sale": null,
       "owner_name": "MCGEE, WILLIE",
       "owner_address": "5909 2ND PL NW, WASHINGTON DC 20011-2207",
@@ -28105,7 +28105,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.806990Z",
+      "scraped_at": "2026-04-28T01:52:24.914553Z",
       "days_to_sale": null,
       "owner_name": "PERSONAL TOUCH INVESTMENT INC",
       "owner_address": "3100 ETON DR, UPPER MARLBORO MD 20772-7740",
@@ -28180,7 +28180,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807002Z",
+      "scraped_at": "2026-04-28T01:52:24.914568Z",
       "days_to_sale": null,
       "owner_name": "CASCADE FUNDING MORTGAGE TRUST HB13",
       "owner_address": "1661 WORTHINGTON RD, WEST PALM BEACH FL 33409-6488",
@@ -28255,7 +28255,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807015Z",
+      "scraped_at": "2026-04-28T01:52:24.914584Z",
       "days_to_sale": null,
       "owner_name": "INGLESIDE PRESBYTERIAN RETIREMENT COMMUNITY INC",
       "owner_address": "3050 MILITARY RD NW, WASHINGTON DC 20015-1300",
@@ -28329,7 +28329,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807027Z",
+      "scraped_at": "2026-04-28T01:52:24.914599Z",
       "days_to_sale": null,
       "owner_name": "RUFFIN, JOAN E",
       "owner_address": "1410 OGLETHORPE ST NW, WASHINGTON DC 20011-8119",
@@ -28403,7 +28403,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807039Z",
+      "scraped_at": "2026-04-28T01:52:24.914614Z",
       "days_to_sale": null,
       "owner_name": "DISTRICT OF COLUMBIA, DEPUTY MAYOR FOR PLANNING AND ECONOMIC DEVELOPME",
       "owner_address": "1350 PENNSYLVANIA AVE NW STE 317, WASHINGTON DC 20004-3049",
@@ -28477,7 +28477,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807051Z",
+      "scraped_at": "2026-04-28T01:52:24.914628Z",
       "days_to_sale": null,
       "owner_name": "DISTRICT OF COLUMBIA, DEPUTY MAYOR FOR PLANNING AND ECONOMIC DEVELOPME",
       "owner_address": "1350 PENNSYLVANIA AVE NW STE 317, WASHINGTON DC 20004-3049",
@@ -28551,7 +28551,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807063Z",
+      "scraped_at": "2026-04-28T01:52:24.914644Z",
       "days_to_sale": null,
       "owner_name": "DISTRICT OF COLUMBIA, DEPUTY MAYOR FOR PLANNING AND ECONOMIC DEVELOPME",
       "owner_address": "1350 PENNSYLVANIA AVE NW STE 317, WASHINGTON DC 20004-3049",
@@ -28625,7 +28625,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807075Z",
+      "scraped_at": "2026-04-28T01:52:24.914671Z",
       "days_to_sale": null,
       "owner_name": "DISTRICT OF COLUMBIA, DEPUTY MAYOR FOR PLANNING AND ECONOMIC DEVELOPME",
       "owner_address": "1350 PENNSYLVANIA AVE NW STE 317, WASHINGTON DC 20004-3049",
@@ -28699,7 +28699,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807088Z",
+      "scraped_at": "2026-04-28T01:52:24.914685Z",
       "days_to_sale": null,
       "owner_name": "DISTRICT OF COLUMBIA, DEPUTY MAYOR FOR PLANNING AND ECONOMIC DEVELOPME",
       "owner_address": "1350 PENNSYLVANIA AVE NW STE 317, WASHINGTON DC 20004-3049",
@@ -28773,7 +28773,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807100Z",
+      "scraped_at": "2026-04-28T01:52:24.914701Z",
       "days_to_sale": null,
       "owner_name": "GANT, KATHLEEN E",
       "owner_address": "602 15TH ST NE, WASHINGTON DC 20002-4506",
@@ -28847,7 +28847,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807113Z",
+      "scraped_at": "2026-04-28T01:52:24.914717Z",
       "days_to_sale": null,
       "owner_name": "GEBREMICHAEL, PAULOS",
       "owner_address": "PO BOX 21770, WASHINGTON DC 20009-9770",
@@ -28921,7 +28921,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807125Z",
+      "scraped_at": "2026-04-28T01:52:24.914732Z",
       "days_to_sale": null,
       "owner_name": "THOMAS, MARY M",
       "owner_address": "5830 EASTERN AVE NE, WASHINGTON DC 20011-2721",
@@ -28995,7 +28995,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807137Z",
+      "scraped_at": "2026-04-28T01:52:24.914751Z",
       "days_to_sale": null,
       "owner_name": "TIG HOME'S LLC",
       "owner_address": "9317 LAVALL DR, UPPER MARLBORO MD 20774-2585",
@@ -29070,7 +29070,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807147Z",
+      "scraped_at": "2026-04-28T01:52:24.914765Z",
       "days_to_sale": null,
       "owner_name": "U.S. BANK TRUST NATIONAL ASSOCIATION",
       "owner_address": "3501 OLYMPUS BLVD STE 500, COPPELL TX 75019-6295",
@@ -29145,7 +29145,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807160Z",
+      "scraped_at": "2026-04-28T01:52:24.914781Z",
       "days_to_sale": null,
       "owner_name": "911 JEFFERSON ST NW LLC",
       "owner_address": "1717 N ST NW STE 1, WASHINGTON DC 20036-2827",
@@ -29219,7 +29219,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807172Z",
+      "scraped_at": "2026-04-28T01:52:24.914796Z",
       "days_to_sale": null,
       "owner_name": "ALSTON, P J",
       "owner_address": "228 JEFFERSON ST NW, WASHINGTON DC 20011-6630",
@@ -29293,7 +29293,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807184Z",
+      "scraped_at": "2026-04-28T01:52:24.914812Z",
       "days_to_sale": null,
       "owner_name": "5018 CONNECTICUT AVE LLC",
       "owner_address": "6820B COMMERCIAL DR, SPRINGFIELD VA 22151-4220",
@@ -29368,7 +29368,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807196Z",
+      "scraped_at": "2026-04-28T01:52:24.914827Z",
       "days_to_sale": null,
       "owner_name": "5018 CONNECTICUT AVE LLC",
       "owner_address": "6820B COMMERCIAL DR, SPRINGFIELD VA 22151-4220",
@@ -29443,7 +29443,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807208Z",
+      "scraped_at": "2026-04-28T01:52:24.914842Z",
       "days_to_sale": null,
       "owner_name": "WOODS, GEMAL L",
       "owner_address": "32 RIGGS RD NE, WASHINGTON DC 20011-2406",
@@ -29517,7 +29517,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807219Z",
+      "scraped_at": "2026-04-28T01:52:24.914856Z",
       "days_to_sale": null,
       "owner_name": "ZWERDLING, VICKI S",
       "owner_address": "5005 38TH ST NW, WASHINGTON DC 20016-4201",
@@ -29591,7 +29591,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807231Z",
+      "scraped_at": "2026-04-28T01:52:24.914870Z",
       "days_to_sale": null,
       "owner_name": "AL-HIJAZ, HARUN S",
       "owner_address": "6101 EXECUTIVE BLVD STE 230, ROCKVILLE MD 20852-3900",
@@ -29666,7 +29666,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807243Z",
+      "scraped_at": "2026-04-28T01:52:24.914885Z",
       "days_to_sale": null,
       "owner_name": "BRICKLAYERS MASONS HELPERS AND BUILDING LABORERS LOCAL UNION NO 74",
       "owner_address": "5201 1ST PL NE, WASHINGTON DC 20011-3403",
@@ -29740,7 +29740,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807255Z",
+      "scraped_at": "2026-04-28T01:52:24.914900Z",
       "days_to_sale": null,
       "owner_name": "TAIPEI ECONOMIC AND CULTURAL REPRESENTATIVEOFFICE IN THE UNITED STAT",
       "owner_address": "5010 WISCONSIN AVE NW, WASHINGTON DC 20016-4114",
@@ -29814,7 +29814,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807267Z",
+      "scraped_at": "2026-04-28T01:52:24.914915Z",
       "days_to_sale": null,
       "owner_name": "SILVER, JUDY T",
       "owner_address": "5313 1ST ST NW, WASHINGTON DC 20011-6619",
@@ -29888,7 +29888,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807279Z",
+      "scraped_at": "2026-04-28T01:52:24.914929Z",
       "days_to_sale": null,
       "owner_name": "THE HOWARD UNIVERSITY INCORPORATED",
       "owner_address": "2400 6TH ST NW # 104, WASHINGTON DC 20059-0001",
@@ -29962,7 +29962,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807290Z",
+      "scraped_at": "2026-04-28T01:52:24.914943Z",
       "days_to_sale": null,
       "owner_name": "AAIA RML, LLC",
       "owner_address": "645 MADISON AVE FL 19, NEW YORK NY 10022-1010",
@@ -30037,7 +30037,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807301Z",
+      "scraped_at": "2026-04-28T01:52:24.914958Z",
       "days_to_sale": null,
       "owner_name": "NEW YORK WASHINGTON CHRISTIAN METHODIST EPISCOP",
       "owner_address": "103 HEMMINGS WAY, LAWNSIDE NJ 08045-1009",
@@ -30112,7 +30112,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807369Z",
+      "scraped_at": "2026-04-28T01:52:24.915050Z",
       "days_to_sale": null,
       "owner_name": "QUEEN, CHERYL",
       "owner_address": "5613 HIGH TOR HL, COLUMBIA MD 21045-2540",
@@ -30187,7 +30187,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807382Z",
+      "scraped_at": "2026-04-28T01:52:24.915068Z",
       "days_to_sale": null,
       "owner_name": "GRAPPLERS CORP INC",
       "owner_address": "1930 VETERANS HWY, ISLANDIA NY 11749-1599",
@@ -30262,7 +30262,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807395Z",
+      "scraped_at": "2026-04-28T01:52:24.915083Z",
       "days_to_sale": null,
       "owner_name": "FLORIDA AVENUE JOINT VENTURE LLC",
       "owner_address": "14672 SOUTHLAWN LN STE O, ROCKVILLE MD 20850-5390",
@@ -30337,7 +30337,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807407Z",
+      "scraped_at": "2026-04-28T01:52:24.915098Z",
       "days_to_sale": null,
       "owner_name": "UBIAM, INIOBONG",
       "owner_address": "248 HAMILTON ST NW, WASHINGTON DC 20011-3281",
@@ -30411,7 +30411,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807419Z",
+      "scraped_at": "2026-04-28T01:52:24.915113Z",
       "days_to_sale": null,
       "owner_name": "FLORIDA AVENUE JOINT VENTURE LLC",
       "owner_address": "14672 SOUTHLAWN LN STE O, ROCKVILLE MD 20850-5390",
@@ -30486,7 +30486,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807431Z",
+      "scraped_at": "2026-04-28T01:52:24.915128Z",
       "days_to_sale": null,
       "owner_name": "FLORIDA AVENUE JOINT VENTURE LLC",
       "owner_address": "14672 SOUTHLAWN LN STE O, ROCKVILLE MD 20850-5390",
@@ -30561,7 +30561,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807443Z",
+      "scraped_at": "2026-04-28T01:52:24.915144Z",
       "days_to_sale": null,
       "owner_name": "GREEN, FLORENCE B",
       "owner_address": "5117 NEW HAMPSHIRE AVE NW, WASHINGTON DC 20011-3209",
@@ -30635,7 +30635,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807456Z",
+      "scraped_at": "2026-04-28T01:52:24.915160Z",
       "days_to_sale": null,
       "owner_name": "US BANK, NATIONAL ASSOCIATION",
       "owner_address": "75 BEATTIE PL STE 300, GREENVILLE SC 29601-2138",
@@ -30710,7 +30710,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807469Z",
+      "scraped_at": "2026-04-28T01:52:24.915175Z",
       "days_to_sale": null,
       "owner_name": "BRIGHT LAKE REAL ESTATE LLC",
       "owner_address": "440 MONTICELLO AVE STE 1802, NORFOLK VA 23510-2670",
@@ -30785,7 +30785,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807481Z",
+      "scraped_at": "2026-04-28T01:52:24.915189Z",
       "days_to_sale": null,
       "owner_name": "WILSON, EDWARD F",
       "owner_address": "5142 S DAKOTA AVE NE, WASHINGTON DC 20017-2308",
@@ -30859,7 +30859,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807491Z",
+      "scraped_at": "2026-04-28T01:52:24.915204Z",
       "days_to_sale": null,
       "owner_name": "GREEN, ROGER L",
       "owner_address": "5015 8TH ST NW, WASHINGTON DC 20011-4003",
@@ -30933,7 +30933,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807503Z",
+      "scraped_at": "2026-04-28T01:52:24.915219Z",
       "days_to_sale": null,
       "owner_name": "BETHEL, FREDERICK E",
       "owner_address": "4928 3RD ST NW, WASHINGTON DC 20011-4120",
@@ -31007,7 +31007,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807516Z",
+      "scraped_at": "2026-04-28T01:52:24.915234Z",
       "days_to_sale": null,
       "owner_name": "REID, LENA M",
       "owner_address": "414 FARRAGUT ST NW, WASHINGTON DC 20011-6115",
@@ -31081,7 +31081,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807527Z",
+      "scraped_at": "2026-04-28T01:52:24.915248Z",
       "days_to_sale": null,
       "owner_name": "JACKSON JOSEPH",
       "owner_address": "5031 14TH ST NE, WASHINGTON DC 20017-2808",
@@ -31155,7 +31155,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807540Z",
+      "scraped_at": "2026-04-28T01:52:24.915263Z",
       "days_to_sale": null,
       "owner_name": "COLUMBIA LP",
       "owner_address": "4641 MONTGOMERY AVE STE 200, BETHESDA MD 20814-3428",
@@ -31230,7 +31230,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807553Z",
+      "scraped_at": "2026-04-28T01:52:24.915279Z",
       "days_to_sale": null,
       "owner_name": "RAJESH AND SADHNA LLC",
       "owner_address": "16527 HARBOUR TOWN DR, ASHTON MD 20861-4042",
@@ -31305,7 +31305,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807565Z",
+      "scraped_at": "2026-04-28T01:52:24.915293Z",
       "days_to_sale": null,
       "owner_name": "EMAMALI-IGLESIA, BEVERLY C",
       "owner_address": "4921 7TH ST NW, WASHINGTON DC 20011-4001",
@@ -31379,7 +31379,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807578Z",
+      "scraped_at": "2026-04-28T01:52:24.915308Z",
       "days_to_sale": null,
       "owner_name": "COLEMAN, BROWN",
       "owner_address": "1666 FORT DAVIS ST SE, WASHINGTON DC 20020-1043",
@@ -31453,7 +31453,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807590Z",
+      "scraped_at": "2026-04-28T01:52:24.915323Z",
       "days_to_sale": null,
       "owner_name": "BOND, JOYCE R",
       "owner_address": "4909 13TH ST NW, WASHINGTON DC 20011-6903",
@@ -31527,7 +31527,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807603Z",
+      "scraped_at": "2026-04-28T01:52:24.915338Z",
       "days_to_sale": null,
       "owner_name": "SALAZAR, RUBEN",
       "owner_address": "421 EMERSON ST NW, WASHINGTON DC 20011-6114",
@@ -31601,7 +31601,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807615Z",
+      "scraped_at": "2026-04-28T01:52:24.915354Z",
       "days_to_sale": null,
       "owner_name": "LEE, VIVIAN C",
       "owner_address": "339 EMERSON ST NW, WASHINGTON DC 20011-4109",
@@ -31675,7 +31675,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807627Z",
+      "scraped_at": "2026-04-28T01:52:24.915368Z",
       "days_to_sale": null,
       "owner_name": "SIMO HOME LLC",
       "owner_address": "7814 BRIARDALE TER, DERWOOD MD 20855-2073",
@@ -31750,7 +31750,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807639Z",
+      "scraped_at": "2026-04-28T01:52:24.915383Z",
       "days_to_sale": null,
       "owner_name": "4907 GEORGIA AVE NW CONDOS LLC",
       "owner_address": "4607 SAND ROCK LN, CHANTILLY VA 20151-2471",
@@ -31825,7 +31825,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807650Z",
+      "scraped_at": "2026-04-28T01:52:24.915399Z",
       "days_to_sale": null,
       "owner_name": "WRIGHT, VERONICA C",
       "owner_address": "719 EMERSON ST NW, WASHINGTON DC 20011-4007",
@@ -31899,7 +31899,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807663Z",
+      "scraped_at": "2026-04-28T01:52:24.915413Z",
       "days_to_sale": null,
       "owner_name": "GROSS, ZANETTA R",
       "owner_address": "717 EMERSON ST NE, WASHINGTON DC 20017-2354",
@@ -31973,7 +31973,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807675Z",
+      "scraped_at": "2026-04-28T01:52:24.915428Z",
       "days_to_sale": null,
       "owner_name": "OTTS, KATHERINE",
       "owner_address": "302 EMERSON ST NW, WASHINGTON DC 20011-4110",
@@ -32047,7 +32047,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807686Z",
+      "scraped_at": "2026-04-28T01:52:24.915443Z",
       "days_to_sale": null,
       "owner_name": "NEGUSSIE, BIZUWORK",
       "owner_address": "7254 OLDE LANTERN WAY, SPRINGFIELD VA 22152-3560",
@@ -32122,7 +32122,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807697Z",
+      "scraped_at": "2026-04-28T01:52:24.915457Z",
       "days_to_sale": null,
       "owner_name": "PAGE, JEFFREY L",
       "owner_address": "515 EDGECOMBE AVE APT 21, NEW YORK NY 10032-4415",
@@ -32197,7 +32197,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807709Z",
+      "scraped_at": "2026-04-28T01:52:24.915472Z",
       "days_to_sale": null,
       "owner_name": "WILLARD HOLDINGS V LLC",
       "owner_address": "4445 WILLARD AVE STE 1000, CHEVY CHASE MD 20815-3791",
@@ -32272,7 +32272,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807722Z",
+      "scraped_at": "2026-04-28T01:52:24.915487Z",
       "days_to_sale": null,
       "owner_name": "WILLARD HOLDINGS V LLC",
       "owner_address": "4445 WILLARD AVE STE 1000, CHEVY CHASE MD 20815-3791",
@@ -32347,7 +32347,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807747Z",
+      "scraped_at": "2026-04-28T01:52:24.915502Z",
       "days_to_sale": null,
       "owner_name": "103 J AND A PIKESVILLE INVESTMENTS LLC",
       "owner_address": "1002 SMOKE TREE RD, BALTIMORE MD 21208-3533",
@@ -32422,7 +32422,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807758Z",
+      "scraped_at": "2026-04-28T01:52:24.915516Z",
       "days_to_sale": null,
       "owner_name": "WASHINGTON, SARAH M",
       "owner_address": "4954 8TH ST NE, WASHINGTON DC 20017-3908",
@@ -32496,7 +32496,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807771Z",
+      "scraped_at": "2026-04-28T01:52:24.915531Z",
       "days_to_sale": null,
       "owner_name": "BLANCHE C GAINES (LIFE ESTATE)",
       "owner_address": "4839 KANSAS AVE NW, WASHINGTON DC 20011-6120",
@@ -32570,7 +32570,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807783Z",
+      "scraped_at": "2026-04-28T01:52:24.915546Z",
       "days_to_sale": null,
       "owner_name": "MARC INVESTMENTS AND CONSULTING LLC",
       "owner_address": "539 MALCOLM RD NW, VIENNA VA 22180-4125",
@@ -32645,7 +32645,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807796Z",
+      "scraped_at": "2026-04-28T01:52:24.915562Z",
       "days_to_sale": null,
       "owner_name": "EMILUZ LLC",
       "owner_address": "3703 WINDOM PL NW, WASHINGTON DC 20016-2238",
@@ -32719,7 +32719,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807806Z",
+      "scraped_at": "2026-04-28T01:52:24.915576Z",
       "days_to_sale": null,
       "owner_name": "WADDELL, J M",
       "owner_address": "1006 DREXELGATE LN, UPPER MARLBORO MD 20774-2227",
@@ -32794,7 +32794,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807818Z",
+      "scraped_at": "2026-04-28T01:52:24.915591Z",
       "days_to_sale": null,
       "owner_name": "EGGA, ALMAZ",
       "owner_address": "9133 SILVERSHADOW CT, LORTON VA 22079-5207",
@@ -32869,7 +32869,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807829Z",
+      "scraped_at": "2026-04-28T01:52:24.915604Z",
       "days_to_sale": null,
       "owner_name": "HJB PROPERTIES LLC",
       "owner_address": "1308 ALPS DR, MC LEAN VA 22102-1502",
@@ -32944,7 +32944,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807841Z",
+      "scraped_at": "2026-04-28T01:52:24.915620Z",
       "days_to_sale": null,
       "owner_name": "4811 GEORGIA AVENUE NW LLC",
       "owner_address": "1600 WILSON BLVD, ARLINGTON VA 22209-2511",
@@ -33019,7 +33019,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807851Z",
+      "scraped_at": "2026-04-28T01:52:24.915634Z",
       "days_to_sale": null,
       "owner_name": "CAMPBELL, MARY C",
       "owner_address": "4907 11TH ST NE, WASHINGTON DC 20017-2847",
@@ -33093,7 +33093,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807862Z",
+      "scraped_at": "2026-04-28T01:52:24.915648Z",
       "days_to_sale": null,
       "owner_name": "YANCIE, REMARGO",
       "owner_address": "4911 7TH PL NE, WASHINGTON DC 20017-2328",
@@ -33167,7 +33167,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807874Z",
+      "scraped_at": "2026-04-28T01:52:24.915674Z",
       "days_to_sale": null,
       "owner_name": "LATORTUE, JEAN-BERNARD",
       "owner_address": "821 DECATUR ST NW, WASHINGTON DC 20011-4511",
@@ -33241,7 +33241,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807886Z",
+      "scraped_at": "2026-04-28T01:52:24.915689Z",
       "days_to_sale": null,
       "owner_name": "FEDERAL NATIONAL MORTGAGE ASSOCIATION",
       "owner_address": "5600 GRANITE PKWY # VII, PLANO TX 75024-4177",
@@ -33316,7 +33316,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807898Z",
+      "scraped_at": "2026-04-28T01:52:24.915705Z",
       "days_to_sale": null,
       "owner_name": "SBLONE, LLC",
       "owner_address": "1590 GULF BLVD UNIT 502, CLEARWATER BEACH FL 33767-2938",
@@ -33391,7 +33391,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807910Z",
+      "scraped_at": "2026-04-28T01:52:24.915721Z",
       "days_to_sale": null,
       "owner_name": "LOTUS VENTURE GROUP LLC",
       "owner_address": "13613 MILLS AVE, SILVER SPRING MD 20904-1049",
@@ -33466,7 +33466,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807920Z",
+      "scraped_at": "2026-04-28T01:52:24.915735Z",
       "days_to_sale": null,
       "owner_name": "PEOPLES CONGREGATIONAL UNITED CHURCH OF CHRIST",
       "owner_address": "4704 13TH ST NW, WASHINGTON DC 20011-4408",
@@ -33540,7 +33540,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807931Z",
+      "scraped_at": "2026-04-28T01:52:24.915749Z",
       "days_to_sale": null,
       "owner_name": "CEIBA, LA",
       "owner_address": "1400 DECATUR ST NW, WASHINGTON DC 20011-4343",
@@ -33614,7 +33614,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807943Z",
+      "scraped_at": "2026-04-28T01:52:24.915764Z",
       "days_to_sale": null,
       "owner_name": "CEIBA, LA",
       "owner_address": "1400 DECATUR ST NW, WASHINGTON DC 20011-4343",
@@ -33688,7 +33688,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807954Z",
+      "scraped_at": "2026-04-28T01:52:24.915780Z",
       "days_to_sale": null,
       "owner_name": "CECIL FRED RAMSUNDAR TRUSTEE",
       "owner_address": "4704 BLAGDEN AVE NW, WASHINGTON DC 20011-3714",
@@ -33762,7 +33762,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807965Z",
+      "scraped_at": "2026-04-28T01:52:24.915794Z",
       "days_to_sale": null,
       "owner_name": "SPENCER, JANICE S",
       "owner_address": "4201 ARGYLE TER NW, WASHINGTON DC 20011-4241",
@@ -33836,7 +33836,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807977Z",
+      "scraped_at": "2026-04-28T01:52:24.915810Z",
       "days_to_sale": null,
       "owner_name": "BRUNSON DAVID",
       "owner_address": "1017 DECATUR ST NE, WASHINGTON DC 20017-3920",
@@ -33910,7 +33910,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807987Z",
+      "scraped_at": "2026-04-28T01:52:24.915824Z",
       "days_to_sale": null,
       "owner_name": "KAMALI, GOLBON",
       "owner_address": "2773 UNICORN LN NW, WASHINGTON DC 20015-2233",
@@ -33984,7 +33984,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.807998Z",
+      "scraped_at": "2026-04-28T01:52:24.915838Z",
       "days_to_sale": null,
       "owner_name": "GRANT, BARBARA S",
       "owner_address": "6701 14TH ST NW # 304, WASHINGTON DC 20012-2854",
@@ -34058,7 +34058,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808011Z",
+      "scraped_at": "2026-04-28T01:52:24.915853Z",
       "days_to_sale": null,
       "owner_name": "KARKI, PARAS D",
       "owner_address": "4324 ALBEMARLE ST NW, WASHINGTON DC 20016-2012",
@@ -34132,7 +34132,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808023Z",
+      "scraped_at": "2026-04-28T01:52:24.915868Z",
       "days_to_sale": null,
       "owner_name": "DC SELF DEFENSE KARATE ASSOCIATION",
       "owner_address": "5123 GEORGIA AVE NW, WASHINGTON DC 20011-3921",
@@ -34206,7 +34206,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808034Z",
+      "scraped_at": "2026-04-28T01:52:24.915882Z",
       "days_to_sale": null,
       "owner_name": "MASON, MEGAN",
       "owner_address": "5130 7TH ST NW, WASHINGTON DC 20011-4016",
@@ -34280,7 +34280,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808044Z",
+      "scraped_at": "2026-04-28T01:52:24.915896Z",
       "days_to_sale": null,
       "owner_name": "GO KEY REALTY CONSULTING LTD",
       "owner_address": "627 HORSEBLOCK RD, FARMINGVILLE NY 11738-2113",
@@ -34355,7 +34355,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808056Z",
+      "scraped_at": "2026-04-28T01:52:24.915910Z",
       "days_to_sale": null,
       "owner_name": "LINWOOD CARTER JR PER REP OF LINWOOD CARTER SR",
       "owner_address": "5114 5TH ST NW, WASHINGTON DC 20011-4041",
@@ -34429,7 +34429,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808068Z",
+      "scraped_at": "2026-04-28T01:52:24.915926Z",
       "days_to_sale": null,
       "owner_name": "REYES, LUIS A",
       "owner_address": "1835 18TH ST NW, WASHINGTON DC 20009-5526",
@@ -34503,7 +34503,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808079Z",
+      "scraped_at": "2026-04-28T01:52:24.915941Z",
       "days_to_sale": null,
       "owner_name": "5110 7TH L.L.C.",
       "owner_address": "5110 7TH ST NW, WASHINGTON DC 20011-4016",
@@ -34577,7 +34577,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808091Z",
+      "scraped_at": "2026-04-28T01:52:24.915957Z",
       "days_to_sale": null,
       "owner_name": "WILLIAM MOONEY V",
       "tax_class": "3",
@@ -34650,7 +34650,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808104Z",
+      "scraped_at": "2026-04-28T01:52:24.915973Z",
       "days_to_sale": null,
       "owner_name": "HOF REO 1 INC.",
       "owner_address": "645 MADISON AVE FL 19, NEW YORK NY 10022-1010",
@@ -34725,7 +34725,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808116Z",
+      "scraped_at": "2026-04-28T01:52:24.915988Z",
       "days_to_sale": null,
       "owner_name": "LEWIS, HERBERT R",
       "owner_address": "412 GALLATIN ST NW, WASHINGTON DC 20011-4059",
@@ -34799,7 +34799,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808128Z",
+      "scraped_at": "2026-04-28T01:52:24.916003Z",
       "days_to_sale": null,
       "owner_name": "JORDAN, NORMAN L",
       "owner_address": "1451 CHESAPEAKE AVE, ANNAPOLIS MD 21403-4663",
@@ -34874,7 +34874,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808141Z",
+      "scraped_at": "2026-04-28T01:52:24.916019Z",
       "days_to_sale": null,
       "owner_name": "DYK PROPERTY MANAGEMENT L.L.C",
       "owner_address": "1618 7TH ST NW, WASHINGTON DC 20001-3212",
@@ -34948,7 +34948,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808153Z",
+      "scraped_at": "2026-04-28T01:52:24.916035Z",
       "days_to_sale": null,
       "owner_name": "U.S. BANK TRUST NATIONAL ASSOCIATION",
       "owner_address": "3501 OLYMPUS BLVD STE 500, COPPELL TX 75019-6295",
@@ -35023,7 +35023,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808165Z",
+      "scraped_at": "2026-04-28T01:52:24.916050Z",
       "days_to_sale": null,
       "owner_name": "SAINT MARY REAL ESTATE LLC",
       "owner_address": "915 SILVER SPRING AVE APT 718, SILVER SPRING MD 20910-5127",
@@ -35098,7 +35098,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808177Z",
+      "scraped_at": "2026-04-28T01:52:24.916065Z",
       "days_to_sale": null,
       "owner_name": "BECKERMAN, DANIEL R",
       "owner_address": "133 INGRAHAM ST NW, WASHINGTON DC 20011-6617",
@@ -35172,7 +35172,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808188Z",
+      "scraped_at": "2026-04-28T01:52:24.916080Z",
       "days_to_sale": null,
       "owner_name": "SHEILAH SULLIVAN GUARDIAN OF ASHLEIGH FAI SULLIVAN",
       "owner_address": "4401 RED ROSE CT, MIDDLETOWN MD 21769-8533",
@@ -35247,7 +35247,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808200Z",
+      "scraped_at": "2026-04-28T01:52:24.916095Z",
       "days_to_sale": null,
       "owner_name": "SOMMERFIELD, DIANE Y",
       "owner_address": "247 INGRAHAM ST NW, WASHINGTON DC 20011-6625",
@@ -35321,7 +35321,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808211Z",
+      "scraped_at": "2026-04-28T01:52:24.916108Z",
       "days_to_sale": null,
       "owner_name": "14TH STREET NW LLC",
       "owner_address": "531 BOSTON ST, NORTH ANDOVER MA 01845-6320",
@@ -35396,7 +35396,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808223Z",
+      "scraped_at": "2026-04-28T01:52:24.916123Z",
       "days_to_sale": null,
       "owner_name": "RAINY DAY INVESTMENTS, LLC",
       "owner_address": "9406 JACKSON ST, BURKE VA 22015-2022",
@@ -35471,7 +35471,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808235Z",
+      "scraped_at": "2026-04-28T01:52:24.916138Z",
       "days_to_sale": null,
       "owner_name": "JOHNSON, KIERRA",
       "owner_address": "245 INGRAHAM ST NW, WASHINGTON DC 20011-6625",
@@ -35545,7 +35545,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808248Z",
+      "scraped_at": "2026-04-28T01:52:24.916154Z",
       "days_to_sale": null,
       "owner_name": "4936 WISCONSIN LLC",
       "owner_address": "9804 KORMAN CT, POTOMAC MD 20854-2042",
@@ -35620,7 +35620,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808261Z",
+      "scraped_at": "2026-04-28T01:52:24.916169Z",
       "days_to_sale": null,
       "owner_name": "MORGAN, MATTIE M",
       "owner_address": "1011 HAMILTON ST NE, WASHINGTON DC 20011-6427",
@@ -35694,7 +35694,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808271Z",
+      "scraped_at": "2026-04-28T01:52:24.916183Z",
       "days_to_sale": null,
       "owner_name": "JORDAN, CHARLES R",
       "owner_address": "12005 MOURNING DOVE LN, CHARLOTTE NC 28269-0679",
@@ -35769,7 +35769,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808282Z",
+      "scraped_at": "2026-04-28T01:52:24.916197Z",
       "days_to_sale": null,
       "owner_name": "COX, CHARISSA P",
       "owner_address": "24 HAMILTON ST NW, WASHINGTON DC 20011-3312",
@@ -35843,7 +35843,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808294Z",
+      "scraped_at": "2026-04-28T01:52:24.916212Z",
       "days_to_sale": null,
       "owner_name": "TRIA, GERARD J",
       "owner_address": "300 INGRAHAM ST NW, WASHINGTON DC 20011-6604",
@@ -35917,7 +35917,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808304Z",
+      "scraped_at": "2026-04-28T01:52:24.916225Z",
       "days_to_sale": null,
       "owner_name": "FRANCES C S DAVIS",
       "owner_address": "5831 YARBOROUGH LN, LAKELAND FL 33813-4316",
@@ -35992,7 +35992,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808315Z",
+      "scraped_at": "2026-04-28T01:52:24.916239Z",
       "days_to_sale": null,
       "owner_name": "BUTLER, SETSUKO",
       "owner_address": "5161 7TH ST NE, WASHINGTON DC 20011-2624",
@@ -36066,7 +36066,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808327Z",
+      "scraped_at": "2026-04-28T01:52:24.916253Z",
       "days_to_sale": null,
       "owner_name": "TIDEWATER ASSETS LLC",
       "owner_address": "770 S 13TH ST UNIT 7307, BOISE ID 83707-3559",
@@ -36141,7 +36141,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808339Z",
+      "scraped_at": "2026-04-28T01:52:24.916269Z",
       "days_to_sale": null,
       "owner_name": "BERHANU, YONATHAN",
       "owner_address": "1210 INGRAHAM ST NW, WASHINGTON DC 20011-3602",
@@ -36215,7 +36215,7 @@
         "Ward Ward 3"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808351Z",
+      "scraped_at": "2026-04-28T01:52:24.916283Z",
       "days_to_sale": null,
       "owner_name": "4912 WISCONSIN LLC",
       "owner_address": "4132 GEORGIA AVE NW, WASHINGTON DC 20011-5859",
@@ -36289,7 +36289,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808362Z",
+      "scraped_at": "2026-04-28T01:52:24.916297Z",
       "days_to_sale": null,
       "owner_name": "ATLANTIC CAPITAL SERVICES, LLC",
       "owner_address": "3703 WHISPERING LN, FALLS CHURCH VA 22041-1121",
@@ -36364,7 +36364,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808373Z",
+      "scraped_at": "2026-04-28T01:52:24.916311Z",
       "days_to_sale": null,
       "owner_name": "DAVIS, JOHN W",
       "owner_address": "5212 13TH ST NW, WASHINGTON DC 20011-6914",
@@ -36438,7 +36438,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808385Z",
+      "scraped_at": "2026-04-28T01:52:24.916326Z",
       "days_to_sale": null,
       "owner_name": "5223 GEORGIA AVE LLC",
       "owner_address": "2411 BENNING RD NE, WASHINGTON DC 20002-4827",
@@ -36512,7 +36512,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808397Z",
+      "scraped_at": "2026-04-28T01:52:24.916341Z",
       "days_to_sale": null,
       "owner_name": "ZHOU, XU",
       "owner_address": "12 FAIRWOOD CT, ROCKVILLE MD 20850-3005",
@@ -36587,7 +36587,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808409Z",
+      "scraped_at": "2026-04-28T01:52:24.916356Z",
       "days_to_sale": null,
       "owner_name": "513 KENNEDY LLC",
       "owner_address": "5305 VILLAGE CENTER DR # 232, COLUMBIA MD 21044-2382",
@@ -36662,7 +36662,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808422Z",
+      "scraped_at": "2026-04-28T01:52:24.916371Z",
       "days_to_sale": null,
       "owner_name": "DAVIS, MERCELLE",
       "owner_address": "119 VICTOR ST NE, WASHINGTON DC 20011-5062",
@@ -36736,7 +36736,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808434Z",
+      "scraped_at": "2026-04-28T01:52:24.916387Z",
       "days_to_sale": null,
       "owner_name": "BLAVY, RODOLPHE",
       "owner_address": "4301 KANSAS AVE NW, WASHINGTON DC 20011-7221",
@@ -36810,7 +36810,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808446Z",
+      "scraped_at": "2026-04-28T01:52:24.916402Z",
       "days_to_sale": null,
       "owner_name": "WOOD PROPERTY MANAGEMENT LLC",
       "owner_address": "PO BOX 6133, WOODBRIDGE VA 22195-6133",
@@ -36885,7 +36885,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808458Z",
+      "scraped_at": "2026-04-28T01:52:24.916417Z",
       "days_to_sale": null,
       "owner_name": "VRNM LLC",
       "owner_address": "5510 THORNBUSH CT, BETHESDA MD 20814-2156",
@@ -36960,7 +36960,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808470Z",
+      "scraped_at": "2026-04-28T01:52:24.916432Z",
       "days_to_sale": null,
       "owner_name": "1512 VARNUM STREET NW LLC",
       "owner_address": "1626 MYRTLE ST NW, WASHINGTON DC 20012-1130",
@@ -37034,7 +37034,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808481Z",
+      "scraped_at": "2026-04-28T01:52:24.916447Z",
       "days_to_sale": null,
       "owner_name": "LANDAVERDE, MARIE F",
       "tax_class": "4",
@@ -37107,7 +37107,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808493Z",
+      "scraped_at": "2026-04-28T01:52:24.916462Z",
       "days_to_sale": null,
       "owner_name": "BENJAMIN F PEASANT TRUSTEE",
       "owner_address": "733 QUEBEC PL NW, WASHINGTON DC 20010-1966",
@@ -37181,7 +37181,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808504Z",
+      "scraped_at": "2026-04-28T01:52:24.916476Z",
       "days_to_sale": null,
       "owner_name": "CASTELLANOS, GIOVANI",
       "owner_address": "707 MEADOW LN SW, VIENNA VA 22180-6344",
@@ -37256,7 +37256,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808515Z",
+      "scraped_at": "2026-04-28T01:52:24.916489Z",
       "days_to_sale": null,
       "owner_name": "ZHANG, WINNI",
       "owner_address": "4214 14TH ST NW, WASHINGTON DC 20011-5514",
@@ -37330,7 +37330,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808525Z",
+      "scraped_at": "2026-04-28T01:52:24.916504Z",
       "days_to_sale": null,
       "owner_name": "OIG ACQUISITIONS, LLC",
       "owner_address": "616 INGRAHAM ST NW, WASHINGTON DC 20011-7706",
@@ -37404,7 +37404,7 @@
         "Ward Ward 4"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808536Z",
+      "scraped_at": "2026-04-28T01:52:24.916518Z",
       "days_to_sale": null,
       "owner_name": "FERBISH, THELMA",
       "owner_address": "1304 FLORAL ST NW, WASHINGTON DC 20012-1718",
@@ -37478,7 +37478,7 @@
         "Ward Ward 5"
       ],
       "status": "Active",
-      "scraped_at": "2026-04-28T01:44:51.808548Z",
+      "scraped_at": "2026-04-28T01:52:24.916533Z",
       "days_to_sale": null,
       "owner_name": "1363 MICHIGAN AVE LLC",
       "owner_address": "PO BOX 5741, WASHINGTON DC 20016-1341",
