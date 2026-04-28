@@ -2104,6 +2104,13 @@
 
   // ─── Listings view — full sortable table ────────────────────────────────
   let __listingsSortKey = 'score';
+  // Quick-filter dropdowns at the top of the Command Center Listings view.
+  // Empty string = "All <dimension>". Single-select; populated from the
+  // dropdowns themselves and applied in renderListings() after state +
+  // live-signal filtering.
+  let __listingsTypeFilter = '';
+  let __listingsPropertyFilter = '';
+  let __listingsSourceFilter = '';
   function renderListings(d) {
     const body = document.getElementById('fc-listings-body');
     const countPill = document.getElementById('fc-listings-count');
@@ -2140,6 +2147,27 @@
     } else {
       renderSignalFilterChip(null);
     }
+
+    // Apply quick-filter dropdowns (listing type / property type / source).
+    if (__listingsTypeFilter)     props = props.filter(p => p.listingType === __listingsTypeFilter);
+    if (__listingsPropertyFilter) props = props.filter(p => p.property_type === __listingsPropertyFilter);
+    if (__listingsSourceFilter)   props = props.filter(p => p.source === __listingsSourceFilter);
+
+    // Populate Source dropdown from observed source values (idempotent — same
+    // input → same DOM after first run). Done here so newly-added sources
+    // appear without a page reload.
+    const sourceSel = document.getElementById('fc-qf-source');
+    if (sourceSel) {
+      const observed = [...new Set((filtered.foreclosures || []).map(p => p.source).filter(Boolean))].sort();
+      const desiredOptions = '<option value="">All Sources</option>' +
+        observed.map(s => `<option value="${s.replace(/"/g, '&quot;')}"${s === __listingsSourceFilter ? ' selected' : ''}>${s}</option>`).join('');
+      if (sourceSel.innerHTML !== desiredOptions) sourceSel.innerHTML = desiredOptions;
+    }
+    // Visual emphasis when a quick-filter is active.
+    const setActive = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('fc-qf-active', !!on); };
+    setActive('fc-qf-type',     !!__listingsTypeFilter);
+    setActive('fc-qf-property', !!__listingsPropertyFilter);
+    setActive('fc-qf-source',   !!__listingsSourceFilter);
 
     const sortFns = {
       score:    (a, b) => (b.score || 0) - (a.score || 0),
@@ -3471,6 +3499,22 @@
   // the legacy foreclosure-scout.html map-pin click path can route here
   // instead of showing the older legacy drawer.
   window.openPropertyDrawer = openPropertyDrawer;
+
+  // Quick-filter handlers for the Listings view dropdowns.
+  window.fcSetListingsFilter = function(group, value) {
+    if (group === 'type')     __listingsTypeFilter = value || '';
+    if (group === 'property') __listingsPropertyFilter = value || '';
+    if (group === 'source')   __listingsSourceFilter = value || '';
+    if (window.__fcData) renderListings(window.__fcData);
+  };
+  window.fcClearListingsFilters = function() {
+    __listingsTypeFilter = '';
+    __listingsPropertyFilter = '';
+    __listingsSourceFilter = '';
+    const ids = ['fc-qf-type', 'fc-qf-property', 'fc-qf-source'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    if (window.__fcData) renderListings(window.__fcData);
+  };
   window.closePropertyDrawer = closePropertyDrawer;
 
   function openPropertyDrawer(propId) {
@@ -5658,6 +5702,32 @@ Return ONLY the 2-sentence analysis.`,
                   <button class="fc-btn fc-btn-sm fc-btn-ghost fc-list-sort" data-sort="discount">Discount</button>
                 </div>
               </div>
+              <!-- Quick-filter row: Listing Type / Property Type / Source.
+                   Each dropdown is single-select; value drives renderListings().
+                   Source options populated from data on render. -->
+              <div style="display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);flex-wrap:wrap">
+                <select id="fc-qf-type" class="fc-select fc-qf-select" onchange="window.fcSetListingsFilter('type', this.value)">
+                  <option value="">All Listing Types</option>
+                  <option value="Auction">Auction</option>
+                  <option value="REO/Bank-Owned">REO / Bank-Owned</option>
+                  <option value="HUD Home">HUD Home</option>
+                  <option value="Pre-Foreclosure">Pre-Foreclosure</option>
+                  <option value="Short Sale">Short Sale</option>
+                </select>
+                <select id="fc-qf-property" class="fc-select fc-qf-select" onchange="window.fcSetListingsFilter('property', this.value)">
+                  <option value="">All Property Types</option>
+                  <option value="Single Family">Single Family</option>
+                  <option value="Townhouse">Townhouse</option>
+                  <option value="Condo">Condo</option>
+                  <option value="Multi-Family">Multi-Family</option>
+                  <option value="Mobile Home">Mobile Home</option>
+                  <option value="Land">Land</option>
+                </select>
+                <select id="fc-qf-source" class="fc-select fc-qf-select" onchange="window.fcSetListingsFilter('source', this.value)">
+                  <option value="">All Sources</option>
+                </select>
+                <button class="fc-btn fc-btn-sm fc-btn-ghost" onclick="window.fcClearListingsFilters()">Clear filters</button>
+              </div>
               <div id="fc-listings-filter-chip" style="display:none"></div>
               <table class="fc-table" id="fc-listings-table">
                 <thead>
@@ -6258,6 +6328,27 @@ Return ONLY the 2-sentence analysis.`,
     display: flex; align-items: center; gap: 10px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--hair);
+  }
+  /* Quick-filter dropdowns at the top of the Listings view. */
+  .fc-qf-select {
+    padding: 6px 10px;
+    background: var(--white);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    cursor: pointer;
+    outline: none;
+    flex: 0 1 auto;
+    min-width: 130px;
+  }
+  .fc-qf-select:focus { border-color: var(--accent2); }
+  .fc-qf-select.fc-qf-active {
+    border-color: var(--accent);
+    background: #fff8f6;
+    color: var(--accent);
+    font-weight: 600;
   }
   .fc-card-title {
     font-size: 13px; font-weight: 600;
