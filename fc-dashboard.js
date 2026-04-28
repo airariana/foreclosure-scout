@@ -835,6 +835,10 @@
     // assessed value / sales / owner / beds / baths require auth-walled lisweb.
     // The handler returns a partial dataset and a deep-link to lisweb.
     if (state === 'VA' && county === 'Loudoun County') return 'loudoun';
+    // Prince William's CAMA Public layer exposes owner, structured address,
+    // sqft above grade, acreage, last deed refs. No sale prices, year built,
+    // or beds/baths — those aren't in PW open data.
+    if (state === 'VA' && county === 'Prince William County') return 'pwc';
     return null;
   }
 
@@ -4321,6 +4325,7 @@ Return ONLY the 2-sentence analysis.`,
             return j === 'arlington' ? 'Arlington County Property Search'
                  : j === 'fairfax'   ? 'Fairfax County Open GIS'
                  : j === 'loudoun'   ? 'Loudoun County WebLogis (open data)'
+                 : j === 'pwc'       ? 'Prince William County QuickInfo'
                  : 'County records';
           })()} ↗
         </a>
