@@ -1312,6 +1312,14 @@ def run(gmaps_key: str = "") -> dict:
     except Exception as e:
         log.warning(f"DC Vacant: loader failed: {e}")
 
+    # VA Vendee REO via VRM Properties — public listings, no auth.
+    # Bank-owned VA-foreclosed homes already in disposition.
+    try:
+        from va_vendee import scrape_va_vendee
+        all_props.extend(scrape_va_vendee())
+    except Exception as e:
+        log.warning(f"VA Vendee: loader failed: {e}")
+
     # Deduplicate
     all_props = deduplicate(all_props)
 
