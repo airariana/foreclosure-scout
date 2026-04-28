@@ -1320,6 +1320,14 @@ def run(gmaps_key: str = "") -> dict:
     except Exception as e:
         log.warning(f"VA Vendee: loader failed: {e}")
 
+    # HomeSteps REO (Freddie Mac) — public Drupal Views site with JSON-LD
+    # structured data per listing. Single page covers DC/MD/VA inventory.
+    try:
+        from homesteps_reo import scrape_homesteps_reo
+        all_props.extend(scrape_homesteps_reo())
+    except Exception as e:
+        log.warning(f"HomeSteps: loader failed: {e}")
+
     # Deduplicate
     all_props = deduplicate(all_props)
 
