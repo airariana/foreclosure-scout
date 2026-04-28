@@ -1144,7 +1144,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=81"></script>
+<script src="fc-dashboard.js?v=82"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -1810,6 +1810,7 @@ let selectedId=null, activeTypeFilter=null, enrichedCount=0;
 // fitMapWhenReady() to fit the viewport once markers land.
 window.__fcGetMarkers = () => markers;
 window.__fcGetMap     = () => map;
+window.__fcGetAllProperties = () => allProperties;
 let ALERTS   = JSON.parse(localStorage.getItem('fs_alerts')||'[]');
 let SEEN_IDS = new Set(JSON.parse(localStorage.getItem('fs_seen')||'[]'));
 

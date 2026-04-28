@@ -1174,6 +1174,135 @@
   window.fcSyncLiensFromServer = syncLiensFromServer;
   syncLiensFromServer();
 
+  // ─── Auction intel (manual cross-check from auction.com) ─────────────────
+  // Direct auction.com scraping is blocked by ToS, so this is the manual
+  // bridge: user logs in, looks up the property, types the current bid +
+  // auction time into the drawer. Saved per-device + synced via worker D1
+  // so iPhone/desktop see the same numbers. Same shape as liens.
+  const AUCTION_LS_PREFIX = 'fs_auction_';
+  const AUCTION_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/auction';
+
+  function getAuction(propId) {
+    if (!propId) return null;
+    try {
+      const raw = localStorage.getItem(AUCTION_LS_PREFIX + propId);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveAuction(propId, data) {
+    if (!propId) return;
+    const entry = { ...data, updated_at: new Date().toISOString() };
+    localStorage.setItem(AUCTION_LS_PREFIX + propId, JSON.stringify(entry));
+    const token = getZillowSyncToken();
+    if (token) {
+      fetch(`${AUCTION_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Nestscoop-Token': token },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+    return entry;
+  }
+
+  function deleteAuction(propId) {
+    if (!propId) return;
+    localStorage.removeItem(AUCTION_LS_PREFIX + propId);
+    const token = getZillowSyncToken();
+    if (token) {
+      fetch(`${AUCTION_SYNC_BASE}/${encodeURIComponent(propId)}`, {
+        method: 'DELETE',
+        headers: { 'X-Nestscoop-Token': token },
+      }).catch(() => {});
+    }
+  }
+
+  async function syncAuctionFromServer() {
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    try {
+      const res = await fetch(AUCTION_SYNC_BASE, {
+        headers: { 'X-Nestscoop-Token': token },
+      });
+      if (!res.ok) return { ok: false, reason: `http-${res.status}` };
+      const data = await res.json();
+      const remote = data.auction || {};
+      let pulled = 0;
+      for (const [propId, remoteEntry] of Object.entries(remote)) {
+        const localRaw = localStorage.getItem(AUCTION_LS_PREFIX + propId);
+        if (!localRaw) {
+          localStorage.setItem(AUCTION_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+          continue;
+        }
+        try {
+          const local = JSON.parse(localRaw);
+          if ((remoteEntry.updated_at || '') > (local.updated_at || '')) {
+            localStorage.setItem(AUCTION_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+            pulled++;
+          }
+        } catch (e) {
+          localStorage.setItem(AUCTION_LS_PREFIX + propId, JSON.stringify(remoteEntry));
+          pulled++;
+        }
+      }
+      return { ok: true, pulled, total: Object.keys(remote).length };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+  window.fcSyncAuctionFromServer = syncAuctionFromServer;
+  syncAuctionFromServer();
+
+  // Compute the cross-check metrics that drive the auto-comparison panel.
+  // All inputs are optional — math gracefully degrades when fields are
+  // missing (e.g. no assessor cache, no BWW original loan amount).
+  function computeAuctionMetrics(p, bid, assessedValue, originalLoan) {
+    if (!bid || bid <= 0) return null;
+    const arv = Number(p.arv) || 0;
+    const eav = Number(p.price) || 0;
+    const rehab = Number(p.rehabEstimate) || 0;
+    const monthlyRent = Number(p.monthlyRent) || 0;
+
+    // Bid vs ARV: discount to retail. Industry rule: aim for >= 30% discount.
+    const discountToARV = arv ? ((arv - bid) / arv) * 100 : null;
+
+    // Bid vs heuristic EAV: positive = paying more than our model predicted.
+    const eavDeltaPct = eav ? ((bid - eav) / eav) * 100 : null;
+
+    // Bid vs assessed value (when assessor has it): >100% = paying premium
+    // over govt valuation; <80% = significant discount.
+    const assessedRatio = assessedValue ? (bid / assessedValue) * 100 : null;
+
+    // Bid vs original loan (BWW only): ratio at this bid. >100% = bidder is
+    // paying more than the loan balance, lender is whole. <80% = lender
+    // already eating a haircut.
+    const loanRatio = originalLoan ? (bid / originalLoan) * 100 : null;
+
+    // 70% rule: MAO = ARV * 0.7 - rehab. Bid <= MAO is the classic flip
+    // viability check. Delta tells how much margin/over-pay there is.
+    const mao70 = arv ? (arv * 0.7 - rehab) : null;
+    const mao70Pass = mao70 != null ? bid <= mao70 : null;
+    const mao70Delta = mao70 != null ? mao70 - bid : null;
+
+    // Cap rate at this bid using the existing rent estimate. 55%-NOI is a
+    // conservative-but-realistic operating-expense ratio for SFR rentals.
+    const grossCap = monthlyRent && bid ? ((monthlyRent * 12) / bid) * 100 : null;
+    const noiCap55 = monthlyRent && bid ? ((monthlyRent * 12 * 0.55) / bid) * 100 : null;
+
+    // Total all-in if you bought at this bid + rehab.
+    const allIn = bid + rehab;
+    const allInVsARV = arv ? (allIn / arv) * 100 : null;
+
+    return {
+      bid, arv, eav, rehab, monthlyRent, assessedValue, originalLoan,
+      discountToARV, eavDeltaPct, assessedRatio, loanRatio,
+      mao70, mao70Pass, mao70Delta,
+      grossCap, noiCap55,
+      allIn, allInVsARV,
+    };
+  }
+
   // ── Watchlist ──────────────────────────────────────────────────────────
   // Lightweight flag-based watchlist. Single localStorage key holds an array
   // of { id, address, city, state, zip, addedAt } entries. Persisted client-
@@ -3401,10 +3530,17 @@
     wireDrawerLiens(p);
 
     // Fire-and-forget fetch of county assessor data (renders when ready).
+    // wireDrawerAssessor also re-renders auction metrics once the assessor
+    // cache is populated (so Bid-vs-Assessed unlocks for Winchester etc.).
     wireDrawerAssessor(p);
 
     // Fire-and-forget AI roof analysis from satellite imagery.
     wireDrawerRoof(p);
+
+    // Render the auction-metrics panel synchronously from current saved bid.
+    // It re-renders after the assessor data lands (handled inside
+    // wireDrawerAssessor) so Bid-vs-Assessed populates without a manual save.
+    renderAuctionMetrics(p);
   }
 
   function wireDrawerShareButtons(p) {
@@ -3817,6 +3953,8 @@ Return ONLY the 2-sentence analysis.`,
         ${assessorIntelSection(p)}
 
         ${roofIntelSection(p)}
+
+        ${auctionSection(p)}
 
         ${liensSection(p)}
 
@@ -4406,6 +4544,9 @@ Return ONLY the 2-sentence analysis.`,
       hintEl.dataset.owner = res.data.owner_name;
     }
     renderAssessorIntel(container, p, res.data);
+    // The auction metrics panel needs assessed_value to render the
+    // "vs Assessed" tile. Now that we have it, re-render that panel.
+    if (typeof renderAuctionMetrics === 'function') renderAuctionMetrics(p);
   }
 
   // Click handler for the Judgment search button. Opens the state-specific
@@ -4703,6 +4844,199 @@ Return ONLY the 2-sentence analysis.`,
     { icon: '🍽️', label: 'Restaurants', query: 'restaurants' },
     { icon: '💪', label: 'Gyms',        query: 'gyms' },
   ];
+
+  // ─── Live Auction (auction.com cross-check) ──────────────────────────────
+  // Manual entry form + auto-comparison panel. The form captures starting
+  // bid, current bid, auction date/time, listing URL, and notes. The panel
+  // below the form computes deal-quality metrics live from those inputs +
+  // everything else we already know about the property (ARV, heuristic EAV,
+  // assessed value when available, BWW original loan amount when available,
+  // rehab estimate, rent estimate). All math is documented in
+  // computeAuctionMetrics().
+  function auctionSection(p) {
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const saved = getAuction(p.id) || {};
+    const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+    const auctionSearchUrl = `https://www.auction.com/search-results?searchTerm=${encodeURIComponent(fullAddress)}`;
+
+    const inputStyle = `width:100%;padding:7px 9px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-mono);font-size:12px;box-sizing:border-box;background:var(--paper)`;
+    const labelStyle = `display:block;font-size:10px;color:var(--muted);font-family:var(--f-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px`;
+
+    const lastObserved = saved.observed_at
+      ? `<span class="fc-pill" style="font-size:10px">Last checked ${new Date(saved.observed_at).toLocaleString()}</span>`
+      : `<span class="fc-pill" style="font-size:10px">Not yet checked</span>`;
+
+    return section('Live Auction (auction.com)', `
+      <div style="margin-bottom:10px">${lastObserved}</div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        <a href="${escapeAttr(auctionSearchUrl)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">
+          Search auction.com ↗
+        </a>
+        ${saved.auction_url
+          ? `<a href="${escapeAttr(saved.auction_url)}" target="_blank" rel="noopener" class="fc-btn fc-btn-sm">Open saved listing ↗</a>`
+          : ''}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="${labelStyle}">Starting bid $</label>
+          <input id="fc-auction-start-${sid}" type="number" inputmode="numeric" placeholder="e.g. 185000" value="${saved.starting_bid != null ? saved.starting_bid : ''}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Current bid $</label>
+          <input id="fc-auction-current-${sid}" type="number" inputmode="numeric" placeholder="latest visible" value="${saved.current_bid != null ? saved.current_bid : ''}" style="${inputStyle}">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="${labelStyle}">Auction date</label>
+          <input id="fc-auction-date-${sid}" type="date" value="${escapeAttr(saved.auction_date || '')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Auction time</label>
+          <input id="fc-auction-time-${sid}" type="text" placeholder="11:00 AM ET" value="${escapeAttr(saved.auction_time || '')}" style="${inputStyle}">
+        </div>
+        <div>
+          <label style="${labelStyle}">Bid count</label>
+          <input id="fc-auction-bidcount-${sid}" type="number" inputmode="numeric" placeholder="optional" value="${saved.bid_count != null ? saved.bid_count : ''}" style="${inputStyle}">
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px">
+        <label style="${labelStyle}">Auction.com listing URL</label>
+        <input id="fc-auction-url-${sid}" type="url" placeholder="https://www.auction.com/details/..." value="${escapeAttr(saved.auction_url || '')}" style="${inputStyle}">
+      </div>
+
+      <div style="margin-bottom:10px">
+        <label style="${labelStyle}">Notes (reserve status, photos, condition, etc.)</label>
+        <textarea id="fc-auction-notes-${sid}" rows="2" placeholder="reserve met / no reserve / etc." style="${inputStyle};font-family:var(--f-sans);resize:vertical">${escapeHtml(saved.notes || '')}</textarea>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <button class="fc-btn fc-btn-sm" type="button" onclick="window.fcSaveAuction('${escapeAttr(p.id)}')">Save bid + recompute</button>
+        ${saved.updated_at
+          ? `<button class="fc-btn fc-btn-sm fc-btn-ghost" type="button" onclick="window.fcDeleteAuction('${escapeAttr(p.id)}')">Clear</button>`
+          : ''}
+      </div>
+
+      <div id="fc-auction-metrics-${sid}"></div>
+    `);
+  }
+
+  function renderAuctionMetrics(p) {
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const container = document.getElementById(`fc-auction-metrics-${sid}`);
+    if (!container) return;
+    const saved = getAuction(p.id) || {};
+    const bid = Number(saved.current_bid) || Number(saved.starting_bid) || 0;
+    if (!bid) {
+      container.innerHTML = `<div style="font-size:11px;color:var(--muted);font-family:var(--f-mono);padding:10px;border:1px dashed var(--hair);border-radius:6px">
+        Enter a starting or current bid above and click Save to see deal metrics.
+      </div>`;
+      return;
+    }
+
+    const intel = assessorIntelCache.get(p.id);
+    const assessedValue = intel && intel.assessed_value ? Number(intel.assessed_value) : null;
+    const originalLoan = (p.pricing && p.pricing.original_loan) ? Number(p.pricing.original_loan) : null;
+
+    const m = computeAuctionMetrics(p, bid, assessedValue, originalLoan);
+    if (!m) {
+      container.innerHTML = `<div style="font-size:11px;color:var(--muted)">Cannot compute metrics — missing inputs.</div>`;
+      return;
+    }
+
+    // Color coding for each metric. Standard underwriting thresholds.
+    const fmt$ = (n) => n != null ? '$' + Math.round(n).toLocaleString() : '—';
+    const fmtPct = (n, dec=0) => n != null ? n.toFixed(dec) + '%' : '—';
+    const colorByDiscount = (d) => d == null ? 'muted' : d >= 30 ? 'sage' : d >= 15 ? 'gold' : 'coral';
+    const colorByCap = (c) => c == null ? 'muted' : c >= 8 ? 'sage' : c >= 5 ? 'gold' : 'coral';
+
+    const tile = (label, value, color, hint) => `
+      <div style="padding:10px 12px;background:var(--paper-2);border-left:3px solid var(--${color === 'muted' ? 'hair' : color});border-radius:4px;min-width:0">
+        <div class="fc-eyebrow" style="margin-bottom:3px;font-size:9px">${escapeHtml(label)}</div>
+        <div style="font-family:var(--f-serif);font-size:18px;font-weight:600;color:var(--${color === 'muted' ? 'ink' : color});line-height:1.1">${value}</div>
+        ${hint ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${escapeHtml(hint)}</div>` : ''}
+      </div>
+    `;
+
+    const maoColor = m.mao70Pass === true ? 'sage' : m.mao70Pass === false ? 'coral' : 'muted';
+    const maoHint = m.mao70 != null
+      ? `MAO ${fmt$(m.mao70)} · ${m.mao70Delta >= 0 ? 'room ' + fmt$(m.mao70Delta) : 'over by ' + fmt$(-m.mao70Delta)}`
+      : '';
+    const eavColor = m.eavDeltaPct == null ? 'muted'
+      : m.eavDeltaPct <= -10 ? 'sage' : m.eavDeltaPct <= 10 ? 'gold' : 'coral';
+    const assessedColor = m.assessedRatio == null ? 'muted'
+      : m.assessedRatio <= 80 ? 'sage' : m.assessedRatio <= 110 ? 'gold' : 'coral';
+    const loanColor = m.loanRatio == null ? 'muted'
+      : m.loanRatio <= 80 ? 'sage' : m.loanRatio <= 100 ? 'gold' : 'coral';
+
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px">
+        ${tile('Bid', fmt$(m.bid), 'muted', m.allIn ? `All-in w/ rehab ${fmt$(m.allIn)}` : '')}
+        ${tile('Discount to ARV', fmtPct(m.discountToARV, 1), colorByDiscount(m.discountToARV),
+               m.arv ? `ARV ${fmt$(m.arv)}` : 'no ARV')}
+        ${tile('70% Rule', m.mao70Pass === true ? 'PASS' : m.mao70Pass === false ? 'FAIL' : '—', maoColor, maoHint)}
+        ${tile('vs Heuristic EAV', fmtPct(m.eavDeltaPct, 1), eavColor,
+               m.eav ? `EAV ${fmt$(m.eav)}` : '')}
+        ${m.assessedRatio != null
+          ? tile('vs Assessed', fmtPct(m.assessedRatio, 0), assessedColor, fmt$(m.assessedValue))
+          : ''}
+        ${m.loanRatio != null
+          ? tile('vs Original Loan (LTV)', fmtPct(m.loanRatio, 0), loanColor, fmt$(m.originalLoan))
+          : ''}
+        ${m.noiCap55 != null
+          ? tile('Cap rate (55% NOI)', fmtPct(m.noiCap55, 1), colorByCap(m.noiCap55), `Rent ${fmt$(m.monthlyRent)}/mo`)
+          : ''}
+        ${m.allInVsARV != null
+          ? tile('All-in / ARV', fmtPct(m.allInVsARV, 0),
+                 m.allInVsARV <= 70 ? 'sage' : m.allInVsARV <= 85 ? 'gold' : 'coral',
+                 `Bid + rehab ${fmt$(m.allIn)}`)
+          : ''}
+      </div>
+
+      <div style="font-size:10px;color:var(--muted);font-family:var(--f-mono)">
+        Color: <span style="color:var(--sage)">green</span> = good underwriting ·
+        <span style="color:var(--gold)">gold</span> = marginal ·
+        <span style="color:var(--coral)">red</span> = avoid.
+        Tile thresholds: discount&nbsp;30%/15%, cap&nbsp;8%/5%, all-in/ARV&nbsp;70%/85%.
+      </div>
+    `;
+  }
+
+  // Save handler — collect form values, persist, recompute metrics in place.
+  window.fcSaveAuction = function(propId) {
+    const sid = (propId || 'x').replace(/[^a-z0-9]/gi, '');
+    const $val = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    };
+    const data = {
+      starting_bid: $val(`fc-auction-start-${sid}`) || null,
+      current_bid:  $val(`fc-auction-current-${sid}`) || null,
+      auction_date: $val(`fc-auction-date-${sid}`) || null,
+      auction_time: $val(`fc-auction-time-${sid}`) || null,
+      auction_url:  $val(`fc-auction-url-${sid}`) || null,
+      bid_count:    $val(`fc-auction-bidcount-${sid}`) || null,
+      notes:        $val(`fc-auction-notes-${sid}`) || null,
+      observed_at:  new Date().toISOString(),
+    };
+    saveAuction(propId, data);
+    const props = (typeof window.__fcGetAllProperties === 'function' && window.__fcGetAllProperties()) || [];
+    const p = props.find(x => x.id === propId);
+    if (p) renderAuctionMetrics(p);
+  };
+
+  window.fcDeleteAuction = function(propId) {
+    if (!confirm('Clear saved auction data for this property?')) return;
+    deleteAuction(propId);
+    // Re-render section by reopening drawer
+    if (typeof window.openPropertyDrawer === 'function') {
+      window.openPropertyDrawer(propId);
+    }
+  };
 
   function neighborhoodSection(p) {
     const fullAddress = [p.address, p.city, p.state, p.zip]
