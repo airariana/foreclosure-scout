@@ -831,6 +831,10 @@
     // zip + sqft for comp scoping since the source dataset doesn't always
     // contain the subject foreclosure property.
     if (state === 'VA' && (county === 'Fairfax County' || county === 'Fairfax City')) return 'fairfax';
+    // Loudoun's open ArcGIS gives parcel + year-built + structure use only —
+    // assessed value / sales / owner / beds / baths require auth-walled lisweb.
+    // The handler returns a partial dataset and a deep-link to lisweb.
+    if (state === 'VA' && county === 'Loudoun County') return 'loudoun';
     return null;
   }
 
@@ -4225,11 +4229,32 @@ Return ONLY the 2-sentence analysis.`,
     const deedRefs = (data.sales_history || []).filter(s => s.deed);
     const hasRefs = deedRefs.length > 0;
 
+    // Tax pill only rendered when we actually know the tax status. Some
+    // jurisdictions (e.g. Loudoun open data) don't expose tax info, so the
+    // handler returns 'unknown' and we suppress the pill rather than
+    // misleadingly claiming taxes are owed.
     const taxPill = data.tax_status === 'paid'
       ? '<span class="fc-pill sage" style="font-size:10px">Tax balance $0 · paid</span>'
-      : `<span class="fc-pill coral" style="font-size:10px">Tax balance ${fmt$(data.tax_balance_due)} · OWED</span>`;
+      : data.tax_status === 'unknown' || data.tax_balance_due == null
+        ? ''
+        : `<span class="fc-pill coral" style="font-size:10px">Tax balance ${fmt$(data.tax_balance_due)} · OWED</span>`;
+    // Optional structure-use pill (Loudoun) — surfaces "Single Family
+    // Detached" / "Townhouse" / etc. when the open data exposes it.
+    const structureUsePill = data.raw?.structure_use
+      ? `<span class="fc-pill" style="font-size:10px">${escapeHtml(data.raw.structure_use)}</span>`
+      : '';
+    // Loudoun-specific notice — only shown when the handler flagged the
+    // dataset as limited. Tells the user why fields are missing and points
+    // them at the auth-walled portal for the rest.
+    const limitedNoticeHtml = data.raw?.notice
+      ? `<div style="padding:8px 10px;border:1px dashed var(--hair);border-radius:6px;margin-bottom:12px;
+                     font-size:11px;color:var(--ink-2);background:var(--paper-2);line-height:1.5">
+           <strong>⚠ Limited data:</strong> ${escapeHtml(data.raw.notice)}
+         </div>`
+      : '';
 
     container.innerHTML = `
+      ${limitedNoticeHtml}
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
         <div>
           <div class="fc-eyebrow" style="margin-bottom:3px">Assessed value (${data.assessed_year || ''})</div>
@@ -4253,6 +4278,7 @@ Return ONLY the 2-sentence analysis.`,
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
         <span class="fc-pill" style="font-size:10px">${escapeHtml(data.owner_name || 'Owner unknown')}</span>
         <span class="fc-pill" style="font-size:10px">Built ${data.year_built || '—'}</span>
+        ${structureUsePill}
         <span class="fc-pill" style="font-size:10px">${(data.total_sqft || '—').toLocaleString()} sqft · ${data.baths_total || '—'} ba</span>
         <span class="fc-pill" style="font-size:10px">Lot ${data.lot_size_sqft ? data.lot_size_sqft.toLocaleString() + ' sqft' : '—'}</span>
         <span class="fc-pill" style="font-size:10px">${escapeHtml(data.zoning || '—')}</span>
@@ -4290,7 +4316,13 @@ Return ONLY the 2-sentence analysis.`,
 
       <div style="margin-top:12px;font-size:11px;color:var(--muted);font-family:var(--f-mono)">
         <a href="${escapeAttr(data.source_url || '')}" target="_blank" rel="noopener" style="color:var(--muted)">
-          Source: Arlington County Property Search ↗
+          Source: ${(() => {
+            const j = (assessorJurisdiction(p) || '').toLowerCase();
+            return j === 'arlington' ? 'Arlington County Property Search'
+                 : j === 'fairfax'   ? 'Fairfax County Open GIS'
+                 : j === 'loudoun'   ? 'Loudoun County WebLogis (open data)'
+                 : 'County records';
+          })()} ↗
         </a>
       </div>
     `;
