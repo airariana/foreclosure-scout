@@ -4857,7 +4857,20 @@ Return ONLY the 2-sentence analysis.`,
     const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
     const saved = getAuction(p.id) || {};
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
-    const auctionSearchUrl = `https://www.auction.com/search-results?searchTerm=${encodeURIComponent(fullAddress)}`;
+    // Auction.com uses path-based URLs, not query-string search. Pattern:
+    //   /residential/{state-lower}/{city-slug}_ct/   (city listings page)
+    //   /residential/{state-lower}/                  (state listings page)
+    // Their `/search-results?searchTerm=...` does not exist (404). City
+    // pages let the user scan listings + match by address; state-level is
+    // the fallback when we don't have a city.
+    const stateLow = (p.state || '').toLowerCase();
+    const citySlug = (p.city || '').toLowerCase().trim()
+      .replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    const auctionSearchUrl = stateLow && citySlug
+      ? `https://www.auction.com/residential/${stateLow}/${citySlug}_ct/`
+      : stateLow
+        ? `https://www.auction.com/residential/${stateLow}/`
+        : 'https://www.auction.com/';
 
     const inputStyle = `width:100%;padding:7px 9px;border:1px solid var(--hair);border-radius:4px;font-family:var(--f-mono);font-size:12px;box-sizing:border-box;background:var(--paper)`;
     const labelStyle = `display:block;font-size:10px;color:var(--muted);font-family:var(--f-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px`;
