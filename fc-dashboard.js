@@ -4377,19 +4377,34 @@ Return ONLY the 2-sentence analysis.`,
     const sanitizedId = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
     const sid = sanitizedId; // shorthand for id template keys
     const fullAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
-    // Per-state court portal where civil judgments + tax-lien dockets live.
-    // Generic Google search was useless — it scattergun-matched any page with
-    // "judgment" or "lien" anywhere on it. These are the actual systems of
-    // record. All three have CAPTCHAs so we can't pre-fill the search; the
-    // best we can do is open the portal + copy the owner name to clipboard.
+    // Per-state court portal where civil JUDGMENTS docket against the owner.
+    // VA is non-judicial for foreclosure, so the deed-of-trust + most lien
+    // recordings (mechanic's, HOA, IRS NFTL, lis pendens) live in Land
+    // Records, NOT here — see the Deeds button. OCIS catches the personal
+    // judgments (credit card, medical, divorce decrees) that become real
+    // property liens once docketed.
     const stateUp = (p.state || '').toUpperCase();
     const judgmentPortal =
       stateUp === 'VA' ? 'https://eapps.courts.state.va.us/ocis/' :
       stateUp === 'DC' ? 'https://eaccess.dccourts.gov/eaccess/' :
       stateUp === 'MD' ? 'https://casesearch.courts.state.md.us/casesearch/' :
       null;
+    // PACER bankruptcy index — bankruptcy auto-stays foreclosure and can
+    // void junior liens, so it's a critical title check separate from the
+    // state civil-judgment search. Free name lookup (registration required,
+    // case index free, document downloads cost). The "1" jurisdiction code
+    // narrows to bankruptcy courts (4th Circuit covers VA + MD + DC).
+    const pacerSearch = `https://pcl.uscourts.gov/pcl/index.jsf`;
+    // County / municipal property tax + treasurer (delinquent RE tax,
+    // water/sewer arrears, code-enforcement liens). Per-state primary
+    // entry points; deeper county-specific links could be added later.
     const taxSearchDC = p.state === 'DC' ? `https://mytax.dc.gov/_/` : null;
     const taxSearchMD = p.state === 'MD' ? `https://sdat.dat.maryland.gov/RealProperty/` : null;
+    const taxSearchVA = stateUp === 'VA'
+      ? (p.county === 'Arlington County' ? 'https://taxes.arlingtonva.us/RealEstate/Search'
+        : p.county === 'Fairfax County'  ? 'https://icare.fairfaxcounty.gov/ffxcare/search/CommonSearch.aspx?mode=realtaxes'
+        : `https://www.google.com/search?q=${encodeURIComponent((p.county || '') + ' VA real estate tax payment portal')}`)
+      : null;
 
     const v = (k, def='') => saved[k] != null ? saved[k] : def;
     const num = (k) => saved[k] != null ? saved[k] : '';
@@ -4427,14 +4442,12 @@ Return ONLY the 2-sentence analysis.`,
         </div>
       </div>` : '';
 
-    // Judgment search: state-aware portal + auto-copies owner name to
-    // clipboard at click time (read from assessorIntelCache when available).
-    // The hint line below the button row updates from wireDrawerAssessor
-    // once the owner name is known so the user knows what was copied.
+    // Civil judgments (state OCIS) — auto-copies owner name to clipboard
+    // at click time so user can paste-and-search instead of typing.
     const judgmentBtnHtml = judgmentPortal
       ? `<button class="fc-btn fc-btn-sm" type="button"
                  onclick="window.fcOpenJudgmentSearch('${escapeAttr(p.id)}', '${escapeAttr(judgmentPortal)}')">
-           Judgment search ↗
+           Civil judgments (${stateUp === 'VA' ? 'OCIS' : stateUp === 'DC' ? 'eAccess' : 'Casesearch'}) ↗
          </button>`
       : '';
     const judgmentLabelText = stateUp === 'VA'
@@ -4445,19 +4458,44 @@ Return ONLY the 2-sentence analysis.`,
           ? 'MD Casesearch · search by name'
           : '';
     const judgmentHintHtml = judgmentPortal ? `
-      <div id="fc-judgment-hint-${sid}" style="font-size:11px;color:var(--muted);margin:-6px 0 12px 0;font-family:var(--f-mono)">
+      <div id="fc-judgment-hint-${sid}" style="font-size:11px;color:var(--muted);margin:-2px 0 4px 0;font-family:var(--f-mono)">
         ${escapeHtml(judgmentLabelText)} — owner name auto-copies on click.
       </div>` : '';
+
+    // Methodology tooltip: VA is a non-judicial foreclosure state, so the
+    // typical "judgment search" idiom from FL/NY doesn't fully apply here.
+    // This explains the multi-source title-search stack so the user knows
+    // why we surface OCIS + PACER + Land Records + Treasurer separately.
+    const titleStackTooltip = `
+      <details style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:11px;color:var(--accent2);font-family:var(--f-mono);user-select:none">
+          ⓘ Where do liens actually live? (VA is non-judicial)
+        </summary>
+        <div style="margin-top:8px;padding:10px 12px;background:var(--paper-2);border-radius:6px;font-size:11px;line-height:1.6;color:var(--ink-2)">
+          VA is a <strong>non-judicial foreclosure state</strong> — foreclosures run through the trustee under the Deed of Trust, not court. So the standard "judgment search" only catches one slice of liens. Full title-search stack:
+          <ul style="margin:6px 0 0 0;padding-left:16px">
+            <li><strong>Land Records</strong> (Deeds button) — DOTs, releases, mechanic's, HOA, IRS NFTL, state tax liens, lis pendens</li>
+            <li><strong>Civil judgments</strong> (OCIS / eAccess / Casesearch) — personal judgments against owner that docket as real-property liens (credit card, medical, divorce decrees)</li>
+            <li><strong>PACER</strong> — bankruptcy filings (4th Circuit, VA Eastern + Western Districts)</li>
+            <li><strong>Treasurer</strong> — delinquent RE tax, water/sewer, code-enforcement liens</li>
+          </ul>
+          <div style="margin-top:6px;color:var(--muted)">For a clear title, all four should come back empty (or with releases). For Arlington, Land Records is offline — request from the Clerk via phone/email.</div>
+        </div>
+      </details>
+    `;
 
     const links = `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
         ${isArlington ? '' : linkBtn('Deeds / Land records', portals.deeds)}
         ${linkBtn('Assessor', portals.assessor)}
         ${judgmentBtnHtml}
+        ${linkBtn('PACER bankruptcy', pacerSearch)}
         ${taxSearchDC ? linkBtn('DC tax liens', taxSearchDC) : ''}
         ${taxSearchMD ? linkBtn('MD SDAT tax', taxSearchMD) : ''}
+        ${taxSearchVA ? linkBtn('VA treasurer / RE tax', taxSearchVA) : ''}
       </div>
       ${judgmentHintHtml}
+      ${titleStackTooltip}
       ${arlingtonNote}
     `;
 
