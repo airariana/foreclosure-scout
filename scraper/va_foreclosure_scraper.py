@@ -1328,6 +1328,16 @@ def run(gmaps_key: str = "") -> dict:
     except Exception as e:
         log.warning(f"HomeSteps: loader failed: {e}")
 
+    # HomePath REO (Fannie Mae) — public JSON API found by reverse-engineering
+    # the SPA's XHR. bounds=swLat,swLng,neLat,neLng is the only filter the
+    # backend honors. We fire 6 overlapping bboxes covering DMV and dedupe.
+    # Returns ~1,500 properties — by far the largest REO source.
+    try:
+        from homepath_reo import scrape_homepath_reo
+        all_props.extend(scrape_homepath_reo())
+    except Exception as e:
+        log.warning(f"HomePath: loader failed: {e}")
+
     # Deduplicate
     all_props = deduplicate(all_props)
 
