@@ -839,6 +839,10 @@
     // sqft above grade, acreage, last deed refs. No sale prices, year built,
     // or beds/baths — those aren't in PW open data.
     if (state === 'VA' && county === 'Prince William County') return 'pwc';
+    // Winchester City publishes a fat parcels feed with full CAMA data —
+    // owner, beds, baths, year built, assessed value, last sale price + date,
+    // deed refs, zoning, acreage. Richer than most counties.
+    if (state === 'VA' && county === 'Winchester City') return 'winchester';
     return null;
   }
 
@@ -4322,10 +4326,11 @@ Return ONLY the 2-sentence analysis.`,
         <a href="${escapeAttr(data.source_url || '')}" target="_blank" rel="noopener" style="color:var(--muted)">
           Source: ${(() => {
             const j = (assessorJurisdiction(p) || '').toLowerCase();
-            return j === 'arlington' ? 'Arlington County Property Search'
-                 : j === 'fairfax'   ? 'Fairfax County Open GIS'
-                 : j === 'loudoun'   ? 'Loudoun County WebLogis (open data)'
-                 : j === 'pwc'       ? 'Prince William County QuickInfo'
+            return j === 'arlington'  ? 'Arlington County Property Search'
+                 : j === 'fairfax'    ? 'Fairfax County Open GIS'
+                 : j === 'loudoun'    ? 'Loudoun County WebLogis (open data)'
+                 : j === 'pwc'        ? 'Prince William County QuickInfo'
+                 : j === 'winchester' ? 'Winchester City GIS (open data)'
                  : 'County records';
           })()} ↗
         </a>
@@ -4466,6 +4471,8 @@ Return ONLY the 2-sentence analysis.`,
       'Manassas Park City':     'https://www.cityofmanassaspark.us/180/Treasurer',
       'Falls Church City':      'https://www.fallschurchva.gov/1078/Treasurer',
       'Fauquier County':        'https://www.fauquiercounty.gov/government/departments-h-z/treasurer',
+      'Winchester City':        'https://www.winchesterva.gov/government/city-departments/treasurer',
+      'Frederick County':       'https://www.fcva.us/departments/treasurer',
     };
     const taxSearchVA = stateUp === 'VA'
       ? (VA_TREASURER_URLS[p.county]
