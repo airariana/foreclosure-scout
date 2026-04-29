@@ -321,12 +321,14 @@ def build_pricing(
 
 # ── Geocoding ─────────────────────────────────────────────────────────────────
 
-def geocode(address: str, api_key: str) -> tuple[float | None, float | None]:
-    """Return (lat, lng) for a given address string. Caller passes the
-    full address including state/zip — do NOT hardcode a state here, the
-    project covers DC + MD + VA."""
+def geocode(address: str, api_key: str) -> tuple[float | None, float | None, str | None]:
+    """Return (lat, lng, county) for a given address string. Caller passes
+    the full address including state/zip — do NOT hardcode a state here, the
+    project covers DC + MD + VA. County is extracted from the same response
+    (administrative_area_level_2 component) so REO sources that didn't set
+    a county at scrape time get backfilled for free."""
     if not api_key:
-        return None, None
+        return None, None, None
     try:
         r = requests.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
@@ -336,8 +338,30 @@ def geocode(address: str, api_key: str) -> tuple[float | None, float | None]:
         data = r.json()
         status = data.get("status")
         if status == "OK":
-            loc = data["results"][0]["geometry"]["location"]
-            return loc["lat"], loc["lng"]
+            top = data["results"][0]
+            loc = top["geometry"]["location"]
+            # Extract county / equivalent. DC has no county — Google returns
+            # "District of Columbia" as administrative_area_level_1; we map
+            # that case explicitly so the field is non-empty.
+            county = None
+            comps = top.get("address_components") or []
+            for c in comps:
+                types = c.get("types") or []
+                if "administrative_area_level_2" in types:
+                    county = c.get("long_name") or c.get("short_name")
+                    break
+            if not county:
+                # DC fallback: independent cities (Alexandria, etc.) and DC
+                # itself report "locality" instead of admin level 2.
+                for c in comps:
+                    if "locality" in (c.get("types") or []):
+                        loc_name = c.get("long_name") or ""
+                        if loc_name == "Washington":
+                            county = "District of Columbia"
+                        else:
+                            county = f"{loc_name} City"
+                        break
+            return loc["lat"], loc["lng"], county
         # Surface non-OK responses so we can tell the difference between
         # "API key rejected" (REQUEST_DENIED), "rate-limited" (OVER_QUERY_LIMIT),
         # "address didn't resolve" (ZERO_RESULTS), and other failure modes.
@@ -345,7 +369,7 @@ def geocode(address: str, api_key: str) -> tuple[float | None, float | None]:
         log.warning(f"Geocode {status} for '{address}': {err_msg[:200]}")
     except Exception as e:
         log.warning(f"Geocode exception for '{address}': {e}")
-    return None, None
+    return None, None, None
 
 
 # ── Property ID ───────────────────────────────────────────────────────────────
@@ -1241,11 +1265,14 @@ def deduplicate(properties: list[dict]) -> list[dict]:
 def geocode_missing(properties: list[dict], api_key: str) -> list[dict]:
     """Geocode any property missing lat/lng. Builds the full
     address-with-state from each property's own state/city/zip — DO NOT
-    hardcode VA, this project covers DC + MD + VA."""
+    hardcode VA, this project covers DC + MD + VA. Also backfills county
+    from the same response when the source scraper left it unset (REO
+    sources HomePath / HomeSteps / VA Vendee all default to "Unknown
+    County" because their feeds don't expose county directly)."""
     missing = [p for p in properties if not p.get("lat")]
     log.info(f"Geocoding {len(missing)} properties ...")
     success = 0
-    failed_status_counts: dict[str, int] = {}
+    county_filled = 0
     for prop in missing:
         state = (prop.get("state") or "VA").upper()
         zip_code = prop.get("zip_code") or ""
@@ -1253,15 +1280,74 @@ def geocode_missing(properties: list[dict], api_key: str) -> list[dict]:
         # Compose the cleanest possible string. Fall back through what we have.
         parts = [prop.get("address") or "", city, state, zip_code]
         address_str = ", ".join(p for p in parts if p)
-        lat, lng = geocode(address_str, api_key)
+        lat, lng, county = geocode(address_str, api_key)
         prop["lat"] = lat
         prop["lng"] = lng
+        # Backfill county only when missing — never overwrite a value the
+        # scraper already set (those are usually more accurate than what
+        # Google's reverse-geocode returns for ambiguous areas).
+        existing_county = (prop.get("county") or "").strip()
+        if county and (not existing_county or existing_county == "Unknown County"):
+            prop["county"] = county
+            county_filled += 1
         if lat:
             success += 1
-            log.debug(f"  ✓ {prop['address']} → {lat:.4f}, {lng:.4f}")
+            log.debug(f"  ✓ {prop['address']} → {lat:.4f}, {lng:.4f} · {county or '?'}")
         time.sleep(0.1)  # rate limit
-    log.info(f"Geocoded {success}/{len(missing)} successfully")
+    log.info(f"Geocoded {success}/{len(missing)} successfully · backfilled county for {county_filled}")
     return properties
+
+def backfill_counties_from_coords(properties: list[dict], api_key: str) -> int:
+    """Reverse-geocode lat/lng → county for properties that ALREADY have
+    coords but are missing county (e.g. REO sources where the scraper
+    saved coords from the source data but never resolved county). Returns
+    the number of properties updated.
+
+    Only runs on properties with `(lat, lng) and not county` so this is a
+    no-op on subsequent runs once county is filled."""
+    if not api_key:
+        return 0
+    targets = [p for p in properties
+               if p.get("lat") and p.get("lng")
+               and ((p.get("county") or "").strip() in ("", "Unknown County"))]
+    if not targets:
+        return 0
+    log.info(f"Reverse-geocoding county for {len(targets)} properties with coords but no county ...")
+    filled = 0
+    for prop in targets:
+        try:
+            r = requests.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={"latlng": f"{prop['lat']},{prop['lng']}", "key": api_key,
+                        "result_type": "administrative_area_level_2|locality"},
+                timeout=5,
+            )
+            data = r.json()
+            if data.get("status") != "OK":
+                continue
+            for result in (data.get("results") or []):
+                comps = result.get("address_components") or []
+                county = None
+                for c in comps:
+                    types = c.get("types") or []
+                    if "administrative_area_level_2" in types:
+                        county = c.get("long_name")
+                        break
+                if not county:
+                    for c in comps:
+                        if "locality" in (c.get("types") or []):
+                            loc_name = c.get("long_name") or ""
+                            county = "District of Columbia" if loc_name == "Washington" else f"{loc_name} City"
+                            break
+                if county:
+                    prop["county"] = county
+                    filled += 1
+                    break
+        except Exception as e:
+            log.debug(f"Reverse-geocode failed for {prop.get('id')}: {e}")
+        time.sleep(0.1)
+    log.info(f"Reverse-geocode filled county for {filled}/{len(targets)}")
+    return filled
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -1347,6 +1433,10 @@ def run(gmaps_key: str = "") -> dict:
     # Geocode
     if api_key:
         all_props = geocode_missing(all_props, api_key)
+        # REO sources (HomePath / HomeSteps / VA Vendee) ship with lat/lng
+        # but no county — backfill via reverse-geocode using the coords we
+        # already have. No-op once county is populated on subsequent runs.
+        backfill_counties_from_coords(all_props, api_key)
 
     # Sort by days to sale (soonest first), nulls last
     all_props.sort(
