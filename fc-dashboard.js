@@ -1106,6 +1106,144 @@
     renderRoofIntel(container, p, res);
   }
 
+  // ─── Building Permits (per-jurisdiction, on-demand, D1-cached) ────────────
+  // DC is the only jurisdiction wired today (DCRA Building Permits feature
+  // service via /api/permits/dc). Fairfax / Arlington / Loudoun / etc. would
+  // each get their own endpoint and routing in permitsJurisdiction().
+  const PERMITS_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/permits';
+
+  function permitsJurisdiction(p) {
+    const state = (p.state || '').toUpperCase();
+    if (state === 'DC') return 'dc';
+    return null;
+  }
+
+  async function fetchPermits(p) {
+    const jur = permitsJurisdiction(p);
+    if (!jur) return { ok: false, reason: 'no-parser' };
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token' };
+    try {
+      const params = new URLSearchParams({ prop_id: p.id, address: p.address || '' });
+      const res = await fetch(`${PERMITS_BASE}/${jur}?${params}`, {
+        headers: { 'X-Nestscoop-Token': token },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { ok: false, reason: err.error || `http-${res.status}`, detail: err.detail };
+      }
+      const body = await res.json();
+      return { ok: true, cached: body.cached, ageHours: body.ageHours, data: body.data };
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+  }
+
+  function permitsSection(p) {
+    if (!permitsJurisdiction(p)) return ''; // Silently hide on non-supported jurisdictions
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    return section('Building permits (DC)', `
+      <div id="fc-permits-${sid}" style="font-family:var(--f-mono);font-size:12px;color:var(--muted);min-height:40px">
+        Loading building permit history...
+      </div>
+    `);
+  }
+
+  function renderPermits(container, p, res) {
+    if (!res.ok) {
+      container.innerHTML = `<span style="color:var(--muted)">Permit lookup unavailable: ${escapeHtml(res.reason || 'unknown')}</span>`;
+      return;
+    }
+    const d = res.data || {};
+    const permits = d.permits || [];
+    const fmt$ = (n) => n ? '$' + Number(n).toLocaleString() : '—';
+
+    if (!permits.length) {
+      container.innerHTML = `
+        <div style="color:var(--muted);font-size:12px">
+          No DC building permits found at this address (last 3 years).
+          ${res.cached ? `<span style="margin-left:6px;font-size:10px">(cached ${res.ageHours || 0}h ago)</span>` : ''}
+        </div>
+        <div style="margin-top:8px">
+          <a class="fc-btn fc-btn-sm fc-btn-ghost" href="${escapeAttr(d.source_url || 'https://opendata.dc.gov/')}" target="_blank" rel="noopener">DC Open Data permits ↗</a>
+        </div>
+      `;
+      return;
+    }
+
+    // Latest permit summary at the top
+    const latest = permits[0];
+    const latestPill = `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center">
+        <span class="fc-pill" style="font-size:11px"><strong>${permits.length}</strong> permit${permits.length === 1 ? '' : 's'} (3yr)</span>
+        <span class="fc-pill" style="font-size:11px">Latest: ${escapeHtml(latest.issue_date || '?')}</span>
+        <span class="fc-pill" style="font-size:11px">${escapeHtml(latest.type || latest.category || '?')}</span>
+      </div>
+    `;
+
+    // Permit-type breakdown — counts per type
+    const typeCounts = {};
+    for (const x of permits) {
+      const t = x.type || x.category || 'Other';
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    }
+    const typePills = Object.entries(typeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([t, n]) => `<span class="fc-pill" style="font-size:10px">${escapeHtml(t)}: ${n}</span>`)
+      .join('');
+
+    // Detail rows for the most recent permits
+    const rows = permits.slice(0, 12).map(x => `
+      <tr>
+        <td style="padding:3px 8px;white-space:nowrap;color:var(--ink-2)">${escapeHtml(x.issue_date || '?')}</td>
+        <td style="padding:3px 8px">
+          <div style="font-weight:500;font-size:12px">${escapeHtml(x.type || x.category || '?')}${x.subtype ? ' · ' + escapeHtml(x.subtype) : ''}</div>
+          ${x.work_desc ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4">${escapeHtml(x.work_desc.slice(0, 200))}${x.work_desc.length > 200 ? '…' : ''}</div>` : ''}
+        </td>
+        <td style="padding:3px 8px;text-align:right;font-size:11px;color:var(--muted)">${escapeHtml(x.status || '')}</td>
+        <td style="padding:3px 8px;text-align:right;font-family:var(--f-mono);font-size:11px">${fmt$(x.fees_paid)}</td>
+      </tr>
+    `).join('');
+
+    container.innerHTML = `
+      ${latestPill}
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        ${typePills}
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--hair);border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="background:var(--paper-2)">
+            <tr>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);font-family:var(--f-mono);font-weight:500;letter-spacing:0.5px">DATE</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);font-family:var(--f-mono);font-weight:500;letter-spacing:0.5px">TYPE / WORK</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;color:var(--muted);font-family:var(--f-mono);font-weight:500;letter-spacing:0.5px">STATUS</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;color:var(--muted);font-family:var(--f-mono);font-weight:500;letter-spacing:0.5px">FEES</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${permits.length > 12 ? `<div style="margin-top:6px;color:var(--muted);font-size:11px">Showing 12 of ${permits.length}. Older permits may exist in earlier-year datasets.</div>` : ''}
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <a class="fc-btn fc-btn-sm fc-btn-ghost" href="${escapeAttr(d.source_url || 'https://opendata.dc.gov/')}" target="_blank" rel="noopener">DC Open Data permits ↗</a>
+        ${res.cached ? `<span style="font-size:10px;color:var(--muted);font-family:var(--f-mono)">cached ${res.ageHours || 0}h ago</span>` : ''}
+      </div>
+    `;
+  }
+
+  async function wireDrawerPermits(p) {
+    if (!permitsJurisdiction(p)) return;
+    const sid = (p.id || 'x').replace(/[^a-z0-9]/gi, '');
+    const container = document.getElementById(`fc-permits-${sid}`);
+    if (!container) return;
+    if (!getZillowSyncToken()) {
+      container.innerHTML = '<span style="color:var(--muted)">Paste sync token in Settings to enable building permit lookup.</span>';
+      return;
+    }
+    const res = await fetchPermits(p);
+    renderPermits(container, p, res);
+  }
+
   // ─── Liens (manual title-search findings) ───────────────────────────────
   // User clicks deep-links to county recorder / land-records portals from
   // the drawer, does the title check manually, and records what they find
@@ -3587,6 +3725,9 @@
     // Fire-and-forget AI roof analysis from satellite imagery.
     wireDrawerRoof(p);
 
+    // Fire-and-forget building permit lookup (DC properties only for now).
+    wireDrawerPermits(p);
+
     // Render the auction-metrics panel synchronously from current saved bid.
     // It re-renders after the assessor data lands (handled inside
     // wireDrawerAssessor) so Bid-vs-Assessed populates without a manual save.
@@ -4001,6 +4142,8 @@ Return ONLY the 2-sentence analysis.`,
         ${ownershipSection(p)}
 
         ${assessorIntelSection(p)}
+
+        ${permitsSection(p)}
 
         ${roofIntelSection(p)}
 
