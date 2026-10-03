@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Rounded navy tile -->
+  <rect width="192" height="192" rx="28" fill="#0E1728"/>
+
+  <!-- Roof peak (home/property hint) -->
+  <path d="M 64 66 L 96 40 L 128 66"
+        stroke="#D4A93A" stroke-width="8" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Nest cradle (U-curve below, the "scoop") -->
+  <path d="M 44 96 Q 44 156 96 156 Q 148 156 148 96"
+        stroke="#D4A93A" stroke-width="10" fill="none"
+        stroke-linecap="round"/>
+
+  <!-- Egg inside the nest (the "find") -->
+  <ellipse cx="96" cy="112" rx="22" ry="28" fill="#D4A93A"/>
+</svg>

@@ -1,0 +1,40 @@
+{
+  "name": "Nestscoop",
+  "short_name": "Nestscoop",
+  "description": "DC/MD/VA foreclosure + distress-property intelligence",
+  "start_url": "./foreclosure-scout.html",
+  "display": "standalone",
+  "background_color": "#0E1728",
+  "theme_color": "#D4A93A",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "fc-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["finance", "business"],
+  "shortcuts": [
+    {
+      "name": "Search Listings",
+      "short_name": "Search",
+      "description": "Search DC/MD/VA foreclosure listings",
+      "url": "./foreclosure-scout.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

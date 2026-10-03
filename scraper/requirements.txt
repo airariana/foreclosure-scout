@@ -1,0 +1,16 @@
+# Python dependencies for Virginia foreclosure scraper (v2.0)
+
+# PDF parsing (Samuel I. White source)
+pdfplumber==0.10.3
+
+# HTML parsing (McCabe direct-HTML source, post-render BWW/Orlans)
+beautifulsoup4==4.12.3
+
+# Excel parsing (HUD REO xlsx export from user)
+openpyxl==3.1.5
+
+# HTTP requests
+requests==2.31.0
+
+# Browser automation (Orlans + BWW/Aldridge Pite use JS-rendered disclaimer gates)
+playwright==1.47.0

@@ -1,0 +1,50 @@
+name: Update VA Foreclosures
+
+on:
+  # Weekly schedule paused 2026-05-XX while AJ stabilizes the tool. To re-
+  # enable: uncomment the two lines below. workflow_dispatch is left active
+  # so manual `gh workflow run` still works for ad-hoc testing.
+  # schedule:
+  #   - cron: '0 11 * * 1'   # Every Monday 11:00 UTC = 6 AM EST
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install --break-system-packages -r scraper/requirements.txt
+
+    - name: Install Playwright browsers
+      run: |
+        python3 -m playwright install --with-deps chromium
+
+    - name: Run VA foreclosure scraper
+      env:
+        GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      run: |
+        python3 scraper/va_foreclosure_scraper.py
+
+    - name: Commit and push if changed
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add data/foreclosures_va.json
+
+        # Only commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🤖 Auto-update: Virginia foreclosures - $(date +'%Y-%m-%d')"
+          git push
+        fi
