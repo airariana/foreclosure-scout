@@ -1924,7 +1924,7 @@
   }
 
   function setView(view) {
-    const valid = ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
+    const valid = ['dashboard', 'listings', 'deals', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
     if (!valid.includes(view)) view = 'dashboard';
     if (location.hash !== '#' + view) {
       history.replaceState(null, '', '#' + view);
@@ -1940,10 +1940,15 @@
     const mobileFrame = document.querySelector('#fc-view-map .mobile-frame');
     const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
 
-    ['dashboard', 'listings', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+    ['dashboard', 'listings', 'deals', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
       const el = document.getElementById(`fc-view-${v}`);
       if (el) el.style.display = (v === view) ? '' : 'none';
     });
+    // Re-render Deals when entering the view so it reflects the current
+    // allProperties snapshot (listings load after the shell paints).
+    if (view === 'deals' && typeof window.fcRenderDeals === 'function') {
+      window.fcRenderDeals();
+    }
 
     // The mobile-frame inside #fc-view-map has its own display toggle so
     // Google Maps doesn't get torn down on every view switch.
@@ -3660,6 +3665,192 @@
     if (window.__fcData) renderListings(window.__fcData);
   };
   window.closePropertyDrawer = closePropertyDrawer;
+
+  // ─── Deals lens ────────────────────────────────────────────────────────
+  // Phase 1 scaffold. Scores every listing currently in allProperties against
+  // a county median — $/sqft for Residence, $/acre for Land. Comps are a
+  // stub in data/comps_dcmdva.json; precision is directional, not appraisal.
+  // Replaced in Phase 2 by live comp pulls + per-county assessor joins.
+  let __dealsComps = null;
+  let __dealsThesis = 'residence';
+  const GOOD_DEAL_THRESHOLD = 20; // equity% at or above this = "good deal"
+
+  async function loadDealsComps() {
+    if (__dealsComps) return __dealsComps;
+    try {
+      const res = await fetch('data/comps_dcmdva.json', {cache: 'no-cache'});
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      __dealsComps = await res.json();
+    } catch (e) {
+      console.warn('Deals: comps fetch failed', e);
+      __dealsComps = { defaults: {}, counties: {} };
+    }
+    return __dealsComps;
+  }
+
+  // Look up county median for a property. Match "{county}, {state}" first,
+  // then fall back to state default, then null.
+  function dealsCompFor(property, thesis) {
+    if (!__dealsComps) return null;
+    const field = thesis === 'land' ? 'land_per_acre' : 'residence_per_sqft';
+    const state = (property.state || '').toUpperCase().trim();
+    const rawCounty = (property.county || '').trim();
+    if (rawCounty) {
+      // Normalize: strip trailing " County" / " City" markers already in key? The
+      // keys include the suffix (e.g. "Fairfax County, VA"), so try an exact
+      // match on both common shapes.
+      const candidates = [
+        `${rawCounty}, ${state}`,
+        `${rawCounty} County, ${state}`,
+        `${rawCounty} City, ${state}`,
+      ];
+      for (const key of candidates) {
+        const row = __dealsComps.counties[key];
+        if (row && typeof row[field] === 'number') return { value: row[field], key, source: 'county' };
+      }
+    }
+    const def = __dealsComps.defaults[state];
+    if (def && typeof def[field] === 'number') {
+      return { value: def[field], key: state, source: 'state_default' };
+    }
+    return null;
+  }
+
+  // Score one property under the current thesis. Returns null if the shape
+  // can't be scored (missing sqft/acres or no comp) or if property_type
+  // doesn't match the thesis (don't score residential foreclosure yards as
+  // raw land — the ask price covers the house + lot, not the lot alone).
+  function scoreDeal(p, thesis) {
+    const price = Number(p.price) || 0;
+    if (price <= 0) return null;
+    const ptype = String(p.property_type || '').toLowerCase();
+    if (thesis === 'land' && ptype !== 'land') return null;
+    if (thesis === 'residence' && ptype === 'land') return null;
+    const comp = dealsCompFor(p, thesis);
+    if (!comp) return null;
+    let size, sizeLabel, fairValue;
+    if (thesis === 'land') {
+      // lot_size is raw sqft in the Dashboard pool; a Land listing may also
+      // ship `acres` directly from the scraper.
+      const acres = Number(p.acres) || 0;
+      const lotSqft = Number(p.lotSize || p.lot_size || p.lot_size_sqft) || 0;
+      size = acres > 0 ? acres : (lotSqft / 43560);
+      // Sanity bounds: skip zero-acre and farm-scale listings so a 500ac
+      // outlier doesn't dominate the ranking before Phase 2 brings in
+      // acreage-tiered comps.
+      if (size <= 0 || size > 500) return null;
+      sizeLabel = size.toFixed(2) + ' ac';
+      fairValue = comp.value * size;
+    } else {
+      const sqft = Number(p.sqft || p.total_sqft) || 0;
+      // Sanity bounds: residential medians don't apply to tiny outbuildings
+      // (<300sf) or commercial-scale buildings (>10,000sf). Skip both.
+      if (sqft <= 300 || sqft > 10000) return null;
+      size = sqft;
+      sizeLabel = Math.round(sqft).toLocaleString() + ' sf';
+      fairValue = comp.value * sqft;
+    }
+    if (fairValue <= 0) return null;
+    const equityDollars = fairValue - price;
+    const equityPct = (equityDollars / fairValue) * 100;
+    return {
+      p,
+      size,
+      sizeLabel,
+      compValue: comp.value,
+      compKey: comp.key,
+      compSource: comp.source,
+      fairValue,
+      equityDollars,
+      equityPct
+    };
+  }
+
+  function renderDeals() {
+    const body = document.getElementById('fc-deals-body');
+    const countEl = document.getElementById('fc-deals-count');
+    const sideCount = document.getElementById('fc-sc-deals');
+    const sizeHead = document.getElementById('fc-deals-size-head');
+    const compHead = document.getElementById('fc-deals-comp-head');
+    const blurb = document.getElementById('fc-deals-blurb');
+    if (!body) return;
+    const thesis = __dealsThesis;
+
+    if (sizeHead) sizeHead.textContent = (thesis === 'land') ? 'Acres' : 'Sqft';
+    if (compHead) compHead.textContent = (thesis === 'land') ? 'Comp $/ac' : 'Comp $/sqft';
+    if (blurb) {
+      blurb.textContent = (thesis === 'land')
+        ? 'Land ask vs county median $/acre. Phase 1 stub comps — directional only. Listings must have a positive lot size to score.'
+        : 'Residence ask vs county median $/sqft. Phase 1 stub comps — directional only. Listings must have a positive building sqft to score.';
+    }
+
+    // Data source: the live Dashboard pool (__fcData.foreclosures), not the
+    // legacy allProperties array in foreclosure-scout.html — that was only
+    // populated by the pre-dashboard scraper path.
+    const all = (window.__fcData && window.__fcData.foreclosures) || [];
+    const scored = all.map(p => scoreDeal(p, thesis)).filter(Boolean);
+    scored.sort((a, b) => b.equityPct - a.equityPct);
+
+    if (countEl) countEl.textContent = scored.length + ' scored';
+    const goodCount = scored.filter(s => s.equityPct >= GOOD_DEAL_THRESHOLD).length;
+    if (sideCount) sideCount.textContent = goodCount || '—';
+
+    if (!scored.length) {
+      body.innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted)">No listings have the fields needed to score this thesis yet. Load listings on Dashboard first.</td></tr>`;
+      return;
+    }
+
+    const fmt$ = v => '$' + Math.round(v).toLocaleString();
+    const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+    const rows = scored.slice(0, 200).map(s => {
+      const p = s.p;
+      const pctCls = s.equityPct >= GOOD_DEAL_THRESHOLD ? 'sage' : (s.equityPct > 0 ? '' : 'red');
+      const addr = escapeHtml(p.address || '—') + (p.city ? ', ' + escapeHtml(p.city) : '');
+      const county = escapeHtml(p.county || '—');
+      // Pool uses listingType (e.g. "Auction", "REO/Bank-Owned") + property_type
+      // (e.g. "Single Family", "Land"). Show listing type, fall back to prop type.
+      const typ = escapeHtml(p.listingType || p.property_type || p.type || '—');
+      return `
+        <tr>
+          <td>${addr}</td>
+          <td>${county}</td>
+          <td>${typ}</td>
+          <td style="text-align:right">${s.sizeLabel}</td>
+          <td style="text-align:right">${fmt$(p.price)}</td>
+          <td style="text-align:right">${fmt$(s.compValue)}${s.compSource === 'state_default' ? ' <span class="fc-pill" style="font-size:9px">state</span>' : ''}</td>
+          <td style="text-align:right">${fmt$(s.fairValue)}</td>
+          <td style="text-align:right">${fmt$(s.equityDollars)}</td>
+          <td style="text-align:right"><span class="fc-pill ${pctCls}" style="font-size:11px">${fmtPct(s.equityPct)}</span></td>
+        </tr>`;
+    }).join('');
+    body.innerHTML = rows;
+  }
+
+  // Wire the Residence/Land toggle. Kept idempotent so re-calls after
+  // setView don't double-bind.
+  function wireDealsThesis() {
+    const btns = document.querySelectorAll('.fc-deals-thesis');
+    btns.forEach(btn => {
+      if (btn.__fcWired) return;
+      btn.__fcWired = true;
+      btn.addEventListener('click', () => {
+        __dealsThesis = btn.getAttribute('data-thesis') || 'residence';
+        btns.forEach(b => b.classList.toggle('active', b === btn));
+        renderDeals();
+      });
+    });
+  }
+
+  // Public hook used by setView() and by the listings-loaded path so the
+  // sidebar count stays truthful even before user opens the Deals view.
+  window.fcRenderDeals = async function() {
+    await loadDealsComps();
+    wireDealsThesis();
+    renderDeals();
+  };
+  // Prime once at init so the sidebar count populates after listings load.
+  // Debounced via setTimeout so we don't block the initial render.
+  setTimeout(() => { try { window.fcRenderDeals(); } catch (e) {} }, 1500);
 
   function openPropertyDrawer(propId) {
     const data = window.__fcData;
@@ -5834,6 +6025,7 @@ Return ONLY the 2-sentence analysis.`,
           <div class="fc-side-label">Properties</div>
           <div class="fc-side-item active" data-view="dashboard">${ICO.home}<span>Dashboard</span></div>
           <div class="fc-side-item" data-view="listings">${ICO.building}<span>Listings</span><span class="fc-side-count" id="fc-sc-listings">—</span></div>
+          <div class="fc-side-item" data-view="deals">${ICO.chart}<span>Deals</span><span class="fc-side-count" id="fc-sc-deals">—</span></div>
           <div class="fc-side-item" data-view="map">${ICO.map}<span>Map</span></div>
           <div class="fc-side-item" data-view="alerts">${ICO.bell}<span>Alerts</span><span class="fc-side-count">0</span></div>
         </div>
@@ -6017,6 +6209,41 @@ Return ONLY the 2-sentence analysis.`,
                   </tr>
                 </thead>
                 <tbody id="fc-listings-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Deals lens — ranks the current listings pool against county
+               median $/sqft (Residence) or $/acre (Land). Comps live in
+               data/comps_dcmdva.json; see renderDeals() below. -->
+          <div id="fc-view-deals" style="display:none">
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Deals</div>
+                <span class="fc-pill" id="fc-deals-count">—</span>
+                <div style="margin-left:auto;display:flex;gap:4px">
+                  <button class="fc-btn fc-btn-sm fc-deals-thesis active" data-thesis="residence">Residence</button>
+                  <button class="fc-btn fc-btn-sm fc-deals-thesis" data-thesis="land">Land</button>
+                </div>
+              </div>
+              <div style="padding:10px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);font-size:12px;color:var(--muted)">
+                <span id="fc-deals-blurb">Ranked by equity-on-day-one versus county median. Phase 1 stub comps — treat %s as directional, not appraisal-grade.</span>
+              </div>
+              <table class="fc-table" id="fc-deals-table">
+                <thead>
+                  <tr>
+                    <th>Address</th>
+                    <th>County</th>
+                    <th>Type</th>
+                    <th style="text-align:right" id="fc-deals-size-head">Sqft</th>
+                    <th style="text-align:right">Price</th>
+                    <th style="text-align:right" id="fc-deals-comp-head">Comp $/sqft</th>
+                    <th style="text-align:right">Fair value</th>
+                    <th style="text-align:right">Equity $</th>
+                    <th style="text-align:right">Equity %</th>
+                  </tr>
+                </thead>
+                <tbody id="fc-deals-body"></tbody>
               </table>
             </div>
           </div>

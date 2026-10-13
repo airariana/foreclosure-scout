@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "generated": "2026-10-13",
+    "note": "Phase 1 stub medians for Deals-lens scoring. County-level approximations of 2026 market, NOT live comps. Replace with live scrape (Zillow Research or Redfin Data Center) in Phase 2 for residence; LandWatch + county GIS for land.",
+    "residence_unit": "USD per sqft (median sold)",
+    "land_unit": "USD per acre (approximate ask/sale median)"
+  },
+  "defaults": {
+    "DC": { "residence_per_sqft": 650, "land_per_acre": 2000000 },
+    "MD": { "residence_per_sqft": 220, "land_per_acre": 60000 },
+    "VA": { "residence_per_sqft": 190, "land_per_acre": 25000 }
+  },
+  "counties": {
+    "DC": { "residence_per_sqft": 650, "land_per_acre": 2000000 },
+
+    "Montgomery County, MD": { "residence_per_sqft": 400, "land_per_acre": 400000 },
+    "Prince George's County, MD": { "residence_per_sqft": 280, "land_per_acre": 150000 },
+    "Anne Arundel County, MD": { "residence_per_sqft": 350, "land_per_acre": 180000 },
+    "Howard County, MD": { "residence_per_sqft": 380, "land_per_acre": 300000 },
+    "Baltimore County, MD": { "residence_per_sqft": 240, "land_per_acre": 120000 },
+    "Baltimore City, MD": { "residence_per_sqft": 180, "land_per_acre": 90000 },
+    "Frederick County, MD": { "residence_per_sqft": 310, "land_per_acre": 100000 },
+    "Charles County, MD": { "residence_per_sqft": 280, "land_per_acre": 70000 },
+    "Harford County, MD": { "residence_per_sqft": 260, "land_per_acre": 80000 },
+    "Carroll County, MD": { "residence_per_sqft": 270, "land_per_acre": 90000 },
+    "St. Mary's County, MD": { "residence_per_sqft": 260, "land_per_acre": 50000 },
+    "Calvert County, MD": { "residence_per_sqft": 290, "land_per_acre": 70000 },
+    "Washington County, MD": { "residence_per_sqft": 210, "land_per_acre": 40000 },
+
+    "Arlington County, VA": { "residence_per_sqft": 650, "land_per_acre": 1500000 },
+    "Alexandria, VA": { "residence_per_sqft": 580, "land_per_acre": 1200000 },
+    "Fairfax County, VA": { "residence_per_sqft": 500, "land_per_acre": 500000 },
+    "Fairfax City, VA": { "residence_per_sqft": 480, "land_per_acre": 600000 },
+    "Falls Church, VA": { "residence_per_sqft": 620, "land_per_acre": 1400000 },
+    "Loudoun County, VA": { "residence_per_sqft": 400, "land_per_acre": 150000 },
+    "Prince William County, VA": { "residence_per_sqft": 350, "land_per_acre": 80000 },
+    "Manassas, VA": { "residence_per_sqft": 320, "land_per_acre": 100000 },
+    "Manassas Park, VA": { "residence_per_sqft": 310, "land_per_acre": 95000 },
+    "Fauquier County, VA": { "residence_per_sqft": 320, "land_per_acre": 25000 },
+    "Stafford County, VA": { "residence_per_sqft": 300, "land_per_acre": 50000 },
+    "Spotsylvania County, VA": { "residence_per_sqft": 260, "land_per_acre": 30000 },
+    "Fredericksburg, VA": { "residence_per_sqft": 280, "land_per_acre": 150000 },
+    "Culpeper County, VA": { "residence_per_sqft": 250, "land_per_acre": 18000 },
+    "Rappahannock County, VA": { "residence_per_sqft": 290, "land_per_acre": 20000 },
+    "Warren County, VA": { "residence_per_sqft": 230, "land_per_acre": 15000 },
+    "Clarke County, VA": { "residence_per_sqft": 270, "land_per_acre": 25000 },
+    "Winchester, VA": { "residence_per_sqft": 240, "land_per_acre": 60000 },
+    "Frederick County, VA": { "residence_per_sqft": 230, "land_per_acre": 20000 },
+    "Shenandoah County, VA": { "residence_per_sqft": 180, "land_per_acre": 8000 },
+    "Page County, VA": { "residence_per_sqft": 170, "land_per_acre": 7000 }
+  }
+}
