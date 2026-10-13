@@ -26,6 +26,10 @@
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png?v=3">
   <link rel="shortcut icon" href="favicon.ico?v=3">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Leaflet 1.9.4 vendored for the Area Focus map. Loaded here so Leaflet
+       is available before fc-dashboard.js initializes the view. -->
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <script src="vendor/leaflet/leaflet.js"></script>
 <style>
 :root {
   --bg:#f4f1eb; --surface:#ffffff; --surface2:#ede9e1; --border:#d6d0c4;
@@ -1148,7 +1152,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=91"></script>
+<script src="fc-dashboard.js?v=92"></script>
 </head>
 <body>
 <div class="mobile-frame">

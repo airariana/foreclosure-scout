@@ -1924,7 +1924,7 @@
   }
 
   function setView(view) {
-    const valid = ['dashboard', 'listings', 'deals', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
+    const valid = ['dashboard', 'listings', 'deals', 'area-focus', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
     if (!valid.includes(view)) view = 'dashboard';
     if (location.hash !== '#' + view) {
       history.replaceState(null, '', '#' + view);
@@ -1940,7 +1940,7 @@
     const mobileFrame = document.querySelector('#fc-view-map .mobile-frame');
     const appInner = mobileFrame ? mobileFrame.querySelector('.app') : null;
 
-    ['dashboard', 'listings', 'deals', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
+    ['dashboard', 'listings', 'deals', 'area-focus', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'].forEach(v => {
       const el = document.getElementById(`fc-view-${v}`);
       if (el) el.style.display = (v === view) ? '' : 'none';
     });
@@ -1948,6 +1948,11 @@
     // allProperties snapshot (listings load after the shell paints).
     if (view === 'deals' && typeof window.fcRenderDeals === 'function') {
       window.fcRenderDeals();
+    }
+    // Area Focus initializes Leaflet lazily on first entry so the map tiles
+    // only fetch when the view is actually visible.
+    if (view === 'area-focus' && typeof window.fcInitAreaFocus === 'function') {
+      window.fcInitAreaFocus();
     }
 
     // The mobile-frame inside #fc-view-map has its own display toggle so
@@ -3851,6 +3856,313 @@
   // Prime once at init so the sidebar count populates after listings load.
   // Debounced via setTimeout so we don't block the initial render.
   setTimeout(() => { try { window.fcRenderDeals(); } catch (e) {} }, 1500);
+
+  // ─── Area Focus (Phase 2a) ─────────────────────────────────────────────
+  // Leaflet-powered map centered on western Loudoun / Fauquier. User clicks
+  // to drop a search center; a radius circle filters land listings around
+  // the point. Water polygons/lines from OpenStreetMap drawn as a layer so
+  // adjacency to rivers/lakes is visible. Water-adjacency score computed
+  // per listing as haversine distance to nearest hydrography vertex.
+  let __areaMap = null;
+  let __areaCenterMarker = null;
+  let __areaRadiusCircle = null;
+  let __areaCenter = null; // {lat, lng}
+  let __areaRadiusMi = 10;
+  let __areaOnlyWater = true;
+  let __areaListingLayer = null;
+  let __areaHydro = null; // GeoJSON FeatureCollection
+  let __areaHydroPoints = null; // flat [[lat,lng,name,kind], ...] for fast nearest lookup
+
+  // Haversine distance in meters.
+  function haversineM(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  const MI_PER_M = 1 / 1609.344;
+  const FT_PER_M = 3.28084;
+
+  async function loadAreaHydro() {
+    if (__areaHydro) return __areaHydro;
+    try {
+      const res = await fetch('data/hydro_western_dmv.geojson', { cache: 'force-cache' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      __areaHydro = await res.json();
+      // Flatten vertices into a dense point list for cheap nearest-neighbor
+      // scanning. 3,849 features × avg 4 points each = ~15k points — small
+      // enough to brute-force per listing without indexing.
+      const pts = [];
+      for (const f of __areaHydro.features) {
+        const name = f.properties.name || null;
+        const kind = f.properties.kind || 'water';
+        const g = f.geometry;
+        const walk = (coords, isPoly) => {
+          if (isPoly) {
+            for (const ring of coords) {
+              for (const [lng, lat] of ring) pts.push([lat, lng, name, kind]);
+            }
+          } else {
+            for (const [lng, lat] of coords) pts.push([lat, lng, name, kind]);
+          }
+        };
+        if (g.type === 'LineString') walk(g.coordinates, false);
+        else if (g.type === 'Polygon') walk(g.coordinates, true);
+        else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => walk(poly, true));
+      }
+      __areaHydroPoints = pts;
+    } catch (e) {
+      console.warn('Area Focus: hydro fetch failed', e);
+      __areaHydro = { features: [] };
+      __areaHydroPoints = [];
+    }
+    return __areaHydro;
+  }
+
+  // Nearest water feature to (lat,lng). Returns { distM, name, kind } or null.
+  function nearestWater(lat, lng) {
+    if (!__areaHydroPoints || !__areaHydroPoints.length) return null;
+    // Bounding-box prefilter: only consider points within ~2 miles for speed.
+    const LAT_RANGE = 0.03; // ~2 miles
+    const LNG_RANGE = 0.04;
+    let best = null;
+    for (const p of __areaHydroPoints) {
+      if (Math.abs(p[0] - lat) > LAT_RANGE) continue;
+      if (Math.abs(p[1] - lng) > LNG_RANGE) continue;
+      const d = haversineM(lat, lng, p[0], p[1]);
+      if (!best || d < best.distM) best = { distM: d, name: p[2], kind: p[3] };
+    }
+    // Fallback: widen if nothing found in 2-mile band
+    if (!best) {
+      for (const p of __areaHydroPoints) {
+        const d = haversineM(lat, lng, p[0], p[1]);
+        if (!best || d < best.distM) best = { distM: d, name: p[2], kind: p[3] };
+      }
+    }
+    return best;
+  }
+
+  // Seed listings from the existing foreclosure pool, filtering to land type
+  // (or anything with a positive lot size as a near-approximation).
+  function getAreaFocusCandidates() {
+    const pool = (window.__fcData && window.__fcData.foreclosures) || [];
+    return pool.filter(p => {
+      const pt = String(p.property_type || '').toLowerCase();
+      if (pt !== 'land') return false;
+      const lat = Number(p.lat || p.latitude);
+      const lng = Number(p.lng || p.longitude);
+      return isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0;
+    });
+  }
+
+  function drawHydroLayer() {
+    if (!__areaMap || !__areaHydro) return;
+    const style = f => {
+      const k = f.properties.kind;
+      // Rivers heavier; streams lighter; polygons filled.
+      const strong = k === 'river' || k === 'canal' || k === 'reservoir';
+      return {
+        color: '#3a7a9b',
+        weight: strong ? 2.4 : 1.1,
+        opacity: 0.75,
+        fillColor: '#8dc1d9',
+        fillOpacity: 0.42,
+      };
+    };
+    L.geoJSON(__areaHydro, { style }).addTo(__areaMap);
+  }
+
+  function renderAreaListings() {
+    const listEl = document.getElementById('fc-area-list');
+    const countEl = document.getElementById('fc-area-count');
+    const sideCount = document.getElementById('fc-sc-area');
+    if (!listEl) return;
+
+    // Remove any prior listing markers
+    if (__areaListingLayer) {
+      __areaListingLayer.clearLayers();
+    } else if (__areaMap) {
+      __areaListingLayer = L.layerGroup().addTo(__areaMap);
+    }
+
+    if (!__areaCenter) {
+      listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Click the map to begin.</div>`;
+      if (countEl) countEl.textContent = '—';
+      return;
+    }
+
+    const radiusM = __areaRadiusMi * 1609.344;
+    const candidates = getAreaFocusCandidates();
+    const scored = candidates.map(p => {
+      const lat = Number(p.lat || p.latitude);
+      const lng = Number(p.lng || p.longitude);
+      const distM = haversineM(__areaCenter.lat, __areaCenter.lng, lat, lng);
+      if (distM > radiusM) return null;
+      const water = nearestWater(lat, lng);
+      return {
+        p, lat, lng,
+        distM,
+        waterDistM: water ? water.distM : null,
+        waterName: water ? water.name : null,
+        waterKind: water ? water.kind : null,
+      };
+    }).filter(Boolean);
+
+    // Optional water-only filter: within 1,000 ft of water
+    const filtered = __areaOnlyWater
+      ? scored.filter(s => s.waterDistM !== null && (s.waterDistM * FT_PER_M) <= 1000)
+      : scored;
+
+    // Sort: water-adjacent first, then by distance to center
+    filtered.sort((a, b) => {
+      const aW = (a.waterDistM !== null ? a.waterDistM : 1e9);
+      const bW = (b.waterDistM !== null ? b.waterDistM : 1e9);
+      if (Math.abs(aW - bW) > 50) return aW - bW; // meaningful water-dist diff wins
+      return a.distM - b.distM;
+    });
+
+    if (countEl) countEl.textContent = filtered.length + ' in radius';
+    if (sideCount) sideCount.textContent = filtered.length || '—';
+
+    if (!filtered.length) {
+      const totalInRadius = scored.length;
+      listEl.innerHTML = `
+        <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">
+          No land listings matched${__areaOnlyWater ? ' (water-adjacent filter on)' : ''}.
+          <div style="margin-top:6px;font-size:11px">${candidates.length} total land listings loaded; ${totalInRadius} inside the current radius.</div>
+          <div style="margin-top:4px;font-size:11px">Phase 2b will pull LandWatch + Lands of America to widen the pool.</div>
+        </div>`;
+      return;
+    }
+
+    const fmt$ = v => '$' + Math.round(v).toLocaleString();
+    const fmtMi = m => (m * MI_PER_M).toFixed(1) + ' mi';
+    const fmtFt = m => Math.round(m * FT_PER_M).toLocaleString() + ' ft';
+    const cards = filtered.slice(0, 100).map(s => {
+      const p = s.p;
+      const acres = Number(p.acres) || (Number(p.lot_size || p.lotSize) || 0) / 43560;
+      const waterLine = s.waterDistM === null
+        ? '<span style="color:var(--muted)">No water nearby</span>'
+        : `<span style="color:var(--accent2)">${fmtFt(s.waterDistM)} to ${escapeHtml(s.waterName || 'water')}${s.waterKind ? ' ('+escapeHtml(s.waterKind)+')' : ''}</span>`;
+      const latlng = `${s.lat},${s.lng}`;
+      const sourceLink = p.source_url ? `<a href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px">Source →</a>` : '';
+      // Drop a marker on the map for this listing.
+      if (__areaMap) {
+        const m = L.circleMarker([s.lat, s.lng], {
+          radius: 6, color: '#c84b2f', fillColor: '#c84b2f', fillOpacity: 0.75, weight: 1
+        }).bindPopup(`<strong>${escapeHtml(p.address || 'Land')}</strong><br>${acres ? acres.toFixed(2) + ' ac · ' : ''}${p.price ? fmt$(p.price) : ''}<br>${waterLine}`);
+        m.addTo(__areaListingLayer);
+      }
+      return `
+        <div style="padding:10px 8px;border-bottom:1px solid var(--hair);cursor:pointer"
+             onclick="(window.openPropertyDrawer && window.openPropertyDrawer('${escapeHtml(p.id || '')}'))">
+          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px">${escapeHtml(p.address || 'Unnamed parcel')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${escapeHtml(p.county || '')} · ${acres ? acres.toFixed(2) + ' ac' : 'size unknown'} · ${fmtMi(s.distM)} from center</div>
+          <div style="font-size:11px;margin-bottom:4px">${waterLine}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:600">${p.price ? fmt$(p.price) : '—'}</span>
+            ${sourceLink}
+          </div>
+        </div>`;
+    }).join('');
+    listEl.innerHTML = cards;
+  }
+
+  function wireAreaPresets() {
+    document.querySelectorAll('.fc-area-preset').forEach(btn => {
+      if (btn.__fcWired) return;
+      btn.__fcWired = true;
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.fc-area-preset').forEach(b => b.classList.toggle('active', b === btn));
+        if (__areaMap) {
+          const lat = parseFloat(btn.getAttribute('data-lat'));
+          const lng = parseFloat(btn.getAttribute('data-lng'));
+          const zoom = parseInt(btn.getAttribute('data-zoom'), 10) || 10;
+          __areaMap.setView([lat, lng], zoom);
+        }
+      });
+    });
+  }
+
+  function wireAreaControls() {
+    const radius = document.getElementById('fc-area-radius');
+    const radiusLabel = document.getElementById('fc-area-radius-label');
+    const onlyWater = document.getElementById('fc-area-only-water');
+    if (radius && !radius.__fcWired) {
+      radius.__fcWired = true;
+      radius.addEventListener('input', () => {
+        __areaRadiusMi = Number(radius.value) || 10;
+        if (radiusLabel) radiusLabel.textContent = __areaRadiusMi + ' mi';
+        if (__areaRadiusCircle && __areaCenter) {
+          __areaRadiusCircle.setRadius(__areaRadiusMi * 1609.344);
+        }
+        renderAreaListings();
+      });
+    }
+    if (onlyWater && !onlyWater.__fcWired) {
+      onlyWater.__fcWired = true;
+      onlyWater.addEventListener('change', () => {
+        __areaOnlyWater = onlyWater.checked;
+        renderAreaListings();
+      });
+    }
+  }
+
+  async function initAreaFocus() {
+    if (__areaMap) {
+      // Already initialized — just invalidate size so Leaflet recomputes
+      // (the container was display:none, so it had no dimensions earlier).
+      setTimeout(() => __areaMap.invalidateSize(), 100);
+      renderAreaListings();
+      return;
+    }
+    if (typeof L === 'undefined') {
+      console.warn('Area Focus: Leaflet not loaded');
+      return;
+    }
+    const mapEl = document.getElementById('fc-area-map');
+    if (!mapEl) return;
+
+    __areaMap = L.map(mapEl, { preferCanvas: true }).setView([39.004, -77.734], 10);
+    // Expose for debugging / scripted drops: window.fcAreaDrop(lat, lng).
+    window.__fcAreaMap = __areaMap;
+    window.fcAreaDrop = (lat, lng) => __areaMap.fire('click', { latlng: L.latLng(lat, lng) });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(__areaMap);
+
+    await loadAreaHydro();
+    drawHydroLayer();
+
+    __areaListingLayer = L.layerGroup().addTo(__areaMap);
+
+    __areaMap.on('click', (e) => {
+      __areaCenter = { lat: e.latlng.lat, lng: e.latlng.lng };
+      if (__areaCenterMarker) __areaCenterMarker.remove();
+      if (__areaRadiusCircle) __areaRadiusCircle.remove();
+      __areaCenterMarker = L.marker(e.latlng).addTo(__areaMap);
+      __areaRadiusCircle = L.circle(e.latlng, {
+        radius: __areaRadiusMi * 1609.344,
+        color: '#c84b2f',
+        fillColor: '#c84b2f',
+        fillOpacity: 0.07,
+        weight: 2,
+      }).addTo(__areaMap);
+      renderAreaListings();
+    });
+
+    wireAreaPresets();
+    wireAreaControls();
+
+    // Make sure Leaflet gets correct size now that the container is visible.
+    setTimeout(() => __areaMap.invalidateSize(), 100);
+  }
+
+  window.fcInitAreaFocus = initAreaFocus;
 
   function openPropertyDrawer(propId) {
     const data = window.__fcData;
@@ -6026,6 +6338,7 @@ Return ONLY the 2-sentence analysis.`,
           <div class="fc-side-item active" data-view="dashboard">${ICO.home}<span>Dashboard</span></div>
           <div class="fc-side-item" data-view="listings">${ICO.building}<span>Listings</span><span class="fc-side-count" id="fc-sc-listings">—</span></div>
           <div class="fc-side-item" data-view="deals">${ICO.chart}<span>Deals</span><span class="fc-side-count" id="fc-sc-deals">—</span></div>
+          <div class="fc-side-item" data-view="area-focus">${ICO.map}<span>Area Focus</span><span class="fc-side-count" id="fc-sc-area">—</span></div>
           <div class="fc-side-item" data-view="map">${ICO.map}<span>Map</span></div>
           <div class="fc-side-item" data-view="alerts">${ICO.bell}<span>Alerts</span><span class="fc-side-count">0</span></div>
         </div>
@@ -6245,6 +6558,41 @@ Return ONLY the 2-sentence analysis.`,
                 </thead>
                 <tbody id="fc-deals-body"></tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- Area Focus — Leaflet map centered on western Loudoun / Fauquier.
+               Click to drop a search center, slider adjusts radius, listings
+               panel on the right shows land within the radius scored by
+               water-adjacency + equity%. Water layer from OpenStreetMap. -->
+          <div id="fc-view-area-focus" style="display:none">
+            <div class="fc-card">
+              <div class="fc-card-hd">
+                <div class="fc-card-title">Area Focus</div>
+                <span class="fc-pill" id="fc-area-count">—</span>
+                <div style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">
+                  <button class="fc-btn fc-btn-sm fc-area-preset active" data-lat="39.004" data-lng="-77.734" data-zoom="10">Middleburg</button>
+                  <button class="fc-btn fc-btn-sm fc-area-preset" data-lat="38.714" data-lng="-77.797" data-zoom="10">Warrenton</button>
+                  <button class="fc-btn fc-btn-sm fc-area-preset" data-lat="38.858" data-lng="-77.800" data-zoom="10">The Plains</button>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);flex-wrap:wrap;font-size:12px;color:var(--muted)">
+                <div><strong>Click the map</strong> to drop a search center.</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <label for="fc-area-radius">Radius</label>
+                  <input type="range" id="fc-area-radius" min="1" max="30" value="10" style="width:140px">
+                  <span id="fc-area-radius-label" style="font-family:var(--f-mono);font-size:11px;color:var(--ink)">10 mi</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label><input type="checkbox" id="fc-area-only-water" checked> Only water-adjacent (≤ 1,000 ft)</label>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:0;min-height:620px">
+                <div id="fc-area-map" style="height:620px;border-right:1px solid var(--hair);background:#dde6e8"></div>
+                <div id="fc-area-list" style="height:620px;overflow:auto;padding:8px 10px;background:var(--paper-2)">
+                  <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Click the map to begin.</div>
+                </div>
+              </div>
             </div>
           </div>
 
