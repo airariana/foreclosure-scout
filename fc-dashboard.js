@@ -3975,6 +3975,92 @@
     L.geoJSON(__areaHydro, { style }).addTo(__areaMap);
   }
 
+  // ─── Phase 2b: county GIS growth-signal + exclusion layers ─────────────
+  // Each entry: {file, label, style, popup, defaultOn}
+  // Style palette:
+  //   Rezoning cases      → yellow stroke, light yellow fill (growth signal)
+  //   Service / Growth    → green shade (county-planned growth areas)
+  //   Transition Policy   → tan shade (rural-becoming-suburban buffer)
+  //   Conservation easmt  → red hatched (🔴 CANNOT develop — critical exclusion)
+  const AREA_GIS_LAYERS = [
+    {
+      file: 'data/gis_fauquier_zoning_cases.geojson',
+      label: 'Fauquier rezoning cases',
+      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }),
+      popup: p => `<strong>Fauquier rezoning case</strong><br>Case: ${p.CASE_NUMBER || '—'}<br>Status: ${p.STATUS || '—'}<br>Zone type: ${p.ZONETYPE || '—'}<br>Zone code: ${p.ZONECODE || '—'}`,
+      defaultOn: true,
+    },
+    {
+      file: 'data/gis_loudoun_rezoning_zmap.geojson',
+      label: 'Loudoun rezoning (ZMAP)',
+      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }),
+      popup: p => `<strong>Loudoun ZMAP</strong><br>Zone: ${p.ZO_ZONE || '—'}<br>Project #: ${p.ZO_PROJ_NUM || '—'}<br>Ordinance: ${p.ZO_ORDINANCE || '—'}<br>Date: ${p.ZO_ZONE_DATE || '—'}`,
+      defaultOn: true,
+    },
+    {
+      file: 'data/gis_fauquier_service_districts.geojson',
+      label: 'Fauquier growth areas (Service Districts)',
+      style: () => ({ color: '#2d6a4f', weight: 1.4, opacity: 0.9, fillColor: '#95d5b2', fillOpacity: 0.25 }),
+      popup: p => `<strong>Fauquier Service District</strong><br>District: ${p.DISTRICTNA || '—'}<br>Code: ${p.SVCDISTRIC || '—'}`,
+      defaultOn: true,
+    },
+    {
+      file: 'data/gis_loudoun_transition_policy_area.geojson',
+      label: 'Loudoun Transition Policy Area',
+      style: () => ({ color: '#a67b4a', weight: 1.6, opacity: 0.9, fillColor: '#d4b48a', fillOpacity: 0.22 }),
+      popup: () => `<strong>Loudoun Transition Policy Area</strong><br>2019 Comp Plan — rural becoming suburban. Growth is formally contemplated here.`,
+      defaultOn: true,
+    },
+    {
+      file: 'data/gis_fauquier_conservation_easements.geojson',
+      label: 'Fauquier conservation easements (🔴 no development)',
+      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }),
+      popup: p => `<strong>Conservation easement</strong><br>${p.NAME || 'Unnamed'}<br>Type: ${p.EASEMENTTY || '—'}<br>⚠️ Land cannot be developed.`,
+      defaultOn: true,
+    },
+    {
+      file: 'data/gis_loudoun_conservation_easements.geojson',
+      label: 'Loudoun conservation easements (🔴 no development)',
+      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }),
+      popup: p => `<strong>Conservation easement</strong><br>Holder: ${p.CE_HOLDER1 || '—'}<br>Type: ${p.CE_TYPE || '—'}<br>Class: ${p.CE_CLASSIFICATION || '—'}<br>Acres: ${p.CE_GIS_ACRES ? Number(p.CE_GIS_ACRES).toFixed(1) : '—'}<br>Recorded: ${p.CE_RECORDATION_DATE || '—'}<br>⚠️ Land cannot be developed.`,
+      defaultOn: true,
+    },
+  ];
+
+  // Cached layer objects so the layer control toggles can show/hide without
+  // re-fetching.
+  let __areaGisLayerObjs = null;
+
+  async function loadAreaGisLayers() {
+    if (__areaGisLayerObjs) return __areaGisLayerObjs;
+    __areaGisLayerObjs = {};
+    // Fetch all layers in parallel — each is independent.
+    const results = await Promise.allSettled(AREA_GIS_LAYERS.map(cfg =>
+      fetch(cfg.file, { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)
+    ));
+    const overlays = {};
+    results.forEach((res, i) => {
+      const cfg = AREA_GIS_LAYERS[i];
+      if (res.status !== 'fulfilled' || !res.value) {
+        console.warn('GIS layer failed:', cfg.file);
+        return;
+      }
+      const fc = res.value;
+      const layer = L.geoJSON(fc, {
+        style: cfg.style,
+        onEachFeature: (feature, lyr) => {
+          lyr.bindPopup(cfg.popup(feature.properties || {}));
+        },
+      });
+      __areaGisLayerObjs[cfg.label] = layer;
+      overlays[cfg.label] = layer;
+      if (cfg.defaultOn) layer.addTo(__areaMap);
+    });
+    // Add a Leaflet layer-control so the user can toggle each overlay.
+    L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(__areaMap);
+    return __areaGisLayerObjs;
+  }
+
   function renderAreaListings() {
     const listEl = document.getElementById('fc-area-list');
     const countEl = document.getElementById('fc-area-count');
@@ -4137,6 +4223,10 @@
 
     await loadAreaHydro();
     drawHydroLayer();
+
+    // Phase 2b — overlay growth-signal + exclusion layers from county GIS.
+    // Non-blocking; map stays usable while these load in parallel.
+    await loadAreaGisLayers();
 
     __areaListingLayer = L.layerGroup().addTo(__areaMap);
 
@@ -6586,6 +6676,14 @@ Return ONLY the 2-sentence analysis.`,
                 <div style="display:flex;align-items:center;gap:6px">
                   <label><input type="checkbox" id="fc-area-only-water" checked> Only water-adjacent (≤ 1,000 ft)</label>
                 </div>
+              </div>
+              <div style="padding:8px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);font-size:11px;color:var(--muted);line-height:1.5">
+                <strong>Overlays:</strong>
+                <span style="color:#b8860b">🟡 rezoning cases</span> ·
+                <span style="color:#2d6a4f">🟢 growth areas</span> ·
+                <span style="color:#a67b4a">🟤 transition policy</span> ·
+                <span style="color:#c84b2f">🔴 conservation easements (no development)</span>.
+                Toggle individual layers via the control in the map's top-right. Click any polygon for case details.
               </div>
               <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:0;min-height:620px">
                 <div id="fc-area-map" style="height:620px;border-right:1px solid var(--hair);background:#dde6e8"></div>
