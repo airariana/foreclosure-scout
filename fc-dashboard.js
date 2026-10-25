@@ -5680,26 +5680,26 @@
   const SCREEN_SOURCES = {
     fauquier: {
       label: 'Fauquier', url: GIS.F_PARCELS, oid: 'FID', box: FAUQUIER_BOX,
-      where: min => `CAST(ACREAGE AS FLOAT) >= ${Number(min)}`,
+      acres: 'CAST(ACREAGE AS FLOAT)',
       outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,LASTSALEDA,Building_V,Primary__1',
     },
     loudoun: {
       label: 'western Loudoun', url: GIS.L_OWNER, oid: 'OBJECTID', box: LOUDOUN_WEST_BOX,
       // Owners who asked the county to withhold their name are never downloaded.
-      where: min => `PA_LEGAL_ACRE >= ${Number(min)} AND (HIDENAME IS NULL OR HIDENAME <> 'Y')`,
+      acres: 'PA_LEGAL_ACRE', extra: "(HIDENAME IS NULL OR HIDENAME <> 'Y')",
       outFields: 'PA_MCPI,PA_LEGAL_ACRE,OWNER,HIDENAME,OWNER_ADDRESS1,OWNER_ADDRESS2,OWNER_CITY,OWNER_STATE,OWNER_ZIP1,OWNER_COUNTRY,PRI_PREMISE_ADD',
     },
   };
   const SCREEN_DEFAULTS = { area: 'map', minAcres: 10, maxAcres: 0, water: 'any', rawOnly: false, keepEasements: false, signals: { tax: true, estate: true, away: true, held: true } };
   const SCREEN_PAGE = 2000;
-  const SCREEN_SMALL = 5;        // below this many acres, search only the map view
-  const SCREEN_VIEW_MAX = 8000;  // most small parcels one map-view search will load per county
+  const SCREEN_SMALL = 5;          // below this many acres, load only the size band searched
+  const SCREEN_BAND_MAX = 15000;   // most parcels one banded or map-view load will take per county
   const SCREEN_LIST_STEP = 200;
   const SCREEN_MAP_MAX = 1000;
   const __screen = {
     recs: { fauquier: null, loudoun: null },     // normalized records per county
     minLoaded: { fauquier: Infinity, loudoun: Infinity },
-    viewCache: { fauquier: null, loudoun: null },  // last small-lot (map view) load per county
+    bandCache: { fauquier: null, loudoun: null },  // last small-lot (banded or map view) load per county
     aux: { delinquent: null, fEase: null, lEase: null }, // filled per layer; a failed layer retries next search
     filters: null, results: null, summary: null, shown: SCREEN_LIST_STEP,
     running: false, runSeq: 0, status: '', errors: [], restoreIndex: null,
@@ -5804,32 +5804,41 @@
     }
   }
 
-  // Every parcel ≥ minAcres for one county, paged in parallel (count first).
-  // view (bounds) = small-lot search: only the parcels on screen, not cached
-  // county-wide (under 5 acres there are ~35,000 across both counties).
-  async function screenLoadCounty(key, minAcres, progress, view) {
+  function screenWhere(src, minAcres, band) {
+    let w = `${src.acres} >= ${Number(minAcres)}`;
+    if (band && band.max) w += ` AND ${src.acres} ${band.open ? '<' : '<='} ${Number(band.max)}`;
+    return src.extra ? `${w} AND ${src.extra}` : w;
+  }
+
+  // Every parcel ≥ minAcres for one county, paged in parallel (count first),
+  // cached county-wide. band = small-lot load: only acres up to band.max
+  // (below it when band.open) and, with band.view, only the parcels on
+  // screen; the last one per county is kept, not merged into the cache.
+  async function screenLoadCounty(key, minAcres, progress, band) {
     const src = SCREEN_SOURCES[key];
-    let viewKey = null, box = key === 'loudoun' ? src.box : null;
-    if (view) {
-      const b = src.box;
-      box = { s: Math.max(view.s, b.s), n: Math.min(view.n, b.n), w: Math.max(view.w, b.w), e: Math.min(view.e, b.e) };
-      viewKey = `${minAcres}|${[box.s, box.n, box.w, box.e].map(v => v.toFixed(4)).join(',')}`;
-      const hit = __screen.viewCache[key];
-      if (hit && hit.key === viewKey) return hit.recs;
+    let bandKey = null, box = key === 'loudoun' ? src.box : null;
+    if (band) {
+      const b = src.box, v = band.view;
+      if (v) box = { s: Math.max(v.s, b.s), n: Math.min(v.n, b.n), w: Math.max(v.w, b.w), e: Math.min(v.e, b.e) };
+      bandKey = `${minAcres}|${band.max || ''}|${band.open ? 1 : 0}|${box ? [box.s, box.n, box.w, box.e].map(x => x.toFixed(4)).join(',') : ''}`;
+      const hit = __screen.bandCache[key];
+      if (hit && hit.key === bandKey) return hit.recs;
     } else if (__screen.recs[key] && __screen.minLoaded[key] <= minAcres) return __screen.recs[key];
-    const base = { where: src.where(minAcres) };
+    const base = { where: screenWhere(src, minAcres, band) };
     if (box) Object.assign(base, { geometry: `${box.w},${box.s},${box.e},${box.n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
     const cnt = await arcgis(src.url, Object.assign({}, base, { returnCountOnly: 'true', f: 'json' }), 20000);
     const total = (cnt && cnt.count) || 0;
-    if (view && total > SCREEN_VIEW_MAX) {
-      const err = new Error(`${total.toLocaleString()} ${src.label} parcels of ${minAcres}+ acres are on screen — zoom in and search again (the limit for small lots is ${SCREEN_VIEW_MAX.toLocaleString()}).`);
+    if (band && total > SCREEN_BAND_MAX) {
+      const fix = band.view ? 'zoom in, or raise the smallest size,' : 'raise the smallest size, or set Area to Map view and zoom in,';
+      const err = new Error(`${total.toLocaleString()} ${src.label} parcels of that size — ${fix} then search again (the limit is ${SCREEN_BAND_MAX.toLocaleString()} per county).`);
       err.friendly = true;
       throw err;
     }
     const offsets = [];
     for (let off = 0; off < total; off += SCREEN_PAGE) offsets.push(off);
     let done = 0;
-    progress(`Loading ${src.label} parcels… 0 of ${total.toLocaleString()}`);
+    const what = band ? `${src.label} parcels ${band.open ? 'under' : 'up to'} ${band.max} acres` : `${src.label} parcels`;
+    progress(`Loading ${what}… 0 of ${total.toLocaleString()}`);
     const pages = await screenPool(offsets, 3, async off => {
       const j = await arcgis(src.url, Object.assign({}, base, {
         outFields: src.outFields, returnGeometry: 'true', outSR: '4326', geometryPrecision: '5', maxAllowableOffset: '0.0001',
@@ -5837,7 +5846,7 @@
       }), 45000);
       const fs = (j && j.features) || [];
       done += fs.length;
-      progress(`Loading ${src.label} parcels… ${Math.min(done, total).toLocaleString()} of ${total.toLocaleString()}`);
+      progress(`Loading ${what}… ${Math.min(done, total).toLocaleString()} of ${total.toLocaleString()}`);
       return fs;
     });
     const recs = [];
@@ -5850,7 +5859,7 @@
       if (r.label) recs.push(r);
     }
     const collapsed = screenCollapseStacks(recs);
-    if (view) { __screen.viewCache[key] = { key: viewKey, recs: collapsed }; return collapsed; }
+    if (band) { __screen.bandCache[key] = { key: bandKey, recs: collapsed }; return collapsed; }
     __screen.recs[key] = collapsed;
     __screen.minLoaded[key] = minAcres;
     return collapsed;
@@ -5908,10 +5917,6 @@
         const b = __areaMap.getBounds();
         bounds = { s: b.getSouth(), n: b.getNorth(), w: b.getWest(), e: b.getEast() };
       }
-      if (f.minAcres < SCREEN_SMALL && !bounds) {
-        __screen.results = []; __screen.summary = { checked: 0, counties: [], smallNeedsMap: true, filters: f };
-        return;
-      }
       const counties = Object.keys(SCREEN_SOURCES).filter(k => !bounds || boxesIntersect(bounds, SCREEN_SOURCES[k].box));
       if (!counties.length) {
         __screen.results = []; __screen.summary = { checked: 0, counties: [], outside: true, filters: f };
@@ -5927,8 +5932,16 @@
         f.water = 'any';
       }
       stage = 'loading parcels';
-      const view = f.minAcres < SCREEN_SMALL ? bounds : null;
-      const loaded = await Promise.all(counties.map(k => screenLoadCounty(k, f.minAcres, progress, view).catch(err => {
+      // Small lots load only the size searched (on screen when Area is the map):
+      // with no max under 5 acres, the band below 5 plus the cached 5+ set.
+      const loadSmall = k => {
+        if (f.maxAcres && f.maxAcres <= SCREEN_SMALL) return screenLoadCounty(k, f.minAcres, progress, { view: bounds, max: f.maxAcres });
+        return Promise.all([
+          screenLoadCounty(k, f.minAcres, progress, { view: bounds, max: SCREEN_SMALL, open: true }),
+          screenLoadCounty(k, SCREEN_SMALL, progress),
+        ]).then(([a, b]) => a.concat(b));
+      };
+      const loaded = await Promise.all(counties.map(k => (f.minAcres < SCREEN_SMALL ? loadSmall(k) : screenLoadCounty(k, f.minAcres, progress)).catch(err => {
         errors.push(err.friendly ? err.message : `${SCREEN_SOURCES[k].label} parcels (county GIS) did not load: ${err.message || err}`);
         return [];
       })));
@@ -6044,8 +6057,6 @@
       const sum = __screen.summary || {};
       if (sum.outside) {
         resultsHtml = '<div class="fc-area-empty">The map isn\'t over Fauquier or western Loudoun. Pan there, or switch Area to both counties.</div>';
-      } else if (sum.smallNeedsMap) {
-        resultsHtml = '<div class="fc-area-empty">Parcels under 5 acres search the <strong>map view</strong> only — there are about 35,000 of them across both counties. Set Area to Map view, zoom to the area you like, and search again.</div>';
       } else {
         const rows = res.slice(0, __screen.shown).map((x, i) => {
           const r = x.rec, w = x.ev.water;
@@ -6071,7 +6082,7 @@
       <div class="fc-pc-title">Find land that might sell</div>
       <details class="fc-find-filters"${res && !running ? '' : ' open'}>
       <summary>${escapeHtml(screenFilterSummary(f))}</summary>
-      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name. Under 5 acres, only the map view is searched.</div>
+      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name.</div>
       <div class="fc-find-grid">
         <label>Area<select class="fc-area-input" data-f="area"${dis}>${opt('map', f.area, 'Map view')}${opt('all', f.area, 'Both counties')}</select></label>
         <label>Size<select class="fc-area-input" data-f="minAcres"${dis}>${[0.5, 1, 2, 3, 5, 10, 20, 50, 100].map(v => opt(v, f.minAcres, (v === 0.5 ? '½' : v) + (v <= 1 ? '+ acre' : '+ acres'))).join('')}</select></label>
