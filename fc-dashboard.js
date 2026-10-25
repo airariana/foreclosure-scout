@@ -3966,7 +3966,7 @@
     if (__areaHydroPromise) return __areaHydroPromise;
     __areaHydroPromise = (async () => {
       try {
-        const res = await fetch('data/hydro_western_dmv.geojson', { cache: 'force-cache' });
+        const res = await fetch('data/hydro_western_dmv.geojson?v=2', { cache: 'force-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         __areaHydro = await res.json();
         // Flatten vertices into a dense point list for cheap nearest-neighbor
@@ -3985,10 +3985,12 @@
           else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => walk(poly, true));
         }
         __areaHydroPoints = pts;
+        drawHydroLayer();
       } catch (e) {
         console.warn('Area Focus: hydro fetch failed', e);
         __areaHydro = { features: [] };
         __areaHydroPoints = [];
+        __areaHydroPromise = null; // let the next lookup try again
       }
       return __areaHydro;
     })();
@@ -4029,8 +4031,10 @@
     });
   }
 
+  let __hydroDrawn = false;
   function drawHydroLayer() {
-    if (!__areaMap || !__areaHydro) return;
+    if (__hydroDrawn || !__areaMap || !__areaHydro || !__areaHydro.features || !__areaHydro.features.length) return;
+    __hydroDrawn = true;
     const style = f => {
       const k = f.properties.kind;
       const strong = k === 'river' || k === 'canal' || k === 'reservoir';
@@ -4160,6 +4164,394 @@
     return out;
   }
 
+  // ─── Land screener core (pure — no DOM, no fetch) ──────────────────────
+  // Turns county parcel rows into candidate records with seller signals and
+  // a score. Kept free of side effects so scratchpad tests can run it in node.
+  // Owners who will not sell: government, HOAs, utilities, conservation
+  // bodies. Church/cemetery only as an organisation, not a "SURNAME, CHURCH"
+  // or "EBENEZER CHURCH RD LLC".
+  const SCREEN_NOSELL = /^NO OWNER$|UNITED STATES|^USA$|COMMONWEALTH OF (VIRGINIA|VA)\b|VIRGINIA OUTDOORS FOUNDATION|BOARD OF SUPERVISORS|BD OF SUPERVISORS|SCHOOL BOARD|\bCOUNTY OF\b|^(LOUDOUN|FAUQUIER) (COUNTY|CO)\b|COUNTY SCHOOL|\bTOWN OF\b|\bCITY OF\b|AIRPORT|\bH(O)?M(E)?\s?OWN(E)?RS?\b|OWNE?RS'? ASS|PROPERTY OWNERS|\bCOMM(UNITY)? ASSOC|COMMONS ASSOC|LANDOWNERS COUNCIL|MAINTENANCE ASSOC|\bH\.?O\.?A\b|CONSERVANCY|LAND TRUST OF VIRGINIA|PIEDMONT ENVIRONMENTAL|NATIONAL TRUST FOR HISTORIC|TRAIL CLUB|ELECTRIC (&|AND) POWER|POWER COMPANY|ELECTRIC COOPERATIVE|PIPE ?LINE|GAS TRANSMISSION|\bTRANSMISSION (INC|CORP|CO)\b|REGIONAL PARK|PARK AUTHORITY|WATER AUTHORITY|SANITATION AUTHORITY|SERVICE AUTHORITY|LOUDOUN WATER|RAILROAD|RAILWAY|NORFOLK SOUTHERN|DIOCESE|FIRE (AND|&) RESCUE|VOLUNTEER FIRE|RESCUE SQUAD|DEPT OF TRANSPORTATION|DEPARTMENT OF/;
+  const SCREEN_ORG_WORD = /\b(CHURCH|CEMETERY|CEMETARY)\b(?!\s+(RD|ROAD|ST|STREET|LN|LANE|HILL|DR|DRIVE)\b)/;
+  // "... ASSOCIATION" is usually an HOA, but not a bank trustee, Fannie Mae
+  // REO or a private club — those can sell.
+  const SCREEN_ASSOC = /\bASSOCIATION\b|\bASSN\b/;
+  const SCREEN_ASSOC_SELLER = /BANK|MORTGAGE|NATIONAL|CLUB|TENNIS|GOLF|COUNTRY/;
+  // A decedent's estate or heirs — not "... ESTATES LLC" or "REAL ESTATE".
+  // County abbreviations seen in the data: HRS = heirs, trailing EST = estate.
+  const SCREEN_ESTATE = /\bHEIRS?\b|\bHRS\b|\bESTATE OF\b|\bEST OF\b|\bESTATE\s*(?:$|[&;]|ET\s?AL\b|C\/O\b)|\bEST\s*(?:$|[&;]|ET\s?AL\b|C\/O\b)|\bDECEASED\b|\bDEC'?D\b|\bEXECUT(OR|RIX)\b|\bEXRS?\b|\bADMINISTRAT(OR|RIX)\b|\bADMRX?\b|\bPERSONAL REP|\bDESCENDANTS OF\b/;
+  const SCREEN_REAL_ESTATE = /\bREAL EST(ATE)?\s*(?:$|[&;]|ET\s?AL\b|C\/O\b)/;
+  // Fauquier land-use: 9xx = exempt (910 HOA common area, 920 rail, 930
+  // pipeline, 940 power, 990 cemetery) plus the public/non-profit categories.
+  const SCREEN_PUBLIC_USE = /^9\d\d|Government|Charitable|Religious|Educational/i;
+  // Bounds of the OSM water pull (Overpass query bbox, extended 10/25). A
+  // "far from water" result is only trusted when the search radius fits inside.
+  const SCREEN_WATER_BOX = { s: 38.38, n: 39.36, w: -78.3, e: -77.3 };
+  const SCREEN_WATER_MAX_M = 2000;
+  const SCREEN_HELD_YEARS = 25;
+  // Fauquier halves are due Jun 5 / Dec 5; days are counted from the oldest
+  // unpaid one. Jun 5 → Dec 5 is 183 days, so > 183 means the second half is
+  // past due too; 186 leaves room for a due date that falls on a weekend.
+  const SCREEN_TAX_DAYS = 186;
+  const SCREEN_TAX_MIN_BALANCE = 500;
+
+  function screenDecode(s) {
+    return String(s == null ? '' : s).replace(/&(amp|lt|gt|quot|#39|apos);/g, (m, e) =>
+      ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'" })[e]).replace(/\s+/g, ' ').trim();
+  }
+  // Fauquier site addresses use "UNASSIGNED" or a bare suffix ("RD") as placeholders.
+  function screenAddress(v) {
+    const a = screenDecode(v);
+    return /^(UNASSIGNED|RD|ST|DR|LN|CT|AVE|TRL|PL|WAY|HWY|PIKE|TPKE)?$/i.test(a) ? '' : a;
+  }
+  // Fauquier easement rows sometimes drop the "-000" suffix of the PIN.
+  function screenPinNorm(v) {
+    const p = screenDecode(v);
+    return /^\d{4}-\d{2}-\d{4}$/.test(p) ? p + '-000' : p;
+  }
+  function screenNum(v) {
+    if (v == null) return null;
+    const s = String(v).replace(/[$,\s]/g, '');
+    if (!s) return null;
+    const n = Number(s);
+    return isFinite(n) ? n : null;
+  }
+  function screenIsNoSell(owner, landUse) {
+    const o = String(owner || '').toUpperCase();
+    if (!o) return true;
+    if (SCREEN_NOSELL.test(o)) return true;
+    if (SCREEN_ASSOC.test(o) && !SCREEN_ASSOC_SELLER.test(o)) return true;
+    const m = SCREEN_ORG_WORD.exec(o);
+    if (m && o.slice(0, m.index).indexOf(',') === -1) return true;
+    return !!(landUse && SCREEN_PUBLIC_USE.test(landUse));
+  }
+  function screenIsEstate(owner) {
+    const o = String(owner || '').toUpperCase();
+    return SCREEN_ESTATE.test(o) && !SCREEN_REAL_ESTATE.test(o);
+  }
+  function screenTaxSerious(days, balance) {
+    return (days || 0) >= SCREEN_TAX_DAYS && (balance || 0) >= SCREEN_TAX_MIN_BALANCE;
+  }
+  // Fauquier DelinquentParcels row → { days, balance, serious } or null.
+  function screenTaxFrom(row) {
+    if (!row) return null;
+    const days = screenNum(row.MAIN_DaysDelinquent), balance = screenNum(row.MAIN_DelinquentBalance);
+    return { days, balance, serious: screenTaxSerious(days, balance) };
+  }
+  // Where the owner's tax bill goes, if not Virginia: a state code, a country,
+  // or 'elsewhere' (address with no state — abroad, APO, territories).
+  function screenAwayFrom(mail) {
+    if (!mail) return null;
+    if (mail.state) return mail.state !== 'VA' ? mail.state : null;
+    if (mail.country && !/^(US|USA|UNITED STATES)$/i.test(mail.country)) return mail.country;
+    if (!(mail.line1 || mail.city) || /ADDRESS UNKNOWN/i.test(mail.line1 || '')) return null;
+    // Blank state: a 5-digit ZIP decides (Virginia = 201xx, 220xx–246xx);
+    // without one, look for "VIRGINIA"/"VA" in the city (not "WEST VIRGINIA").
+    const zip = String(mail.zip || '').trim();
+    if (/^\d{5}$/.test(zip)) return /^(201\d\d|2[23]\d{3}|24[0-6]\d\d)$/.test(zip) ? null : 'elsewhere';
+    if (/(^|[^A-Z])(VIRGINIA|VA)\b/i.test(mail.city || '') && !/WEST VIRGINIA/i.test(mail.city || '')) return null;
+    return 'elsewhere';
+  }
+
+  function screenRings(geom) {
+    if (!geom) return [];
+    if (geom.type === 'Polygon') return [geom.coordinates];
+    if (geom.type === 'MultiPolygon') return geom.coordinates;
+    return [];
+  }
+  function screenRingInside(x, y, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function screenPolyContains(poly, lng, lat) {
+    return !!poly[0] && screenRingInside(lng, lat, poly[0]) && !poly.slice(1).some(h => screenRingInside(lng, lat, h));
+  }
+  function screenContains(geom, lng, lat) {
+    return screenRings(geom).some(poly => screenPolyContains(poly, lng, lat));
+  }
+  // Interior point of the largest polygon, holes respected: the centroid if it
+  // is inside, else the middle of the widest inside span on a few scanlines.
+  function screenLabelPoint(geom) {
+    let poly = null, bestArea = -1;
+    for (const p of screenRings(geom)) {
+      const ring = p[0];
+      if (!ring || ring.length < 3) continue;
+      let a = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+      if (Math.abs(a) > bestArea) { bestArea = Math.abs(a); poly = p; }
+    }
+    if (!poly) return null;
+    const ring = poly[0];
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const f = ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+      a += f; cx += (ring[j][0] + ring[i][0]) * f; cy += (ring[j][1] + ring[i][1]) * f;
+    }
+    if (Math.abs(a) > 1e-14) {
+      cx /= (3 * a); cy /= (3 * a);
+      if (screenPolyContains(poly, cx, cy)) return { lat: cy, lng: cx };
+    }
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of ring) { if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1]; }
+    let best = null, bestW = -1;
+    for (const frac of [0.5, 0.35, 0.65, 0.2, 0.8, 0.1, 0.9]) {
+      const y = minY + (maxY - minY) * frac, xs = [];
+      for (const r of poly) {
+        for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+          const yi = r[i][1], yj = r[j][1];
+          if ((yi > y) !== (yj > y)) xs.push(r[i][0] + (y - yi) * (r[j][0] - r[i][0]) / (yj - yi));
+        }
+      }
+      xs.sort((p, q) => p - q);
+      for (let i = 0; i + 1 < xs.length; i += 2) {
+        if (xs[i + 1] - xs[i] > bestW) { bestW = xs[i + 1] - xs[i]; best = [(xs[i] + xs[i + 1]) / 2, y]; }
+      }
+    }
+    if (!best) best = ring[0];
+    return { lat: best[1], lng: best[0] };
+  }
+  function screenBBox(geom) {
+    const bb = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const poly of screenRings(geom)) for (const ring of poly) for (const p of ring) {
+      if (p[0] < bb[0]) bb[0] = p[0]; if (p[1] < bb[1]) bb[1] = p[1];
+      if (p[0] > bb[2]) bb[2] = p[0]; if (p[1] > bb[3]) bb[3] = p[1];
+    }
+    return bb[0] === Infinity ? null : bb;
+  }
+
+  // Grid index over water SEGMENTS (lines and lake/pond outlines), so a stream
+  // crossing a parcel between two mapped vertices still counts as crossing it.
+  const SCREEN_CELL = 0.005; // degrees (~550 m north–south, ~430 m east–west)
+  function screenWaterIndex(fc) {
+    const cells = new Map();
+    let size = 0;
+    const add = (a, b, name, kind) => {
+      if (a[0] === b[0] && a[1] === b[1]) return;
+      const seg = { x1: a[0], y1: a[1], x2: b[0], y2: b[1], name, kind, q: 0 };
+      const r0 = Math.floor(Math.min(a[1], b[1]) / SCREEN_CELL), r1 = Math.floor(Math.max(a[1], b[1]) / SCREEN_CELL);
+      const c0 = Math.floor(Math.min(a[0], b[0]) / SCREEN_CELL), c1 = Math.floor(Math.max(a[0], b[0]) / SCREEN_CELL);
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+        const k = r + ':' + c;
+        let cell = cells.get(k);
+        if (!cell) { cell = []; cells.set(k, cell); }
+        cell.push(seg);
+      }
+      size++;
+    };
+    const line = (coords, name, kind) => { for (let i = 1; i < coords.length; i++) add(coords[i - 1], coords[i], name, kind); };
+    for (const f of (fc && fc.features) || []) {
+      const g = f.geometry, p = f.properties || {};
+      if (!g) continue;
+      const name = p.name || null, kind = p.kind || 'water';
+      if (g.type === 'LineString') line(g.coordinates, name, kind);
+      else if (g.type === 'MultiLineString') g.coordinates.forEach(c => line(c, name, kind));
+      else if (g.type === 'Polygon') g.coordinates.forEach(r => line(r, name, kind));
+      else if (g.type === 'MultiPolygon') g.coordinates.forEach(pl => pl.forEach(r => line(r, name, kind)));
+    }
+    return { cells, size, q: 0 };
+  }
+  function screenPtSeg2(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, len2 = dx * dx + dy * dy;
+    let t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = x1 + t * dx - px, ey = y1 + t * dy - py;
+    return ex * ex + ey * ey;
+  }
+  function screenSegsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+    const o = (px, py, qx, qy, rx, ry) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+    const o1 = o(ax, ay, bx, by, cx, cy), o2 = o(ax, ay, bx, by, dx, dy), o3 = o(cx, cy, dx, dy, ax, ay), o4 = o(cx, cy, dx, dy, bx, by);
+    return o1 !== o2 && o3 !== o4 && o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0;
+  }
+  // Distance from a parcel's boundary to the nearest mapped water, or 0 when
+  // water crosses or lies inside the parcel. Searches up to SCREEN_WATER_MAX_M.
+  // Returns { ft, name, kind, on } or { ft: null } when nothing is in reach.
+  function screenWaterDistance(index, geom) {
+    const bb = screenBBox(geom);
+    if (!index || !index.size || !bb) return { ft: null };
+    const lat0 = (bb[1] + bb[3]) / 2;
+    const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    const X = lng => (lng - bb[0]) * kx, Y = lat => (lat - bb[1]) * ky;
+    const segs = [];
+    for (const poly of screenRings(geom)) for (const ring of poly) {
+      for (let i = 1; i < ring.length; i++) segs.push([X(ring[i - 1][0]), Y(ring[i - 1][1]), X(ring[i][0]), Y(ring[i][1])]);
+    }
+    if (!segs.length) return { ft: null };
+    const inBox = (lng, lat) => lng >= bb[0] && lng <= bb[2] && lat >= bb[1] && lat <= bb[3];
+    const q = ++index.q; // stamp so a segment listed in several cells is measured once
+    const cellM = SCREEN_CELL * Math.min(kx, ky);
+    const MAXK = Math.ceil(SCREEN_WATER_MAX_M / cellM);
+    const r0 = Math.floor(bb[1] / SCREEN_CELL), r1 = Math.floor(bb[3] / SCREEN_CELL);
+    const c0 = Math.floor(bb[0] / SCREEN_CELL), c1 = Math.floor(bb[2] / SCREEN_CELL);
+    let best = Infinity, bestS = null;
+    for (let k = 0; k <= MAXK; k++) {
+      for (let r = r0 - k; r <= r1 + k; r++) for (let c = c0 - k; c <= c1 + k; c++) {
+        if (k > 0 && r > r0 - k && r < r1 + k && c > c0 - k && c < c1 + k) continue; // only the new ring
+        const cell = index.cells.get(r + ':' + c);
+        if (!cell) continue;
+        for (const s of cell) {
+          if (s.q === q) continue;
+          s.q = q;
+          if ((inBox(s.x1, s.y1) && screenContains(geom, s.x1, s.y1)) || (inBox(s.x2, s.y2) && screenContains(geom, s.x2, s.y2))) {
+            return { ft: 0, name: s.name, kind: s.kind, on: true };
+          }
+          const ax = X(s.x1), ay = Y(s.y1), bx = X(s.x2), by = Y(s.y2);
+          let d2 = Infinity;
+          for (const [x1, y1, x2, y2] of segs) {
+            if (screenSegsCross(ax, ay, bx, by, x1, y1, x2, y2)) return { ft: 0, name: s.name, kind: s.kind, on: true };
+            const m = Math.min(screenPtSeg2(ax, ay, x1, y1, x2, y2), screenPtSeg2(bx, by, x1, y1, x2, y2),
+              screenPtSeg2(x1, y1, ax, ay, bx, by), screenPtSeg2(x2, y2, ax, ay, bx, by));
+            if (m < d2) d2 = m;
+          }
+          if (d2 < best) { best = d2; bestS = s; }
+        }
+      }
+      // Water only in unvisited cells is at least k cells from the bbox, so from the parcel too.
+      if (bestS && Math.sqrt(best) <= k * cellM) break;
+    }
+    if (!bestS) return { ft: null };
+    const m = Math.sqrt(best);
+    if (m > SCREEN_WATER_MAX_M) return { ft: null };
+    return { ft: Math.round(m * 3.28084), name: bestS.name, kind: bestS.kind, on: false };
+  }
+  function screenInWaterBox(lat, lng) {
+    const b = SCREEN_WATER_BOX;
+    return lat >= b.s && lat <= b.n && lng >= b.w && lng <= b.e;
+  }
+  // True when every point within the search radius of the parcel lies inside
+  // the water pull, so "no water nearby" can be trusted.
+  function screenWaterCovers(geom) {
+    const bb = screenBBox(geom);
+    if (!bb) return false;
+    const dLat = SCREEN_WATER_MAX_M / 110540, dLng = SCREEN_WATER_MAX_M / (111320 * Math.cos(bb[1] * Math.PI / 180));
+    const b = SCREEN_WATER_BOX;
+    return bb[1] - dLat >= b.s && bb[3] + dLat <= b.n && bb[0] - dLng >= b.w && bb[2] + dLng <= b.e;
+  }
+
+  function screenHeldCutoff(now) {
+    const d = now || new Date();
+    // Date arithmetic rolls Feb 29 to Mar 1 instead of emitting an invalid date.
+    const c = new Date(d.getFullYear() - SCREEN_HELD_YEARS, d.getMonth(), d.getDate());
+    return `${c.getFullYear()}-${String(c.getMonth() + 1).padStart(2, '0')}-${String(c.getDate()).padStart(2, '0')}`;
+  }
+  // ISO date (YYYY-MM-DD) of the current owner's purchase, or null when unknown.
+  function screenSaleIso(s) {
+    const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m || Number(m[1]) <= 1900) return null;
+    return `${m[1]}-${m[2]}-${m[3]}`;
+  }
+
+  // Fauquier Tax_Parcels_DL feature → record. delinquent: Map(PIN → attrs),
+  // easements: Set(PIN).
+  function screenFromFauquier(f, delinquent, easements) {
+    const a = f.properties || {};
+    const pin = screenDecode(a.PARCELID);
+    if (!/^\d{4}-\d{2}-\d{4}-\d{3}$/.test(pin)) return null;
+    const owner = [screenDecode(a.OWNERNME1), screenDecode(a.Co_Owner2)].filter(Boolean).join(' & ');
+    const tax = screenTaxFrom(delinquent && delinquent.get(pin));
+    const building = screenNum(a.Building_V);
+    return {
+      id: 'fauquier:' + pin, jurisdiction: 'fauquier', county: 'Fauquier', pin,
+      acres: screenNum(a.ACREAGE), address: screenAddress(a.SITEADDRES) || null,
+      owner, ownerHidden: false,
+      mail: { line1: screenDecode(a.PSTLADDRES), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5), country: '' },
+      raw: building == null ? null : building === 0, rawBasis: 'building',
+      saleIso: screenSaleIso(a.LASTSALEDA),
+      tax, easement: !!(easements && easements.has(pin)),
+      noSell: screenIsNoSell(owner, screenDecode(a.Primary__1)),
+      geom: f.geometry,
+    };
+  }
+  // Loudoun Stacked_Parcels_Owner feature → record. saleIso is joined later.
+  function screenFromLoudoun(f, easements) {
+    const a = f.properties || {};
+    const pin = screenDecode(a.PA_MCPI);
+    if (!/^\d{12}$/.test(pin)) return null;
+    const hidden = screenDecode(a.HIDENAME).toUpperCase() === 'Y';
+    const owner = hidden ? '' : screenDecode(a.OWNER);
+    return {
+      id: 'loudoun:' + pin, jurisdiction: 'loudoun', county: 'Loudoun', pin,
+      acres: screenNum(a.PA_LEGAL_ACRE), address: screenDecode(a.PRI_PREMISE_ADD) || null,
+      owner, ownerHidden: hidden,
+      mail: hidden ? null : { line1: [screenDecode(a.OWNER_ADDRESS1), screenDecode(a.OWNER_ADDRESS2)].filter(Boolean).join(', '), city: screenDecode(a.OWNER_CITY), state: screenDecode(a.OWNER_STATE).toUpperCase(), zip: screenDecode(a.OWNER_ZIP1), country: screenDecode(a.OWNER_COUNTRY).toUpperCase() },
+      // No primary address on record usually means no house — a proxy, labelled as such.
+      raw: !screenDecode(a.PRI_PREMISE_ADD), rawBasis: 'address',
+      saleIso: undefined, // undefined = not looked up yet; null = unknown or after the cutoff
+      tax: null, easement: !!(easements && easements.has(pin)),
+      noSell: hidden || screenIsNoSell(owner, null),
+      geom: f.geometry,
+    };
+  }
+  // Condo / hangar units: several PINs on one base parcel with the same acreage
+  // (and outline). They are units, not land — keep only the base "000" record.
+  function screenCollapseStacks(recs) {
+    const groups = new Map();
+    for (const r of recs) {
+      const base = r.jurisdiction === 'fauquier' ? r.pin.slice(0, 12) : r.pin.slice(0, 9);
+      const k = `${r.jurisdiction}:${base}:${r.acres == null ? '' : r.acres.toFixed(3)}`;
+      let g = groups.get(k);
+      if (!g) { g = []; groups.set(k, g); }
+      g.push(r);
+    }
+    const out = [];
+    for (const g of groups.values()) {
+      if (g.length === 1) out.push(g[0]);
+      else for (const r of g) if (r.pin.slice(-3) === '000') out.push(r);
+    }
+    return out;
+  }
+
+  // Seller signals present on a record (independent of which ones are toggled on).
+  function screenSignals(rec, heldCutoff) {
+    const s = [];
+    if (rec.tax && rec.tax.serious) s.push('tax');
+    if (screenIsEstate(rec.owner)) s.push('estate');
+    if (screenAwayFrom(rec.mail)) s.push('away');
+    if (rec.saleIso && rec.saleIso < heldCutoff) s.push('held');
+    return s;
+  }
+  const SCREEN_WEIGHT = { tax: 4, estate: 4, held: 2, away: 2 };
+
+  // filters: { minAcres, maxAcres, rawOnly, water: 'any'|'1000'|'300'|'on',
+  //   signals: { tax, estate, away, held }, keepEasements, bounds: {s,n,w,e}|null }
+  // Returns null when the record is filtered out, else { score, signals, water }.
+  // water is computed lazily via waterFor(rec) only for records that survive
+  // the cheaper checks.
+  function screenEvaluate(rec, f, heldCutoff, waterFor) {
+    if (rec.noSell) return null;
+    if (rec.easement && !f.keepEasements) return null;
+    if (rec.acres == null || rec.acres < f.minAcres) return null;
+    if (f.maxAcres && rec.acres > f.maxAcres) return null;
+    if (f.rawOnly && rec.raw !== true) return null;
+    if (f.bounds && rec.label) {
+      const b = f.bounds;
+      if (rec.label.lat < b.s || rec.label.lat > b.n || rec.label.lng < b.w || rec.label.lng > b.e) return null;
+    }
+    const all = screenSignals(rec, heldCutoff);
+    const wanted = Object.keys(f.signals || {}).filter(k => f.signals[k]);
+    const hits = all.filter(k => wanted.includes(k));
+    if (wanted.length && !hits.length) return null;
+    const water = waterFor ? waterFor(rec) : { ft: null };
+    if (f.water !== 'any') {
+      const lim = f.water === 'on' ? 0 : Number(f.water);
+      if (water.ft == null || water.ft > lim) return null;
+    }
+    let score = 0;
+    for (const k of hits) score += SCREEN_WEIGHT[k];
+    if (water.ft != null) score += water.ft === 0 ? 3 : water.ft <= 300 ? 2 : water.ft <= 1000 ? 1 : 0;
+    if (rec.raw === true) score += 1;
+    return { score, signals: all, water };
+  }
+  function screenCompare(p, q) {
+    if (q.ev.score !== p.ev.score) return q.ev.score - p.ev.score;
+    const pw = p.ev.water.ft == null ? 1e9 : p.ev.water.ft, qw = q.ev.water.ft == null ? 1e9 : q.ev.water.ft;
+    if (pw !== qw) return pw - qw;
+    return (q.rec.acres || 0) - (p.rec.acres || 0);
+  }
+  // ─── end land screener core ────────────────────────────────────────────
+
   // ─── County parcel lookups (browser → county ArcGIS; CORS verified) ────
   const GIS = {
     L_PARCELS: 'https://logis.loudoun.gov/gis/rest/services/COL/LandRecords/MapServer/5/query',
@@ -4179,7 +4571,7 @@
   };
   // Rough county extents — only used to skip a county query for views far away.
   const LOUDOUN_BOX = { s: 38.84, n: 39.33, w: -77.97, e: -77.32 };
-  const FAUQUIER_BOX = { s: 38.43, n: 39.00, w: -78.14, e: -77.53 };
+  const FAUQUIER_BOX = { s: 38.40, n: 39.02, w: -78.14, e: -77.53 };
   const PARCEL_MIN_ZOOM = 15;
 
   const FAUQ_ZONING = {
@@ -4218,6 +4610,7 @@
     if (!m) return null;
     return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2])).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
+  const fmtOverdue = d => d >= 730 ? `${Math.floor(d / 365)}+ years` : d >= 365 ? 'over a year' : `${d} days`;
   const fmtMoney = v => (v == null || !isFinite(v)) ? '—' : '$' + Math.round(v).toLocaleString();
   const fmtAcres = v => (v == null || !isFinite(v)) ? '—' : (v >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' ac';
   const titleish = s => String(s || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -4243,11 +4636,12 @@
   }, extra);
   const firstAttrs = j => (j && j.features && j.features[0] && j.features[0].attributes) || null;
 
-  async function loudounParcelAt(lat, lng) {
-    const j = await arcgis(GIS.L_PARCELS, pointParams(lat, lng, {
-      where: "PA_TYPE<>'W'", outFields: 'PA_MCPI,PA_LEGAL_ACRE,PA_SUBD_NAME',
-      returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
-    }));
+  // byPin (validated) = look the parcel up by ID instead of by point.
+  async function loudounParcelAt(lat, lng, byPin) {
+    const fields = { outFields: 'PA_MCPI,PA_LEGAL_ACRE,PA_SUBD_NAME', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson' };
+    const j = await arcgis(GIS.L_PARCELS, /^\d{12}$/.test(byPin || '')
+      ? Object.assign({ where: `PA_MCPI='${byPin}' AND PA_TYPE<>'W'` }, fields)
+      : pointParams(lat, lng, Object.assign({ where: "PA_TYPE<>'W'" }, fields)));
     const f = j && j.features && j.features[0];
     if (!f) return null;
     const pin = trimS(f.properties.PA_MCPI);
@@ -4255,11 +4649,14 @@
     return { jurisdiction: 'loudoun', county: 'Loudoun', pin, acres: numS(f.properties.PA_LEGAL_ACRE), subdivision: trimS(f.properties.PA_SUBD_NAME) || null, geometry: f.geometry };
   }
 
-  async function fauquierParcelAt(lat, lng) {
-    const j = await arcgis(GIS.F_PARCELS, pointParams(lat, lng, {
-      outFields: 'PARCELID,OWNERNME1,Co_Owner2,SITEADDRES,ACREAGE,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,Building_V,Land_Value,Final_Valu,ASSESS_LND,Total_ASSE,Year_Built',
+  async function fauquierParcelAt(lat, lng, byPin) {
+    const fields = {
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,Building_V,Land_Value,Final_Valu,ASSESS_LND,Total_ASSE,Year_Built',
       returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
-    }));
+    };
+    const j = await arcgis(GIS.F_PARCELS, /^\d{4}-\d{2}-\d{4}-\d{3}$/.test(byPin || '')
+      ? Object.assign({ where: `PARCELID='${byPin}'` }, fields)
+      : pointParams(lat, lng, fields));
     const f = j && j.features && j.features[0];
     if (!f) return null;
     const a = f.properties || {};
@@ -4270,8 +4667,11 @@
     const yb = numS(a.Year_Built);
     return {
       jurisdiction: 'fauquier', county: 'Fauquier', pin,
-      acres: numS(a.ACREAGE), address: trimS(a.SITEADDRES) || null,
-      owner: [trimS(a.OWNERNME1), trimS(a.Co_Owner2)].filter(Boolean).join(' & ') || null,
+      acres: numS(a.ACREAGE), address: screenAddress(a.SITEADDRES) || null,
+      // Fauquier text arrives HTML-escaped ("O B &amp; SONS") — decode before display.
+      owner: [screenDecode(a.OWNERNME1), screenDecode(a.Co_Owner2)].filter(Boolean).join(' & ') || null,
+      mail: { line1: screenDecode(a.PSTLADDRES), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5) },
+      ownerSinceIso: screenSaleIso(a.LASTSALEDA),
       landUse: trimS(a.Primary__1) || null, district: trimS(a.District_D) || null,
       yearBuilt: yb && yb > 1700 ? yb : null,
       // Final_Valu = assessed total. Total_ASSE is market value ONLY for land-use-program
@@ -4284,7 +4684,7 @@
 
   async function loudounDetails(pc, lat, lng) {
     const [own, lmis0, lmis2, ease, lu, zon] = await Promise.allSettled([
-      arcgis(GIS.L_OWNER, { where: `PA_MCPI='${pc.pin}'`, outFields: 'OWNER,HIDENAME,PRI_PREMISE_ADD', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.L_OWNER, { where: `PA_MCPI='${pc.pin}'`, outFields: 'OWNER,HIDENAME,PRI_PREMISE_ADD,OWNER_ADDRESS1,OWNER_ADDRESS2,OWNER_CITY,OWNER_STATE,OWNER_ZIP1,OWNER_COUNTRY', returnGeometry: 'false', f: 'json' }),
       arcgis(GIS.L_LMIS0, pointParams(lat, lng, { outFields: 'VPC_PRIZONE_SUBCD,VPC_PRI_STR_ADDR,VPC_PRI_CTYST,VPC_PROJ_APL_KEY' })),
       arcgis(GIS.L_LMIS2, { where: `VPC_PARCEL_KEY='${pc.pin}'`, outFields: 'VPC_OWN_SALE_DT,VPC_REC_END_DT', returnGeometry: 'false', f: 'json' }),
       arcgis(GIS.L_EASE, { where: `CE_MCPI='${pc.pin}'`, outFields: 'CE_CLASSIFICATION,CE_HOLDER1,CE_TYPE,CE_GIS_ACRES', returnGeometry: 'false', f: 'json' }),
@@ -4295,7 +4695,10 @@
     if (o) {
       // HIDENAME='Y' = owner asked the county to withhold the name (Va. Code § 58.1-3122.2).
       if (trimS(o.HIDENAME).toUpperCase() === 'Y') { pc.owner = null; pc.ownerHidden = true; }
-      else pc.owner = trimS(o.OWNER) || null;
+      else {
+        pc.owner = screenDecode(o.OWNER) || null;
+        pc.mail = { line1: [screenDecode(o.OWNER_ADDRESS1), screenDecode(o.OWNER_ADDRESS2)].filter(Boolean).join(', '), city: screenDecode(o.OWNER_CITY), state: screenDecode(o.OWNER_STATE).toUpperCase(), zip: screenDecode(o.OWNER_ZIP1), country: screenDecode(o.OWNER_COUNTRY).toUpperCase() };
+      }
     }
     const l0 = lmis0.status === 'fulfilled' ? firstAttrs(lmis0.value) : null;
     if (l0) {
@@ -4316,7 +4719,10 @@
       const cur = rows.find(r => r.VPC_REC_END_DT != null && new Date(r.VPC_REC_END_DT).getUTCFullYear() >= 9999) || rows[0];
       // Deed date for the current owner. Kept apart from the assessor's sale
       // record: the two can differ (non-sale transfers, assessor lag).
-      if (cur) pc.ownerSince = etDate(cur.VPC_OWN_SALE_DT);
+      if (cur) {
+        pc.ownerSince = etDate(cur.VPC_OWN_SALE_DT);
+        pc.ownerSinceIso = pc.ownerSince ? screenSaleIso(new Date(cur.VPC_OWN_SALE_DT).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) : null;
+      }
     }
     if (ease.status === 'fulfilled') {
       const e = firstAttrs(ease.value);
@@ -4343,7 +4749,7 @@
   async function fauquierDetails(pc, lat, lng) {
     const [zon, ease, del] = await Promise.allSettled([
       arcgis(GIS.F_ZONING, pointParams(lat, lng, { outFields: 'ZONECLASS' })),
-      arcgis(GIS.F_EASE, { where: `NAME='${pc.pin}'`, outFields: 'NAME,EASEMENTTY', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.F_EASE, { where: `NAME IN ('${pc.pin}','${pc.pin.slice(0, 12)}')`, outFields: 'NAME,EASEMENTTY', returnGeometry: 'false', f: 'json' }),
       arcgis(GIS.F_DELINQ, { where: `PARCELID='${pc.pin}'`, outFields: 'MAIN_DaysDelinquent,MAIN_DelinquentBalance', returnGeometry: 'false', f: 'json' }, 7000),
     ]);
     const z = zon.status === 'fulfilled' ? firstAttrs(zon.value) : null;
@@ -4353,7 +4759,7 @@
     const d = del.status === 'fulfilled' ? firstAttrs(del.value) : null;
     if (d) {
       const days = numS(d.MAIN_DaysDelinquent), bal = numS(d.MAIN_DelinquentBalance);
-      if (days != null || bal != null) pc.delinquent = { days, balance: bal, serious: (days || 0) >= 322 && (bal || 0) >= 500 };
+      if (days != null || bal != null) pc.delinquent = { days, balance: bal, serious: screenTaxSerious(days, bal) };
     }
     pc.failed = (pc.failed || 0) + [zon, ease, del].filter(r => r.status === 'rejected').length;
   }
@@ -4422,26 +4828,57 @@
       if (!isLive()) return;
       const el = target || document.getElementById('fc-area-list');
       if (!el) return;
-      el.innerHTML = (target ? '' : panelBack('saved')) + renderParcelCard(pc, { embedded: !!target, listing: opts.listing || null });
+      el.innerHTML = (target ? '' : panelBack(opts.back || 'saved')) + renderParcelCard(pc, { embedded: !!target, listing: opts.listing || null });
       wireParcelCard(el, pc);
     };
     if (!target) { __areaPanel = 'parcel'; syncTabs(); revealPanelOnPhone(); }
     render();
 
-    const [lo, fq] = await Promise.allSettled([loudounParcelAt(lat, lng), fauquierParcelAt(lat, lng)]);
-    const base = (lo.status === 'fulfilled' && lo.value) || (fq.status === 'fulfilled' && fq.value) || null;
+    // Find land results come with a PIN: look that parcel up directly, so an
+    // inholding or a stacked unit at the same point can't take its place.
+    let base = null, pinFailed = false;
+    if (opts.pin && (opts.jurisdiction === 'loudoun' || opts.jurisdiction === 'fauquier')) {
+      try {
+        base = await (opts.jurisdiction === 'loudoun' ? loudounParcelAt(lat, lng, opts.pin) : fauquierParcelAt(lat, lng, opts.pin));
+        if (!base) {
+          pc.pinNote = `The county no longer lists PIN ${opts.pin}; showing the parcel at this spot instead.`;
+          opts.water = null; opts.address = null; // they described the retired parcel
+        }
+      } catch (e) {
+        pinFailed = true; // county server error — show it, but still fill in the site rows
+        pc.noParcel = 'error';
+      }
+      // The list's label point sits on a simplified outline; re-anchor every
+      // point lookup (zoning, flood, soils, Save) inside the true parcel.
+      if (base && base.geometry && !screenContains(base.geometry, lng, lat)) {
+        const lp = screenLabelPoint(base.geometry);
+        if (lp) { lat = lp.lat; lng = lp.lng; pc.lat = lat; pc.lng = lng; opts.water = null; }
+      }
+    }
+    if (!base && !pinFailed) {
+      const [lo, fq] = await Promise.allSettled([loudounParcelAt(lat, lng), fauquierParcelAt(lat, lng)]);
+      base = (lo.status === 'fulfilled' && lo.value) || (fq.status === 'fulfilled' && fq.value) || null;
+      if (!base) pc.noParcel = (lo.status === 'rejected' && fq.status === 'rejected') ? 'error' : 'none';
+    }
     pc.loadingParcel = false;
     if (base) Object.assign(pc, base);
-    else pc.noParcel = (lo.status === 'rejected' && fq.status === 'rejected') ? 'error' : 'none';
+    if (base && !pc.address && opts.address) pc.address = opts.address;
+    if (base) {
+      // Already tracked — as a saved parcel or as a pasted listing on this parcel?
+      const hit = __savedListings.find(x => x.id === `parcel:${base.jurisdiction}:${base.pin}`) ||
+        __savedListings.find(x => x.source !== 'parcel' && x.loc_precision !== 'approximate' && x.parcel_jurisdiction === base.jurisdiction && x.parcel_pin === base.pin);
+      if (hit) pc.savedId = hit.id;
+    }
     if (!target && isLive()) drawParcelHighlight(base && base.geometry);
     await loadAreaHydro();
-    pc.water = nearestWater(lat, lng);
+    pc.water = opts.water ? Object.assign({ basis: 'parcel' }, opts.water) : parcelWater(pc, lat, lng);
     pc.overlays = overlaysAt(lat, lng);
     render();
 
     const jobs = [siteConditions(pc, lat, lng, render)];
     if (pc.jurisdiction === 'loudoun') {
-      jobs.push(loudounDetails(pc, lat, lng).then(render));
+      pc.addressPending = !pc.address;
+      jobs.push(loudounDetails(pc, lat, lng).finally(() => { pc.addressPending = false; }).then(render));
       jobs.push(loudounAssessmentFor(pc).then(render));
     } else if (pc.jurisdiction === 'fauquier') {
       jobs.push(fauquierDetails(pc, lat, lng).then(render));
@@ -4450,6 +4887,18 @@
     pc.loadingDetails = false;
     render();
     return pc;
+  }
+
+  // Water distance for a card: from the parcel outline when we have one (same
+  // measure as Find land), else from the tapped point.
+  function parcelWater(pc, lat, lng) {
+    if (pc.geometry) return Object.assign({ basis: 'parcel' }, screenWaterFor(pc.geometry));
+    if (!__areaHydroPoints || !__areaHydroPoints.length) return { ft: null, unavailable: true };
+    const n = nearestWater(lat, lng);
+    if (!n) return { ft: null };
+    const ft = Math.round(n.distM * FT_PER_M);
+    if (!screenInWaterBox(lat, lng) && ft > 1000) return { ft: null, outside: true };
+    return { ft, name: n.name, kind: n.kind, on: false, basis: 'point' };
   }
 
   function drawParcelHighlight(geometry) {
@@ -4479,6 +4928,13 @@
     return null;
   }
 
+  function mailingHtml(pc) {
+    const m = pc.mail;
+    if (pc.ownerHidden || !m || !(m.line1 || m.city)) return '';
+    const cityLine = [m.city, [m.state, m.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return kv('Owner mailing address', escapeHtml(m.line1 || '') + (cityLine ? '<br>' + escapeHtml(cityLine) : ''));
+  }
+
   function kv(label, valueHtml) {
     return `<div class="fc-pc-row"><span>${escapeHtml(label)}</span><span>${valueHtml}</span></div>`;
   }
@@ -4505,12 +4961,18 @@
     const eased = !!pc.easement || !!ov.easementSpatial;
     if (eased) flags.push('<span class="fc-pill coral">🔴 Conservation easement</span>');
     if (pc.flood && pc.flood.zone) flags.push(pc.flood.sfha ? `<span class="fc-pill coral">🌊 Flood zone ${escapeHtml(pc.flood.zone)}</span>` : `<span class="fc-pill sky">Flood zone ${escapeHtml(pc.flood.zone)}</span>`);
-    if (pc.water && pc.water.distM * FT_PER_M <= 1000) flags.push(`<span class="fc-pill sky">💧 ${Math.round(pc.water.distM * FT_PER_M).toLocaleString()} ft to water</span>`);
+    if (pc.water && pc.water.ft === 0) flags.push('<span class="fc-pill sky">💧 Water on the parcel</span>');
+    else if (pc.water && pc.water.ft != null && pc.water.ft <= 1000) flags.push(`<span class="fc-pill sky">💧 ${pc.water.ft.toLocaleString()} ft to water</span>`);
+    // Seller signals — same rules as Find land.
+    if (!pc.ownerHidden && screenIsEstate(pc.owner)) flags.push('<span class="fc-pill coral">Estate / heirs owner</span>');
+    const away = !pc.ownerHidden && screenAwayLabel(pc.mail);
+    if (away) flags.push(`<span class="fc-pill sky">${escapeHtml(away)}</span>`);
+    if (pc.ownerSinceIso && pc.ownerSinceIso < screenHeldCutoff()) flags.push(`<span class="fc-pill gold">Owned since ${escapeHtml(pc.ownerSinceIso.slice(0, 4))}</span>`);
     if (ov.growth) flags.push(`<span class="fc-pill sage">🟢 Growth area: ${escapeHtml(ov.growth)}</span>`);
     if (ov.transition) flags.push('<span class="fc-pill gold">🟤 Transition policy area</span>');
     if (ov.rezoningOn && ov.rezoningOn.some(r => r.recent)) flags.push('<span class="fc-pill gold">🟡 Recent rezoning case on this spot</span>');
     else if (ov.rezoningNear) flags.push(`<span class="fc-pill gold">🟡 ${ov.rezoningNear} rezoning case${ov.rezoningNear === 1 ? '' : 's'} within 1 mi</span>`);
-    if (pc.delinquent) flags.push(`<span class="fc-pill ${pc.delinquent.serious ? 'coral' : ''}">⚠️ Taxes past due${pc.delinquent.days != null ? ` · ${pc.delinquent.days} days` : ''}</span>`);
+    if (pc.delinquent) flags.push(`<span class="fc-pill ${pc.delinquent.serious ? 'coral' : ''}">⚠️ Taxes past due${pc.delinquent.days != null ? ` · ${fmtOverdue(pc.delinquent.days)}` : ''}</span>`);
     if (pc.vacant && !(pc.assessed && pc.assessed.building > 0)) flags.push('<span class="fc-pill ink">Vacant land</span>');
 
     if (pc.noParcel) {
@@ -4526,6 +4988,9 @@
     const title = pc.address || (pc.subdivision ? titleish(pc.subdivision) : `Parcel ${pc.pin}`);
     const loading = pc.loadingDetails;
     const mismatch = acreMismatch(o.listing, pc);
+    // Loudoun's address comes with the detail lookups; hold Save until then so
+    // the saved title isn't "Loudoun parcel <PIN>" forever.
+    const saveWaits = !pc.savedId && !pc.address && !!pc.addressPending;
     const mismatchHtml = mismatch ? `<div class="fc-area-warn">This parcel is ${fmtAcres(pc.acres)} but the listing says ${fmtAcres(o.listing.acres)}. ${mismatch === 'bigger'
       ? 'The listing may cover several parcels, or its map pin may be off.'
       : 'The listing\'s map pin may be on a neighboring parcel.'} If so, use <strong>Move pin</strong> to put it on the right one.</div>` : '';
@@ -4606,10 +5071,11 @@
       easementHtml = kv('Easement', 'This spot is inside a mapped easement<div class="fc-pc-dim">May cover only part of the parcel.</div>');
     }
 
-    const delinquentHtml = pc.delinquent ? kv('Taxes past due', escapeHtml([pc.delinquent.days != null ? pc.delinquent.days + ' days' : null, pc.delinquent.balance != null ? fmtMoney(pc.delinquent.balance) : null].filter(Boolean).join(' · ')) +
+    const delinquentHtml = pc.delinquent ? kv('Taxes past due', escapeHtml([pc.delinquent.days != null ? fmtOverdue(pc.delinquent.days) : null, pc.delinquent.balance != null ? fmtMoney(pc.delinquent.balance) : null].filter(Boolean).join(' · ')) +
       (pc.delinquent.serious ? '<div class="fc-pc-dim">Two or more missed installments — a possible motivated seller.</div>' : '')) : '';
 
     return `<div class="fc-pc">
+      ${pc.pinNote ? `<div class="fc-area-warn">${escapeHtml(pc.pinNote)}</div>` : ''}
       ${mismatchHtml}
       <div class="fc-pc-title">${escapeHtml(title)}</div>
       <div class="fc-pc-sub">${escapeHtml(pc.county)} County · ${fmtAcres(pc.acres)} · PIN <span class="fc-mono">${escapeHtml(pc.pin)}</span>
@@ -4623,6 +5089,7 @@
       ${perAcre}${trend}
       ${kv('Last sale', saleHtml)}
       ${pc.ownerSince ? kv('Current owner since', escapeHtml(pc.ownerSince)) : ''}
+      ${mailingHtml(pc)}
       ${delinquentHtml}
       <h4>Zoning &amp; use</h4>
       ${kv('Zoning', zoningHtml)}
@@ -4630,14 +5097,19 @@
       ${pc.yearBuilt ? kv('Year built', String(pc.yearBuilt)) : ''}
       ${rezoningHtml}${easementHtml}
       ${renderSiteSection(pc)}
-      <div class="fc-pc-links">${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
+      <div class="fc-pc-links">${o.embedded ? '' : `<button class="fc-btn fc-btn-sm fc-btn-dark fc-area-admin" data-act="${pc.savedId ? 'open-saved' : 'save-parcel'}"${saveWaits ? ' disabled' : ''}>${pc.savedId ? 'Open in Saved' : saveWaits ? 'Loading address…' : '★ Save parcel'}</button>`}${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
       ${pc.failed ? `<div class="fc-pc-note">${pc.failed} county lookup${pc.failed === 1 ? '' : 's'} did not respond; some fields may be missing.</div>` : ''}
     </div>`;
   }
 
   function renderSiteSection(pc) {
     const w = pc.water;
-    const waterHtml = w ? `≈ ${Math.round(w.distM * FT_PER_M).toLocaleString()} ft to ${escapeHtml(w.name || 'unnamed water')}${w.kind ? ` <span class="fc-pc-dim">(${escapeHtml(w.kind)})</span>` : ''}` : (__areaHydroPoints ? '—' : skel());
+    let waterHtml = __areaHydroPoints ? '—' : skel();
+    if (w && w.ft === 0) waterHtml = `${escapeHtml(w.name || 'Mapped water')} is on the parcel${w.kind ? ` <span class="fc-pc-dim">(${escapeHtml(w.kind)})</span>` : ''}`;
+    else if (w && w.ft != null) waterHtml = `≈ ${w.ft.toLocaleString()} ft ${w.basis === 'parcel' ? 'from the parcel line ' : ''}to ${escapeHtml(w.name || 'unnamed water')}${w.kind ? ` <span class="fc-pc-dim">(${escapeHtml(w.kind)})</span>` : ''}`;
+    else if (w && w.outside) waterHtml = '<span class="fc-pc-dim">Water layer doesn\'t cover this spot</span>';
+    else if (w && w.unavailable) waterHtml = '<span class="fc-pc-dim">Water layer did not load</span>';
+    else if (w) waterHtml = 'No mapped water within 1¼ miles';
     let floodHtml = skel();
     if (pc.flood) {
       if (pc.flood.error) floodHtml = '<span class="fc-pc-dim">FEMA did not respond</span>';
@@ -4681,6 +5153,10 @@
       dropRadiusCenter(L.latLng(pc.lat, pc.lng));
     }));
     el.querySelectorAll('[data-act="connect"]').forEach(b => b.addEventListener('click', () => { setView('settings'); }));
+    el.querySelectorAll('[data-act="save-parcel"], [data-act="open-saved"]').forEach(b => b.addEventListener('click', () => {
+      if (b.getAttribute('data-act') === 'open-saved' && pc.savedId) { drawParcelHighlight(null); openListing(pc.savedId); return; }
+      saveParcelFromCard(pc, b);
+    }));
     wirePanelBack(el);
   }
 
@@ -4804,8 +5280,8 @@
     const place = [s.street, s.city].filter(Boolean).join(', ') || s.county || '';
     return (SOURCE_LABEL[s.source] || 'Listing') + (place ? ' · ' + place : '');
   }
-  const SOURCE_LABEL = { landwatch: 'LandWatch', land: 'Land.com', landsearch: 'LandSearch', unitedcountry: 'United Country', craigslist: 'Craigslist', fsbo: 'FSBO', zillow: 'Zillow', redfin: 'Redfin', realtor: 'Realtor.com', homes: 'Homes.com', acres: 'Acres', other: 'Link' };
-  const WATCH_LABEL = { watching: 'Watching', interested: 'Interested', passed: 'Passed', sold: 'Sold / gone' };
+  const SOURCE_LABEL = { landwatch: 'LandWatch', land: 'Land.com', landsearch: 'LandSearch', unitedcountry: 'United Country', craigslist: 'Craigslist', fsbo: 'FSBO', zillow: 'Zillow', redfin: 'Redfin', realtor: 'Realtor.com', homes: 'Homes.com', acres: 'Acres', parcel: 'Off-market parcel', other: 'Link' };
+  const WATCH_LABEL = { watching: 'Watching', interested: 'Interested', contacted: 'Contacted owner', passed: 'Passed', sold: 'Sold / gone' };
 
   async function loadSavedListings() {
     __savedState = 'loading';
@@ -4842,7 +5318,7 @@
         radius: 8, color: '#ffffff', weight: 2, fillColor: s.watch_status === 'passed' ? '#8f897a' : '#1f6f8b', fillOpacity: 0.95, bubblingMouseEvents: false,
       });
       m.bindTooltip(escapeHtml(listingTitle(s)), { direction: 'top', offset: [0, -6] });
-      m.on('click', () => openListing(s.id));
+      m.on('click', e => { if (__placing || __areaMode === 'radius') onAreaMapClick(tapAt(e)); else openListing(s.id); });
       m.addTo(__savedLayer);
     }
   }
@@ -4894,7 +5370,7 @@
         <div>Or click anywhere on the map to look up that parcel.</div></div>`;
       return;
     }
-    const order = { interested: 0, watching: 1, sold: 2, passed: 3 };
+    const order = { interested: 0, contacted: 1, watching: 2, sold: 3, passed: 4 };
     const rows = __savedListings.slice().sort((a, b) => (order[a.watch_status] ?? 1) - (order[b.watch_status] ?? 1) || String(b.updated_at).localeCompare(String(a.updated_at)));
     listEl.innerHTML = rows.map(s => {
       const ppa = s.price && s.acres ? fmtMoney(s.price / s.acres) + '/ac' : '';
@@ -4925,7 +5401,8 @@
     const s = __savedListings.find(x => x.id === __openListingId);
     if (!s) { listEl.innerHTML = panelBack('saved') + '<div class="fc-area-empty">That listing is gone.</div>'; wirePanelBack(listEl); return; }
     const href = safeHttps(s.url);
-    const precisionNote = s.loc_method === 'pin' ? 'You placed this pin.'
+    const precisionNote = s.source === 'parcel' ? ''
+      : s.loc_method === 'pin' ? 'You placed this pin.'
       : s.loc_method === 'county_addr' ? 'Location from the county address point.'
       : ({
         listing: 'Location from the listing page.', parcel: 'Location from the listing\'s parcel ID.', exact: 'Location confirmed.',
@@ -4936,10 +5413,10 @@
       ? `<div class="fc-pc-note">${escapeHtml(SOURCE_LABEL[s.source] || 'The site')} blocks automatic reading, so details came from the link itself. Use the <strong>Send to Nestscoop</strong> bookmark on the listing page to pull price, acres and location automatically.</div>` : '';
     listEl.innerHTML = panelBack('saved') + `<div class="fc-pc">
       <div class="fc-pc-title">${escapeHtml(listingTitle(s))}</div>
-      <div class="fc-pc-sub">${escapeHtml(SOURCE_LABEL[s.source] || s.source)}${s.listing_status && s.listing_status !== 'unknown' ? ' · ' + escapeHtml(s.listing_status) : ''}${s.county ? ' · ' + escapeHtml(s.county) : ''}</div>
+      <div class="fc-pc-sub">${escapeHtml(SOURCE_LABEL[s.source] || s.source)}${s.source !== 'parcel' && s.listing_status && s.listing_status !== 'unknown' ? ' · ' + escapeHtml(s.listing_status) : ''}${s.county ? ' · ' + escapeHtml(s.county) : ''}</div>
       <div class="fc-pc-flags">${s.status !== 'located' ? '<span class="fc-pill gold">📍 Needs a pin</span>' : ''}${enrichmentBadges(s.enrichment)}</div>
       <div class="fc-sl-edit">
-        <label>Asking price<input class="fc-area-input" inputmode="numeric" data-field="price" value="${s.price != null ? escapeHtml(String(s.price)) : ''}" placeholder="$"></label>
+        <label>${s.source === 'parcel' ? 'Price (if discussed)' : 'Asking price'}<input class="fc-area-input" inputmode="numeric" data-field="price" value="${s.price != null ? escapeHtml(String(s.price)) : ''}" placeholder="$"></label>
         <label>Acres<input class="fc-area-input" inputmode="decimal" data-field="acres" value="${s.acres != null ? escapeHtml(String(s.acres)) : ''}" placeholder="ac"></label>
       </div>
       <div class="fc-pc-note" id="fc-listing-ppa">${ppaNoteHtml(s)}</div>
@@ -4948,7 +5425,7 @@
       </div>
       <label class="fc-sl-notes">Notes<textarea class="fc-area-input" rows="3" data-field="notes" placeholder="Road frontage, views, questions for the agent…">${escapeHtml(s.notes || '')}</textarea></label>
       <div class="fc-pc-links">
-        ${href ? `<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="${escapeHtml(href)}">Open listing ↗</a>` : ''}
+        ${href ? `<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="${escapeHtml(href)}">${s.source === 'parcel' ? 'County record ↗' : 'Open listing ↗'}</a>` : ''}
         <button class="fc-btn fc-btn-sm fc-area-admin" data-act="place">${s.status === 'located' ? 'Move pin' : '📍 Place pin'}</button>
         <button class="fc-btn fc-btn-sm fc-area-admin" data-act="delete">Delete</button>
       </div>
@@ -4973,7 +5450,9 @@
         wireParcelCard(box, __listingParcel.pc);
         maybeSaveEnrichment(s, __listingParcel.pc).catch(() => {});
       } else {
-        inspectParcelAt(s.lat, s.lng, { target: box, listing: s, isLive: () => __areaPanel === 'listing' && __openListingId === id && document.body.contains(box) })
+        // A saved off-market parcel is that PIN; a pasted listing is wherever its pin sits.
+        const byPin = s.source === 'parcel' && s.source_id ? { pin: s.source_id, jurisdiction: s.parcel_jurisdiction || String(s.id).split(':')[1] } : {};
+        inspectParcelAt(s.lat, s.lng, Object.assign({ target: box, listing: s, isLive: () => __areaPanel === 'listing' && __openListingId === id && document.body.contains(box) }, byPin))
           .then(pc => {
             if (!pc.noParcel || pc.noParcel === 'none') __listingParcel = { key, pc };
             const cur = __savedListings.find(x => x.id === id) || s;
@@ -5025,7 +5504,8 @@
       assessedPerAcre: perAcreBasis(pc) ? Math.round(perAcreBasis(pc).value) : null,
       zoning: pc.zoningCode || null, easement: !!(pc.easement || ov.easementSpatial),
       floodZone: pc.flood && pc.flood.zone || null, sfha: !!(pc.flood && pc.flood.sfha),
-      waterFt: pc.water ? Math.round(pc.water.distM * FT_PER_M) : null, waterName: pc.water && pc.water.name || null,
+      waterFt: pc.water && pc.water.ft != null ? pc.water.ft : null, waterName: pc.water && pc.water.name || null,
+      ...(pc.water && pc.water.unavailable && s.enrichment ? { waterFt: s.enrichment.waterFt ?? null, waterName: s.enrichment.waterName ?? null } : {}),
       growth: ov.growth || (ov.transition ? 'Transition policy area' : null),
       rezoningOn: !!(ov.rezoningOn && ov.rezoningOn.some(r => r.recent)), rezoningNear: ov.rezoningNear || 0,
       delinquent: !!(pc.delinquent && pc.delinquent.serious),
@@ -5035,7 +5515,7 @@
     const prev = s.enrichment ? JSON.stringify(s.enrichment) : '';
     if (prev === JSON.stringify(e)) return;
     const body = { enrichment: e };
-    if (pc.pin && pc.jurisdiction) { body.parcel_pin = pc.pin; body.parcel_jurisdiction = pc.jurisdiction; }
+    if (pc.pin && pc.jurisdiction && s.source !== 'parcel' && s.loc_precision !== 'approximate') { body.parcel_pin = pc.pin; body.parcel_jurisdiction = pc.jurisdiction; }
     const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body });
     if (r.ok) {
       const i = __savedListings.findIndex(x => x.id === s.id);
@@ -5163,9 +5643,455 @@
     if (!pay) listEl.querySelector('#fc-area-paste').focus({ preventScroll: true });
   }
 
+  // ─── Find land (screener panel) ────────────────────────────────────────
+  // Pulls every parcel above the size floor straight from county GIS into
+  // memory (nothing is stored or published), joins delinquency, easements and
+  // Loudoun deed dates, then filters/ranks with the pure core above.
+  const LOUDOUN_WEST_BOX = { s: 38.84, n: 39.33, w: -77.97, e: -77.60 };
+  const SCREEN_SOURCES = {
+    fauquier: {
+      label: 'Fauquier', url: GIS.F_PARCELS, oid: 'FID', box: FAUQUIER_BOX,
+      where: min => `CAST(ACREAGE AS FLOAT) >= ${Number(min)}`,
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,LASTSALEDA,Building_V,Primary__1',
+    },
+    loudoun: {
+      label: 'western Loudoun', url: GIS.L_OWNER, oid: 'OBJECTID', box: LOUDOUN_WEST_BOX,
+      // Owners who asked the county to withhold their name are never downloaded.
+      where: min => `PA_LEGAL_ACRE >= ${Number(min)} AND (HIDENAME IS NULL OR HIDENAME <> 'Y')`,
+      outFields: 'PA_MCPI,PA_LEGAL_ACRE,OWNER,HIDENAME,OWNER_ADDRESS1,OWNER_ADDRESS2,OWNER_CITY,OWNER_STATE,OWNER_ZIP1,OWNER_COUNTRY,PRI_PREMISE_ADD',
+    },
+  };
+  const SCREEN_DEFAULTS = { area: 'map', minAcres: 10, maxAcres: 0, water: 'any', rawOnly: false, keepEasements: false, signals: { tax: true, estate: true, away: true, held: true } };
+  const SCREEN_PAGE = 2000;
+  const SCREEN_LIST_STEP = 200;
+  const SCREEN_MAP_MAX = 1000;
+  const __screen = {
+    recs: { fauquier: null, loudoun: null },     // normalized records per county
+    minLoaded: { fauquier: Infinity, loudoun: Infinity },
+    aux: { delinquent: null, fEase: null, lEase: null }, // filled per layer; a failed layer retries next search
+    filters: null, results: null, summary: null, shown: SCREEN_LIST_STEP,
+    running: false, runSeq: 0, status: '', errors: [], restoreIndex: null,
+  };
+  let __screenLayer = null;
+  let __screenWaterIdx = null;
+
+  function screenWaterIdx() {
+    if (!__screenWaterIdx && __areaHydro && __areaHydro.features && __areaHydro.features.length) __screenWaterIdx = screenWaterIndex(__areaHydro);
+    return __screenWaterIdx;
+  }
+  // Water distance from a parcel outline. unavailable = the water layer did
+  // not load; outside = parcel too close to the edge of the water pull for a
+  // "far" answer to be trusted.
+  function screenWaterFor(geom) {
+    const idx = screenWaterIdx();
+    if (!idx) return { ft: null, unavailable: true };
+    if (!geom) return { ft: null };
+    const w = screenWaterDistance(idx, geom);
+    if (!screenWaterCovers(geom) && (w.ft == null || w.ft > 1000)) return { ft: null, outside: true };
+    return w;
+  }
+  function screenRecWater(rec) {
+    if (!rec._water || rec._water.unavailable) rec._water = screenWaterFor(rec.geom);
+    return rec._water;
+  }
+  function screenAwayLabel(mail) {
+    const a = screenAwayFrom(mail);
+    if (!a) return null;
+    if (a === 'elsewhere') return 'Owner outside VA';
+    return mail && mail.state ? `Owner in ${a}` : `Owner abroad (${a})`;
+  }
+
+  function screenLoadFilters() {
+    try {
+      const s = JSON.parse(localStorage.getItem('fs_screen_filters') || 'null');
+      if (s && typeof s === 'object') return Object.assign({}, SCREEN_DEFAULTS, s, { signals: Object.assign({}, SCREEN_DEFAULTS.signals, s.signals || {}) });
+    } catch (e) { /* ignore */ }
+    return JSON.parse(JSON.stringify(SCREEN_DEFAULTS));
+  }
+  function screenSaveFilters(f) {
+    try { localStorage.setItem('fs_screen_filters', JSON.stringify(f)); } catch (e) { /* ignore */ }
+  }
+
+  // Runs fn over items with `limit` workers. After the first failure no new
+  // items start, so a dead server doesn't keep the remaining pages downloading.
+  async function screenPool(items, limit, fn) {
+    const out = new Array(items.length);
+    let i = 0, failed = false;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (!failed && i < items.length) {
+        const k = i++;
+        try { out[k] = await fn(items[k], k); } catch (err) { failed = true; throw err; }
+      }
+    });
+    await Promise.all(workers);
+    return out;
+  }
+
+  // Sequential paging for small lookup lists (delinquency, easements).
+  async function screenPaged(url, params, page, oid) {
+    const out = [];
+    for (let off = 0; off < 50000; off += page) {
+      const j = await arcgis(url, Object.assign({}, params, { resultOffset: String(off), resultRecordCount: String(page), orderByFields: oid }), 20000);
+      const fs = (j && j.features) || [];
+      out.push(...fs);
+      if (!j.exceededTransferLimit || !fs.length) break;
+    }
+    return out;
+  }
+  // Tax and easement lists, each loaded (and cached) on its own so one slow
+  // server costs only its own signal, named in the error.
+  async function screenLoadAux(counties, errors) {
+    const a = __screen.aux;
+    const jobs = [];
+    const fail = what => err => errors.push(`${what}: ${err.message || err}`);
+    if (counties.includes('fauquier') && !a.delinquent) {
+      jobs.push(screenPaged(GIS.F_DELINQ, { where: '1=1', outFields: 'PARCELID,MAIN_DaysDelinquent,MAIN_DelinquentBalance', returnGeometry: 'false', f: 'json' }, 2000, 'OBJECTID')
+        .then(rows => { a.delinquent = new Map(rows.map(f => [screenPinNorm(f.attributes.PARCELID), f.attributes])); })
+        .catch(fail('Fauquier delinquent-tax list (county GIS) did not load, so "Taxes past due" is missing')));
+    }
+    if (counties.includes('fauquier') && !a.fEase) {
+      jobs.push(screenPaged(GIS.F_EASE, { where: '1=1', outFields: 'NAME', returnGeometry: 'false', f: 'json' }, 2000, 'FID')
+        .then(rows => { a.fEase = new Set(rows.map(f => screenPinNorm(f.attributes.NAME)).filter(Boolean)); })
+        .catch(fail('Fauquier conservation easements (county GIS) did not load, so eased land is not filtered out')));
+    }
+    if (counties.includes('loudoun') && !a.lEase) {
+      jobs.push(screenPaged(GIS.L_EASE, { where: '1=1', outFields: 'CE_MCPI', returnGeometry: 'false', f: 'json' }, 5000, 'OBJECTID')
+        .then(rows => { a.lEase = new Set(rows.map(f => trimS(f.attributes.CE_MCPI)).filter(Boolean)); })
+        .catch(fail('Loudoun conservation easements (county GIS) did not load, so eased land is not filtered out')));
+    }
+    await Promise.all(jobs);
+    return a;
+  }
+  // Re-apply the lookup lists to cached records (a list may have loaded after them).
+  function screenApplyAux(recs, aux) {
+    for (const r of recs) {
+      if (r.jurisdiction === 'fauquier') {
+        if (aux.fEase) r.easement = aux.fEase.has(r.pin);
+        if (aux.delinquent) r.tax = screenTaxFrom(aux.delinquent.get(r.pin));
+      } else if (aux.lEase) r.easement = aux.lEase.has(r.pin);
+    }
+  }
+
+  // Every parcel ≥ minAcres for one county, paged in parallel (count first).
+  async function screenLoadCounty(key, minAcres, progress) {
+    if (__screen.recs[key] && __screen.minLoaded[key] <= minAcres) return __screen.recs[key];
+    const src = SCREEN_SOURCES[key];
+    const base = { where: src.where(minAcres) };
+    if (key === 'loudoun') {
+      const b = src.box;
+      Object.assign(base, { geometry: `${b.w},${b.s},${b.e},${b.n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
+    }
+    const cnt = await arcgis(src.url, Object.assign({}, base, { returnCountOnly: 'true', f: 'json' }), 20000);
+    const total = (cnt && cnt.count) || 0;
+    const offsets = [];
+    for (let off = 0; off < total; off += SCREEN_PAGE) offsets.push(off);
+    let done = 0;
+    progress(`Loading ${src.label} parcels… 0 of ${total.toLocaleString()}`);
+    const pages = await screenPool(offsets, 3, async off => {
+      const j = await arcgis(src.url, Object.assign({}, base, {
+        outFields: src.outFields, returnGeometry: 'true', outSR: '4326', geometryPrecision: '5', maxAllowableOffset: '0.0001',
+        orderByFields: src.oid, resultOffset: String(off), resultRecordCount: String(SCREEN_PAGE), f: 'geojson',
+      }), 45000);
+      const fs = (j && j.features) || [];
+      done += fs.length;
+      progress(`Loading ${src.label} parcels… ${Math.min(done, total).toLocaleString()} of ${total.toLocaleString()}`);
+      return fs;
+    });
+    const recs = [];
+    const seen = new Set();
+    for (const page of pages) for (const f of page) {
+      const r = key === 'fauquier' ? screenFromFauquier(f, null, null) : screenFromLoudoun(f, null);
+      if (!r || seen.has(r.id)) continue; // stacked rows can repeat a PIN
+      seen.add(r.id);
+      r.label = screenLabelPoint(r.geom);
+      if (r.label) recs.push(r);
+    }
+    __screen.recs[key] = screenCollapseStacks(recs);
+    __screen.minLoaded[key] = minAcres;
+    return __screen.recs[key];
+  }
+
+  // Loudoun keeps deed dates in a separate table that times out on ID lists
+  // longer than ~25, so fetch the whole "current owner bought before the
+  // cutoff" set once (~11 pages) and join locally. Absent = bought later or unknown.
+  async function screenLoudounHeld(cutoff, progress) {
+    if (__screen.loudounHeld && __screen.loudounHeld.cutoff === cutoff) return __screen.loudounHeld.map;
+    const where = `VPC_OWN_SALE_DT < date '${cutoff}' AND VPC_OWN_SALE_DT > date '1900-01-02' AND VPC_REC_END_DT > date '9000-01-01'`;
+    const cnt = await arcgis(GIS.L_LMIS2, { where, returnCountOnly: 'true', f: 'json' }, 20000);
+    const total = (cnt && cnt.count) || 0;
+    const offsets = [];
+    for (let off = 0; off < total; off += 1000) offsets.push(off);
+    let done = 0;
+    progress(`Looking up Loudoun deed dates… 0 of ${total.toLocaleString()}`);
+    const map = new Map();
+    await screenPool(offsets, 3, async off => {
+      const j = await arcgis(GIS.L_LMIS2, { where, outFields: 'VPC_PARCEL_KEY,VPC_OWN_SALE_DT', returnGeometry: 'false', orderByFields: 'OBJECTID', resultOffset: String(off), resultRecordCount: '1000', f: 'json' }, 30000);
+      for (const f of (j && j.features) || []) {
+        const ms = f.attributes.VPC_OWN_SALE_DT;
+        const iso = ms == null ? null : screenSaleIso(new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }));
+        if (iso) map.set(trimS(f.attributes.VPC_PARCEL_KEY), iso);
+      }
+      done += 1000;
+      progress(`Looking up Loudoun deed dates… ${Math.min(done, total).toLocaleString()} of ${total.toLocaleString()}`);
+    });
+    __screen.loudounHeld = { cutoff, map };
+    return map;
+  }
+
+  function boxesIntersect(a, b) { return !(a.e < b.w || a.w > b.e || a.n < b.s || a.s > b.n); }
+
+  async function runScreen() {
+    if (__screen.running) return;
+    // Snapshot: filters edited while this run is loading apply to the next run.
+    const f = JSON.parse(JSON.stringify(__screen.filters));
+    screenSaveFilters(f);
+    const seq = ++__screen.runSeq;
+    __screen.running = true;
+    __screen.errors = [];
+    const errors = [];
+    const progress = msg => {
+      if (seq !== __screen.runSeq || !__screen.running) return; // a finished or newer run owns the status line
+      __screen.status = msg;
+      const el = document.getElementById('fc-find-status');
+      if (el) el.textContent = msg;
+    };
+    renderFindPanel();
+    let stage = 'starting';
+    try {
+      let bounds = null;
+      if (f.area === 'map' && __areaMap) {
+        const b = __areaMap.getBounds();
+        bounds = { s: b.getSouth(), n: b.getNorth(), w: b.getWest(), e: b.getEast() };
+      }
+      const counties = Object.keys(SCREEN_SOURCES).filter(k => !bounds || boxesIntersect(bounds, SCREEN_SOURCES[k].box));
+      if (!counties.length) {
+        __screen.results = []; __screen.summary = { checked: 0, counties: [], outside: true, filters: f };
+        return;
+      }
+      stage = 'loading the tax, easement and water layers';
+      progress('Loading tax, easement and water layers…');
+      const [aux] = await Promise.all([screenLoadAux(counties, errors), loadAreaHydro()]);
+      if (!screenWaterIdx()) {
+        errors.push(f.water !== 'any'
+          ? 'The water layer did not load, so the water filter was skipped and water is not scored.'
+          : 'The water layer did not load, so water is not scored.');
+        f.water = 'any';
+      }
+      stage = 'loading parcels';
+      const loaded = await Promise.all(counties.map(k => screenLoadCounty(k, f.minAcres, progress).catch(err => {
+        errors.push(`${SCREEN_SOURCES[k].label} parcels (county GIS) did not load: ${err.message || err}`);
+        return [];
+      })));
+      const recs = [].concat(...loaded);
+      screenApplyAux(recs, aux);
+      const cutoff = screenHeldCutoff();
+      const loudounRecs = recs.filter(r => r.jurisdiction === 'loudoun');
+      if (loudounRecs.length) {
+        stage = 'looking up Loudoun deed dates';
+        const held = await screenLoudounHeld(cutoff, progress).catch(err => {
+          errors.push(`Loudoun deed dates (county GIS) did not load, so "Owned 25+ years" is missing for Loudoun: ${err.message || err}`);
+          return null;
+        });
+        for (const r of loudounRecs) r.saleIso = held ? (held.get(r.pin) || null) : null;
+      }
+      stage = 'ranking';
+      progress('Ranking…');
+      const full = Object.assign({}, f, { bounds });
+      const results = [];
+      let checked = 0;
+      for (const rec of recs) {
+        if (bounds && (rec.label.lat < bounds.s || rec.label.lat > bounds.n || rec.label.lng < bounds.w || rec.label.lng > bounds.e)) continue;
+        checked++;
+        const ev = screenEvaluate(rec, full, cutoff, screenRecWater);
+        if (ev) results.push({ rec, ev });
+      }
+      results.sort(screenCompare);
+      __screen.results = results;
+      __screen.summary = { checked, counties, filters: f };
+      __screen.shown = SCREEN_LIST_STEP;
+      __screen.restoreIndex = null;
+    } catch (err) {
+      errors.push(`Search failed while ${stage}: ${err.message || err}`);
+    } finally {
+      if (seq === __screen.runSeq) {
+        __screen.running = false;
+        __screen.status = '';
+        __screen.errors = errors;
+        drawScreenMarkers();
+        if (__areaPanel === 'find') renderFindPanel();
+      }
+    }
+  }
+
+  const SIGNAL_CHIP = {
+    tax: () => '<span class="fc-pill coral">Taxes past due</span>',
+    estate: () => '<span class="fc-pill coral">Estate / heirs</span>',
+    away: rec => `<span class="fc-pill sky">${escapeHtml(screenAwayLabel(rec.mail) || 'Owner outside VA')}</span>`,
+    held: rec => `<span class="fc-pill gold">Owned since ${escapeHtml(String(rec.saleIso || '').slice(0, 4))}</span>`,
+  };
+  function screenTitle(rec) {
+    return rec.address ? titleish(rec.address) : `${rec.county} parcel ${rec.pin}`;
+  }
+  function screenWaterText(w) {
+    if (!w || w.ft == null) {
+      if (w && w.unavailable) return 'water layer not loaded';
+      return w && w.outside ? 'water data not mapped here' : 'no mapped water within 1¼ mi';
+    }
+    if (w.ft === 0) return `💧 ${escapeHtml(w.name || 'water')} on the parcel`;
+    return `💧 ${w.ft.toLocaleString()} ft to ${escapeHtml(w.name || 'water')}`;
+  }
+
+  function drawScreenMarkers() {
+    if (!__areaMap) return;
+    if (!__screenLayer) __screenLayer = L.layerGroup().addTo(__areaMap);
+    __screenLayer.clearLayers();
+    const res = __screen.results || [];
+    res.slice(0, SCREEN_MAP_MAX).forEach((x, i) => {
+      const s = x.ev.signals;
+      const color = s.includes('tax') || s.includes('estate') ? '#c84b2f' : s.includes('held') ? '#b8860b' : s.includes('away') ? '#3a7a9b' : '#5b4a2f';
+      const latlng = L.latLng(x.rec.label.lat, x.rec.label.lng);
+      L.circleMarker(latlng, { radius: 6, color: '#ffffff', weight: 1.5, fillColor: color, fillOpacity: 0.9, bubblingMouseEvents: false })
+        .bindTooltip(escapeHtml(screenTitle(x.rec)), { direction: 'top', offset: [0, -6] })
+        // While placing a pin or setting a radius center, a dot is just part of the map.
+        .on('click', e => { if (__placing || __areaMode === 'radius') onAreaMapClick(tapAt(e)); else openScreenResult(i); })
+        .addTo(__screenLayer);
+    });
+  }
+
+  function openScreenResult(i) {
+    const x = (__screen.results || [])[i];
+    if (!x) return;
+    __screen.restoreIndex = i;
+    if (__areaMap) __areaMap.flyTo([x.rec.label.lat, x.rec.label.lng], Math.max(__areaMap.getZoom(), 15), { duration: 0.6 });
+    // Open by PIN (not by the map point) so inholdings and stacked units can't
+    // swap in a neighbour; reuse the list's water reading so the two agree.
+    inspectParcelAt(x.rec.label.lat, x.rec.label.lng, {
+      back: 'find', pin: x.rec.pin, jurisdiction: x.rec.jurisdiction, address: x.rec.address,
+      water: x.ev.water && !x.ev.water.unavailable ? x.ev.water : null,
+    });
+  }
+
+  function screenFilterSummary(f) {
+    const sig = { tax: 'taxes due', estate: 'estate/heirs', away: 'owner outside VA', held: '25+ yrs owned' };
+    const on = Object.keys(sig).filter(k => f.signals[k]).map(k => sig[k]);
+    const water = { any: '', '1000': ' · water ≤ 1,000 ft', '300': ' · water ≤ 300 ft', on: ' · water on parcel' }[f.water] || '';
+    return `${f.area === 'all' ? 'Both counties' : 'Map view'} · ${f.minAcres}${f.maxAcres ? '–' + f.maxAcres : '+'} ac${water}${f.rawOnly ? ' · no house' : ''} · ${on.length ? on.join(', ') : 'all parcels'}`;
+  }
+
+  function renderFindPanel() {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl || __areaPanel !== 'find') return;
+    if (!__screen.filters) __screen.filters = screenLoadFilters();
+    const f = __screen.filters;
+    const running = __screen.running;
+    const dis = running ? ' disabled' : '';
+    const opt = (v, cur, label) => `<option value="${v}"${String(cur) === String(v) ? ' selected' : ''}>${label}</option>`;
+    const chk = (key, label, note) => `<label class="fc-find-check"><input type="checkbox" data-sig="${key}"${f.signals[key] ? ' checked' : ''}${dis}> ${label}${note ? ` <span class="fc-pc-dim">${note}</span>` : ''}</label>`;
+    const res = __screen.results;
+    let resultsHtml = '';
+    if (!running && res) {
+      const sum = __screen.summary || {};
+      if (sum.outside) {
+        resultsHtml = '<div class="fc-area-empty">The map isn\'t over Fauquier or western Loudoun. Pan there, or switch Area to both counties.</div>';
+      } else {
+        const rows = res.slice(0, __screen.shown).map((x, i) => {
+          const r = x.rec, w = x.ev.water;
+          const chips = x.ev.signals.map(k => SIGNAL_CHIP[k](r)).join('') + (r.raw === true ? `<span class="fc-pill ink">${r.rawBasis === 'address' ? 'No address on record' : 'No building'}</span>` : '') + (r.easement ? '<span class="fc-pill coral">Easement</span>' : '');
+          return `<div class="fc-sl-row" data-sr="${i}">
+            <div class="fc-sl-title">${escapeHtml(screenTitle(r))}</div>
+            <div class="fc-sl-sub">${escapeHtml(r.county)} · ${fmtAcres(r.acres)} · ${screenWaterText(w)}</div>
+            <div class="fc-pc-flags">${chips}</div>
+          </div>`;
+        }).join('');
+        const more = res.length > __screen.shown ? `<button class="fc-btn fc-btn-sm" data-act="more">Show ${Math.min(SCREEN_LIST_STEP, res.length - __screen.shown)} more of ${(res.length - __screen.shown).toLocaleString()}</button>` : '';
+        const mapNote = res.length > SCREEN_MAP_MAX ? ` The map shows the top ${SCREEN_MAP_MAX.toLocaleString()}.` : '';
+        const ran = sum.filters ? `<div class="fc-pc-dim">${escapeHtml(screenFilterSummary(sum.filters))}</div>` : '';
+        resultsHtml = `<div class="fc-find-summary"><strong>${res.length.toLocaleString()} parcel${res.length === 1 ? '' : 's'}</strong> match out of ${(sum.checked || 0).toLocaleString()} checked in ${escapeHtml((sum.counties || []).map(k => SCREEN_SOURCES[k].label).join(' + '))}.${mapNote}${ran}</div>
+          ${rows || '<div class="fc-area-empty">Nothing matches. Try fewer filters or a bigger area.</div>'}
+          ${more}`;
+      }
+    }
+    const errors = __screen.errors.length ? `<div class="fc-area-warn">${__screen.errors.map(escapeHtml).join('<br>')}</div>` : '';
+    listEl.innerHTML = `<div class="fc-find">
+      <div class="fc-pc-title">Find land that might sell</div>
+      <details class="fc-find-filters"${res && !running ? '' : ' open'}>
+      <summary>${escapeHtml(screenFilterSummary(f))}</summary>
+      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name.</div>
+      <div class="fc-find-grid">
+        <label>Area<select class="fc-area-input" data-f="area"${dis}>${opt('map', f.area, 'Map view')}${opt('all', f.area, 'Both counties')}</select></label>
+        <label>Size<select class="fc-area-input" data-f="minAcres"${dis}>${[5, 10, 20, 50, 100].map(v => opt(v, f.minAcres, v + '+ acres')).join('')}</select></label>
+        <label>Up to<select class="fc-area-input" data-f="maxAcres"${dis}>${opt(0, f.maxAcres, 'No limit')}${[25, 50, 100, 250].map(v => opt(v, f.maxAcres, v + ' acres')).join('')}</select></label>
+        <label>Water<select class="fc-area-input" data-f="water"${dis}>${opt('any', f.water, 'Any distance')}${opt('1000', f.water, 'Within 1,000 ft')}${opt('300', f.water, 'Within 300 ft')}${opt('on', f.water, 'On the parcel')}</select></label>
+      </div>
+      <div class="fc-find-sigs">
+        <div class="fc-find-h">Seller signals <span class="fc-pc-dim">(show parcels with any checked)</span></div>
+        ${chk('tax', 'Taxes past due', 'Fauquier only')}
+        ${chk('estate', 'Estate / heirs owner')}
+        ${chk('away', 'Owner lives outside Virginia')}
+        ${chk('held', 'Owned 25+ years')}
+        <div class="fc-find-h">Also</div>
+        <label class="fc-find-check"><input type="checkbox" data-f="rawOnly"${f.rawOnly ? ' checked' : ''}${dis}> No house on record</label>
+        <label class="fc-find-check"><input type="checkbox" data-f="keepEasements"${f.keepEasements ? ' checked' : ''}${dis}> Include conservation-easement land</label>
+      </div>
+      </details>
+      <div class="fc-pc-links"><button class="fc-btn fc-btn-sm fc-btn-dark" data-act="run"${dis}>${res ? 'Search again' : 'Find land'}</button>
+        ${res && res.length && !running ? '<button class="fc-btn fc-btn-sm fc-btn-ghost" data-act="clear">Clear results</button>' : ''}</div>
+      <div id="fc-find-status" class="fc-pc-note" role="status">${escapeHtml(running ? __screen.status : '')}</div>
+      ${errors}
+    </div>
+    <div class="fc-find-results">${resultsHtml}</div>
+    ${res && !running ? '<div class="fc-pc-note">Signals are leads, not proof anyone will sell. "Owned 25+ years" counts from the last recorded transfer. Water distances use OpenStreetMap; small streams can be missing.</div>' : ''}`;
+    listEl.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
+      const k = el.getAttribute('data-f');
+      if (el.type === 'checkbox') f[k] = el.checked;
+      else f[k] = (k === 'minAcres' || k === 'maxAcres') ? Number(el.value) : el.value;
+      screenSaveFilters(f);
+    }));
+    listEl.querySelectorAll('[data-sig]').forEach(el => el.addEventListener('change', () => {
+      f.signals[el.getAttribute('data-sig')] = el.checked;
+      screenSaveFilters(f);
+    }));
+    const run = listEl.querySelector('[data-act="run"]');
+    if (run) run.addEventListener('click', runScreen);
+    const clear = listEl.querySelector('[data-act="clear"]');
+    if (clear) clear.addEventListener('click', () => { __screen.results = null; __screen.summary = null; __screen.errors = []; __screen.restoreIndex = null; drawScreenMarkers(); renderFindPanel(); setAreaCount(''); });
+    const more = listEl.querySelector('[data-act="more"]');
+    if (more) more.addEventListener('click', () => { __screen.shown += SCREEN_LIST_STEP; renderFindPanel(); });
+    listEl.querySelectorAll('[data-sr]').forEach(row => row.addEventListener('click', () => openScreenResult(Number(row.getAttribute('data-sr')))));
+    if (res) setAreaCount(`${res.length.toLocaleString()} found`);
+    // Coming back from a parcel card: return once to the row that was opened.
+    const back = running ? null : __screen.restoreIndex;
+    __screen.restoreIndex = null;
+    if (back != null) {
+      const row = listEl.querySelector(`[data-sr="${back}"]`);
+      if (row) setTimeout(() => row.scrollIntoView({ block: 'center' }), 0);
+    }
+  }
+
+  // Save the open parcel to the saved list (off-market tracking).
+  async function saveParcelFromCard(pc, btn) {
+    if (btn) btn.disabled = true;
+    const body = {
+      jurisdiction: pc.jurisdiction, pin: pc.pin, lat: pc.lat, lng: pc.lng, acres: pc.acres,
+      title: pc.address ? titleish(pc.address) : `${pc.county} parcel ${pc.pin}`, street: pc.address || null,
+    };
+    const r = await apiFetch('/api/listings/parcel', { method: 'POST', body });
+    if (btn) btn.disabled = false;
+    if (!r.ok) {
+      if (r.reason === 'no-token' || r.reason === 'unauthorized') { areaToast('Connect this device in Settings first', 'red'); return; }
+      areaToast('Could not save: ' + (r.error || 'error'), 'red');
+      return;
+    }
+    upsertLocalListing(r.listing);
+    pc.savedId = r.listing.id;
+    areaToast(r.existing ? 'Already in your saved list' : 'Saved to your list');
+    if (btn) { btn.textContent = 'Open in Saved'; btn.setAttribute('data-act', 'open-saved'); }
+  }
+
   // ─── Panel plumbing ────────────────────────────────────────────────────
   function panelBack(to) {
-    return `<button class="fc-area-back" data-back="${to}">← ${to === 'results' ? 'Results' : 'Saved listings'}</button>`;
+    const label = { results: 'Radius results', find: 'Find land results', saved: 'Saved listings' }[to] || 'Back';
+    return `<button class="fc-area-back" data-back="${to}">← ${label}</button>`;
   }
   function wirePanelBack(el) {
     el.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => {
@@ -5193,6 +6119,7 @@
     else if (name === 'results') renderAreaListings();
     else if (name === 'add') { renderAddPanel(arg); revealPanelOnPhone(); }
     else if (name === 'listing') renderListingPanel();
+    else if (name === 'find') renderFindPanel();
   }
 
   function setAreaMode(mode) {
@@ -5201,6 +6128,13 @@
     if (card) card.classList.toggle('is-radius', __areaMode === 'radius');
     document.querySelectorAll('.fc-area-mode').forEach(b => b.classList.toggle('active', b.getAttribute('data-mode') === __areaMode));
     if (__areaMode === 'inspect' && __areaPanel === 'results' && !__areaCenter) showAreaPanel('saved');
+  }
+
+  // Leaflet reports a small circle marker's own centre as the click latlng;
+  // use where the finger/cursor actually landed.
+  function tapAt(e) {
+    const oe = e && e.originalEvent;
+    return { latlng: oe && __areaMap && oe.clientX != null ? __areaMap.mouseEventToLatLng(oe) : e.latlng };
   }
 
   function onAreaMapClick(e) {
@@ -7749,7 +8683,8 @@ Return ONLY the 2-sentence analysis.`,
                 <div id="fc-area-panel" class="fc-area-panel">
                   <div class="fc-area-tabs" role="tablist">
                     <button class="fc-area-tab active" data-panel="saved" role="tab">Saved <span id="fc-area-saved-n"></span></button>
-                    <button class="fc-area-tab" data-panel="results" role="tab">Radius results</button>
+                    <button class="fc-area-tab" data-panel="find" role="tab">Find land</button>
+                    <button class="fc-area-tab" data-panel="results" role="tab">Radius</button>
                   </div>
                   <div id="fc-area-list" class="fc-area-list">
                     <div class="fc-area-empty">Loading…</div>
@@ -9294,6 +10229,20 @@ Return ONLY the 2-sentence analysis.`,
   .fc-pc-note:empty { display: none; }
   .fc-pc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .fc-pc-skel { color: var(--muted-2); font-style: italic; }
+  .fc-find { background: var(--white); border: 1px solid var(--hair); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+  .fc-find-filters { margin-top: 6px; }
+  .fc-find-filters > summary { cursor: pointer; font-size: 12px; color: var(--sky); padding: 4px 0; list-style-position: inside; }
+  .fc-find-filters[open] > summary { color: var(--muted); }
+  .fc-find-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .fc-find-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); min-width: 0; }
+  .fc-find-sigs { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .fc-find-h { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-2); font-weight: 600; font-family: var(--f-mono); margin-top: 6px; }
+  .fc-find-h .fc-pc-dim { text-transform: none; letter-spacing: 0; font-family: var(--f-ui); font-weight: 400; }
+  .fc-find-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); cursor: pointer; }
+  .fc-find-check input { margin: 0; }
+  .fc-find-summary { font-size: 12px; color: var(--muted); margin: 2px 0 8px; line-height: 1.5; }
+  .fc-find-summary strong { color: var(--ink); }
+  .fc-find-results .fc-btn { margin: 4px 0 8px; }
   .fc-area-warn { background: var(--gold-soft); color: var(--gold-ink); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.45; margin-bottom: 10px; }
 
   @media (max-width: 768px) {
@@ -9311,7 +10260,9 @@ Return ONLY the 2-sentence analysis.`,
     /* iOS zooms any focused input under 16px. */
     .fc-area-input { font-size: 16px; }
     .fc-pc-row { font-size: 13px; }
-    .fc-area-tab { padding: 11px 8px; font-size: 13px; }
+    .fc-area-tab { padding: 11px 6px; font-size: 13px; }
+    .fc-find-check { font-size: 14px; padding: 3px 0; }
+    .fc-find-check input { width: 18px; height: 18px; }
   }
 
   /* Viewer hides: keep the app clean + enforce read-only at the UI layer.
