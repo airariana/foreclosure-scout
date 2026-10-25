@@ -5337,6 +5337,10 @@
 
   function upsertLocalListing(l) {
     if (!l || !l.id) return;
+    // Backstop: a listing must carry objects here, never the D1 JSON text.
+    for (const k of ['owner_mail', 'enrichment']) {
+      if (typeof l[k] === 'string') { try { l[k] = JSON.parse(l[k]); } catch (e) { l[k] = null; } }
+    }
     const i = __savedListings.findIndex(x => x.id === l.id);
     if (i >= 0) __savedListings[i] = l; else __savedListings.unshift(l);
     drawSavedMarkers();
@@ -5534,7 +5538,7 @@
       ownerSinceIso: pc.ownerSinceIso || null,
     };
     // Parcels saved before outreach existed lack the owner fields letters need.
-    const backfill = s.source === 'parcel' && !pc.ownerHidden && !s.owner_name && pc.owner
+    const backfill = s.source === 'parcel' && !pc.ownerHidden && !s.owner_name && !(s.owner_mail && s.owner_mail.line1) && pc.owner
       ? { owner_name: pc.owner, owner_mail: pc.mail || null } : null;
     const prev = s.enrichment ? JSON.stringify(s.enrichment) : '';
     if (prev === JSON.stringify(e) && !backfill) return;
@@ -6389,12 +6393,26 @@
     f.querySelector('[data-lf="kind"]').value = kind;
     f.querySelector('[data-lf="at"]').value = todayIso();
   }
-  async function renderTimeline(el, s) {
-    const box = el.querySelector('#fc-or-timeline');
+  // Letters PostGrid mailed (or may have) stay in the history; the server refuses to delete them.
+  function isMailRecord(detail) {
+    const d = String(detail || '');
+    return d.startsWith('Mailed via PostGrid ·') || d.startsWith('Mailing via PostGrid (pending)') || d.startsWith('Mail via PostGrid unconfirmed');
+  }
+  // Outstanding field saves per listing, so a letter opened right after an edit waits for it.
+  const __pendingSaves = new Map();
+  function trackSave(id, promise) {
+    const all = Promise.all([__pendingSaves.get(id), promise].filter(Boolean)).catch(() => {});
+    __pendingSaves.set(id, all);
+    all.then(() => { if (__pendingSaves.get(id) === all) __pendingSaves.delete(id); });
+    return promise;
+  }
+  async function renderTimeline(root, s) {
+    const box = root.querySelector('#fc-or-timeline');
     if (!box) return;
     let events = __eventsCache.get(s.id);
     if (!events) {
       const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id) + '/events');
+      if (!document.body.contains(box)) return;
       if (!r.ok) { box.innerHTML = `<span class="fc-pc-dim">History did not load: ${escapeHtml(r.error || 'error')}</span>`; return; }
       events = r.events || [];
       __eventsCache.set(s.id, events);
@@ -6403,53 +6421,60 @@
     box.innerHTML = events.length ? events.map(ev => `<div class="fc-or-ev">
         <span class="fc-or-ev-day">${escapeHtml(fmtDay(ev.at))}</span>
         <span><strong>${escapeHtml(EVENT_LABEL[ev.kind] || ev.kind)}</strong>${ev.detail ? ' — ' + escapeHtml(ev.detail) : ''}</span>
-        <button class="fc-or-ev-del" data-ev="${Number(ev.id)}" title="Remove">×</button></div>`).join('')
+        ${isMailRecord(ev.detail) ? '<span></span>' : `<button class="fc-or-ev-del" data-ev="${Number(ev.id)}" title="Remove">×</button>`}</div>`).join('')
       : '<span class="fc-pc-dim">No contact logged yet.</span>';
     box.querySelectorAll('[data-ev]').forEach(b => b.addEventListener('click', async () => {
       if (!window.confirm('Remove this entry from the history?')) return;
       const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id) + '/events/' + b.getAttribute('data-ev'), { method: 'DELETE' });
       if (!r.ok) { areaToast('Could not remove: ' + (r.error || 'error'), 'red'); return; }
       __eventsCache.set(s.id, (__eventsCache.get(s.id) || []).filter(e => String(e.id) !== b.getAttribute('data-ev')));
-      renderTimeline(el, s);
+      renderTimeline(root, s);
     }));
   }
   function wireOutreachBlock(el, s) {
-    loadOutreachProfile().then(() => { if (document.body.contains(el)) renderOutreachActions(el, __savedListings.find(x => x.id === s.id) || s); });
-    renderOutreachActions(el, s);
-    renderTimeline(el, s);
+    // Everything below touches only THIS render's block, and only while this
+    // listing is still the one open — slow saves must not write into another listing.
+    const root = el.querySelector('.fc-or');
+    if (!root) return;
+    const live = () => document.body.contains(root) && __areaPanel === 'listing' && __openListingId === s.id;
     const cur = () => __savedListings.find(x => x.id === s.id) || s;
-    el.querySelectorAll('[data-of]').forEach(inp => inp.addEventListener(inp.type === 'date' ? 'change' : 'blur', async () => {
+    // Status and the due pill render with the panel; refresh it once a save lands.
+    const refreshPanel = () => { if (live()) renderListingPanel(); };
+    loadOutreachProfile().then(() => { if (live()) renderOutreachActions(root, cur()); });
+    renderOutreachActions(root, s);
+    renderTimeline(root, s);
+    root.querySelectorAll('[data-of]').forEach(inp => inp.addEventListener(inp.type === 'date' ? 'change' : 'blur', async () => {
       const k = inp.getAttribute('data-of');
       const v = inp.value.trim();
       if ((cur()[k] || '') === v) return;
-      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { [k]: v || null } });
-      if (!r.ok) { areaToast(r.status === 400 ? `That ${k.replace('owner_', '')} doesn't look right` : 'Could not save: ' + (r.error || 'error'), 'red'); return; }
+      const r = await trackSave(s.id, apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { [k]: v || null } }));
+      if (!r.ok) { areaToast(r.status === 400 ? `That ${k.replace('owner_', '').replace('_', ' ')} doesn't look right` : 'Could not save: ' + (r.error || 'error'), 'red'); return; }
       upsertLocalListing(r.listing);
-      renderOutreachActions(el, r.listing);
+      if (live()) renderOutreachActions(root, r.listing);
+      if (k === 'follow_up_on') refreshPanel();
       areaToast('Saved');
     }));
-    el.querySelectorAll('[data-om]').forEach(inp => inp.addEventListener('blur', async () => {
+    root.querySelectorAll('[data-om]').forEach(inp => inp.addEventListener('blur', async () => {
+      // Send all four fields as they read now, so two quick edits can't undo each other.
       const mail = Object.assign({}, cur().owner_mail || {});
-      const k = inp.getAttribute('data-om');
-      const v = k === 'state' ? inp.value.trim().toUpperCase() : inp.value.trim();
-      if ((mail[k] || '') === v) return;
-      mail[k] = v;
-      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { owner_mail: mail } });
+      root.querySelectorAll('[data-om]').forEach(i => { const k = i.getAttribute('data-om'); mail[k] = k === 'state' ? i.value.trim().toUpperCase() : i.value.trim(); });
+      const prev = cur().owner_mail || {};
+      if (['line1', 'city', 'state', 'zip'].every(k => (prev[k] || '') === (mail[k] || ''))) return;
+      const r = await trackSave(s.id, apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { owner_mail: mail } }));
       if (!r.ok) { areaToast('Could not save: ' + (r.error || 'error'), 'red'); return; }
       upsertLocalListing(r.listing);
       areaToast('Saved');
     }));
-    const fuBtn = el.querySelector('[data-act="fu"]');
+    const fuBtn = root.querySelector('[data-act="fu"]');
     if (fuBtn) fuBtn.addEventListener('click', async () => {
       const day = addDaysIso(todayIso(), followUpDays());
-      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { follow_up_on: day } });
+      const r = await trackSave(s.id, apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { follow_up_on: day } }));
       if (!r.ok) { areaToast('Could not save: ' + (r.error || 'error'), 'red'); return; }
       upsertLocalListing(r.listing);
-      const d = el.querySelector('[data-of="follow_up_on"]');
-      if (d) d.value = day;
       areaToast('Follow-up set for ' + fmtDay(day));
+      refreshPanel();
     });
-    const form = el.querySelector('#fc-or-logform');
+    const form = root.querySelector('#fc-or-logform');
     if (form) {
       form.querySelector('[data-act="log-cancel"]').addEventListener('click', () => { form.hidden = true; });
       form.querySelector('[data-act="log-save"]').addEventListener('click', async () => {
@@ -6459,11 +6484,8 @@
         const fu = form.querySelector('[data-lf="fu"]').checked ? addDaysIso(at, followUpDays()) : undefined;
         const r = await logEvent(cur(), kind, detail, { at, followUp: fu });
         if (!r) return;
-        form.hidden = true;
-        form.querySelector('[data-lf="detail"]').value = '';
-        if (fu) { const d = el.querySelector('[data-of="follow_up_on"]'); if (d) d.value = fu; }
-        renderTimeline(el, cur());
         areaToast('Logged');
+        refreshPanel(); // shows the new status, follow-up date and history
       });
     }
   }
@@ -6493,6 +6515,8 @@
     const listEl = document.getElementById('fc-area-list');
     if (!listEl || __areaPanel !== 'letters') return;
     listEl.innerHTML = `<div class="fc-area-empty">${skel('Loading your letter details…')}</div>`;
+    // Address edits made just before opening the letter must land first.
+    await Promise.all(__letterIds.map(id => __pendingSaves.get(id)).filter(Boolean));
     const [p, ms] = await Promise.all([loadOutreachProfile(), mailStatus().catch(() => null)]);
     if (__areaPanel !== 'letters') return;
     const backBtn = __letterBack === 'listing' ? panelBack('listing') : panelBack('saved');
@@ -6541,7 +6565,11 @@
     if (mailBtn) mailBtn.addEventListener('click', async () => {
       const ids = [...chosen];
       if (!ids.length) { areaToast('Pick at least one owner', 'red'); return; }
-      if (ms.mode === 'live' && !window.confirm(`Mail ${ids.length} letter${ids.length === 1 ? '' : 's'} through PostGrid?\n\nThis sends real mail, charged to your PostGrid account (about $1.06 each plus the address page).`)) return;
+      // Re-check now: the key may have switched between test and live since this panel opened.
+      const now = await mailStatus(true).catch(() => null);
+      if (!now || !now.configured) { areaToast('The mail service is not set up', 'red'); return; }
+      if (now.mode !== ms.mode) { areaToast(`The mail service is now in ${now.mode.toUpperCase()} mode — reopening the letter`, 'red'); renderLettersPanel(); return; }
+      if (now.mode === 'live' && !window.confirm(`Mail ${ids.length} letter${ids.length === 1 ? '' : 's'} through PostGrid?\n\nThis sends real mail, charged to your PostGrid account (about $1.06 each plus the address page).`)) return;
       const edited = single ? [...listEl.querySelectorAll('.fc-letter-preview [data-para]')].map(el => el.innerText.trim()) : null;
       const msg = listEl.querySelector('#fc-letter-msg');
       mailBtn.disabled = true;
@@ -6550,18 +6578,37 @@
         const s = __savedListings.find(x => x.id === id);
         if (!s) continue;
         msg.textContent = `Sending ${out.length + 1} of ${ids.length}…`;
-        const r = await apiFetch('/api/outreach/mail', { method: 'POST', body: { listing_id: id, addressee: ownerSummary(s.owner_name).addressee, paragraphs: edited || letterParagraphs(s, p) } });
+        const r = await apiFetch('/api/outreach/mail', { method: 'POST', body: { listing_id: id, addressee: ownerSummary(s.owner_name).addressee, paragraphs: edited || letterParagraphs(s, p), expect_mode: now.mode } });
         out.push({ s, r });
-        if (r.ok) { if (r.listing) upsertLocalListing(r.listing); __eventsCache.delete(id); }
-        else if (r.status === 429 || r.status === 503) break;
+        if (r.ok) {
+          if (r.listing) upsertLocalListing(r.listing);
+          __eventsCache.delete(id);
+          chosen.delete(id); // a second click in this panel won't mail the same owner again
+          const cb = listEl.querySelector(`[data-pick="${CSS.escape(id)}"]`); if (cb) cb.checked = false;
+        } else if (r.status === 409 || r.status === 429 || r.status === 503) break;
       }
+      const n = listEl.querySelector('#fc-letter-n'); if (n) n.textContent = String(chosen.size);
       mailBtn.disabled = false;
       __mailStatus = null;
-      msg.innerHTML = out.map(({ s, r }) => {
+      msg.innerHTML = out.map(({ s, r }, i) => {
         if (!r.ok) return `✗ ${escapeHtml(listingTitle(s))}: ${escapeHtml(r.error || 'error')}`;
-        const pdf = safeHttps(r.letter && r.letter.url);
-        return `✓ ${escapeHtml(listingTitle(s))}${r.mode === 'test' ? ' — test, not mailed' : ' — mailed'}${pdf ? ` · <a href="${escapeHtml(pdf)}" target="_blank" rel="noopener">PDF preview ↗</a>` : ''}`;
+        return `✓ ${escapeHtml(listingTitle(s))}${r.mode === 'test' ? ' — test, not mailed' : ' — mailed'} · <span data-pdf="${i}" class="fc-pc-dim">PDF preview in a few seconds…</span>`;
       }).join('<br>');
+      // PostGrid renders the PDF a few seconds after the letter is created; poll for it.
+      out.forEach(({ r }, i) => {
+        if (!r.ok || !r.letter || !/^letter_[A-Za-z0-9]+$/.test(r.letter.id || '')) return;
+        const slot = () => msg.querySelector(`[data-pdf="${i}"]`);
+        (async () => {
+          for (let tries = 0; tries < 6; tries++) {
+            await new Promise(res => setTimeout(res, 3000));
+            if (!document.body.contains(msg)) return;
+            const g = await apiFetch('/api/outreach/mail/' + r.letter.id);
+            const pdf = g.ok && safeHttps(g.url);
+            if (pdf) { const el = slot(); if (el) el.outerHTML = `<a href="${escapeHtml(pdf)}" target="_blank" rel="noopener">PDF preview ↗</a>`; return; }
+          }
+          const el = slot(); if (el) el.textContent = 'PDF preview is on the PostGrid dashboard';
+        })();
+      });
     });
     const sentBtn = listEl.querySelector('[data-act="sent"]');
     listEl.querySelector('[data-act="print"]').addEventListener('click', () => {
@@ -6576,6 +6623,7 @@
       }
       printPages(pages);
       sentBtn.hidden = false;
+      sentBtn.disabled = false;
       sentBtn.textContent = ids.length === 1 ? 'Mark as sent' : `Mark ${ids.length} as sent`;
       sentBtn.onclick = async () => {
         sentBtn.disabled = true;
@@ -6686,24 +6734,32 @@
       return await res.json();
     } finally { t.done(); }
   }
+  // Slope at each inside point from a fixed ±20 m cross, so big and small
+  // parcels are measured the same way (grid spacing grows with parcel size).
+  const SLOPE_ARM_M = 20;
   async function slopeShare(grid) {
-    const geometry = JSON.stringify({ points: grid.pts.map(p => [p.lng, p.lat]), spatialReference: { wkid: 4326 } });
+    let inside = grid.pts.filter(p => p.inside);
+    if (inside.length > 150) { const k = Math.ceil(inside.length / 150); inside = inside.filter((p, i) => i % k === 0); }
+    const lat0 = (grid.bb[1] + grid.bb[3]) / 2;
+    const dLat = SLOPE_ARM_M / 110540, dLng = SLOPE_ARM_M / (111320 * Math.cos(lat0 * Math.PI / 180));
+    const pts = [];
+    for (const p of inside) pts.push([p.lng + dLng, p.lat], [p.lng - dLng, p.lat], [p.lng, p.lat + dLat], [p.lng, p.lat - dLat]);
+    const geometry = JSON.stringify({ points: pts, spatialReference: { wkid: 4326 } });
     let j;
     try { j = await elevationSamples(geometry); }
     catch (e) { j = await elevationSamples(geometry); } // 3DEP's first call can stall; one retry
-    const samples = (j && j.samples) || [];
-    if (samples.length !== grid.pts.length) throw new Error(`elevation service returned ${samples.length} of ${grid.pts.length} points`);
-    for (const s of samples) { const p = grid.pts[s.locationId]; if (p) p.z = parseFloat(s.value); }
-    const at = (i, j2) => grid.pts.find(p => p.i === i && p.j === j2);
-    const inside = grid.pts.filter(p => p.inside && isFinite(p.z));
-    for (const p of inside) {
-      const xl = at(p.i - 1, p.j), xr = at(p.i + 1, p.j), yd = at(p.i, p.j - 1), yu = at(p.i, p.j + 1);
-      const gx = xl && xr && isFinite(xl.z) && isFinite(xr.z) ? (xr.z - xl.z) / (2 * grid.step) : xr && isFinite(xr.z) ? (xr.z - p.z) / grid.step : xl && isFinite(xl.z) ? (p.z - xl.z) / grid.step : 0;
-      const gy = yd && yu && isFinite(yd.z) && isFinite(yu.z) ? (yu.z - yd.z) / (2 * grid.step) : yu && isFinite(yu.z) ? (yu.z - p.z) / grid.step : yd && isFinite(yd.z) ? (p.z - yd.z) / grid.step : 0;
-      p.slope = Math.hypot(gx, gy) * 100; // 3DEP values are metres; grid step is metres
-    }
-    const rated = inside.filter(p => p.slope != null);
-    return rated.length ? rated.filter(p => p.slope <= BUILD_SLOPE_MAX).length / rated.length : null;
+    const z = new Array(pts.length);
+    for (const smp of (j && j.samples) || []) z[smp.locationId] = parseFloat(smp.value);
+    let rated = 0, gentle = 0;
+    inside.forEach((p, i) => {
+      const e = z[4 * i], w = z[4 * i + 1], n = z[4 * i + 2], so = z[4 * i + 3];
+      if (![e, w, n, so].every(isFinite)) return;
+      p.slope = Math.hypot((e - w) / (2 * SLOPE_ARM_M), (n - so) / (2 * SLOPE_ARM_M)) * 100; // 3DEP values are metres
+      rated++;
+      if (p.slope <= BUILD_SLOPE_MAX) gentle++;
+    });
+    if (rated < Math.max(3, inside.length * 0.5)) throw new Error(`elevation service returned too few points (${rated} of ${inside.length})`);
+    return gentle / rated;
   }
   // Loudoun county soils: per-point septic potential.
   async function septicLoudoun(grid) {
@@ -6721,10 +6777,9 @@
     return { ok: share('ok'), eval: share('eval'), hard: share('hard'), unknown: share('unknown'), basis: 'Loudoun County soil ratings for conventional septic', pointwise: true };
   }
   // Fauquier: NRCS soil survey acres by map unit, classified by limitation reasons.
-  async function septicNrcs(geom) {
-    let poly = screenRings(geom).slice().sort((a, b) => b[0].length - a[0].length)[0];
-    if (!poly) return null;
+  async function septicNrcsPart(poly) {
     let ring = poly[0];
+    if (!ring || ring.length < 3) return null;
     if (ring.length > 160) { const k = Math.ceil(ring.length / 160); ring = ring.filter((p, i) => i % k === 0); }
     if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring = ring.concat([ring[0]]);
     if (ring.length < 4) return null;
@@ -6739,7 +6794,17 @@
     } finally { t.done(); }
     const tbl = (j && j.Table) || [];
     if (tbl.length < 2) return null;
-    const cols = tbl[0], rows = tbl.slice(1).map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]])));
+    const cols = tbl[0];
+    return tbl.slice(1).map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]])));
+  }
+  // Fauquier: NRCS soil survey acres by map unit, classified by limitation
+  // reasons; multi-part parcels are queried part by part (3 largest by area).
+  async function septicNrcs(geom) {
+    const parts = screenRings(geom).map(p => ({ p, ac: polyAcres({ type: 'Polygon', coordinates: p }) }))
+      .filter(x => x.ac > 0).sort((a, b) => b.ac - a.ac).slice(0, 3);
+    if (!parts.length) return null;
+    const rows = [].concat(...(await Promise.all(parts.map(x => septicNrcsPart(x.p)))).filter(Boolean));
+    if (!rows.length) return null;
     let total = 0; const acres = { ok: 0, eval: 0, hard: 0, unknown: 0 };
     const why = new Set();
     for (const r of rows) {
@@ -6776,12 +6841,15 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   function gradeBuildability(acres, flood, gentle, septic, grid) {
     const need = acres >= 2.5 ? 1 : Math.max(0.25, 0.4 * acres);
     const inside = grid.pts.filter(p => p.inside);
-    const usable = p => !p.flood && (p.slope == null || p.slope <= BUILD_SLOPE_MAX);
-    let dryGentle = inside.filter(usable).length / inside.length;
+    // Points not slope-sampled (big parcels are sub-sampled) count at the measured gentle share.
+    const g = gentle == null ? 1 : gentle;
+    const usableW = p => p.flood ? 0 : p.slope == null ? g : p.slope <= BUILD_SLOPE_MAX ? 1 : 0;
+    const usable = p => usableW(p) > 0.5;
+    let dryGentle = inside.reduce((t, p) => t + usableW(p), 0) / inside.length;
     let buildable, buildableStrict;
     if (septic && septic.pointwise) {
-      buildable = inside.filter(p => usable(p) && (p.septic === 'ok' || p.septic === 'eval')).length / inside.length * acres;
-      buildableStrict = inside.filter(p => usable(p) && p.septic === 'ok').length / inside.length * acres;
+      buildable = inside.reduce((t, p) => t + ((p.septic === 'ok' || p.septic === 'eval') ? usableW(p) : 0), 0) / inside.length * acres;
+      buildableStrict = inside.reduce((t, p) => t + (p.septic === 'ok' ? usableW(p) : 0), 0) / inside.length * acres;
     } else if (septic) {
       buildable = dryGentle * (septic.ok + septic.eval) * acres;
       buildableStrict = dryGentle * septic.ok * acres;
@@ -6813,7 +6881,19 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     return { grade, headline, buildable, need, notes };
   }
 
-  async function checkBuildability(geom, jurisdiction, acres) {
+  // Acres from the outline (outer rings minus holes), for parcels whose county acreage is 0/blank.
+  function polyAcres(geom) {
+    const bb = screenBBox(geom);
+    if (!bb) return 0;
+    const lat0 = (bb[1] + bb[3]) / 2, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] * kx) * (r[i][1] * ky) - (r[i][0] * kx) * (r[j][1] * ky); return Math.abs(a / 2); };
+    let m2 = 0;
+    for (const poly of screenRings(geom)) poly.forEach((r, i) => { m2 += (i === 0 ? 1 : -1) * ringArea(r); });
+    return Math.max(0, m2) / 4046.86;
+  }
+  async function checkBuildability(geom, jurisdiction, acresIn) {
+    const acres = acresIn > 0 ? acresIn : polyAcres(geom);
+    if (!(acres > 0)) return { error: 'parcel size unknown' };
     const grid = sampleGrid(geom, acres);
     if (!grid) return { error: 'no parcel outline' };
     const [fl, sl, se] = await Promise.allSettled([
@@ -6823,7 +6903,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     const flood = fl.status === 'fulfilled' ? fl.value : null;
     const gentle = sl.status === 'fulfilled' ? sl.value : null;
     const septic = se.status === 'fulfilled' ? se.value : null;
-    const g = gradeBuildability(acres || 0, flood, gentle, septic, grid);
+    const g = gradeBuildability(acres, flood, gentle, septic, grid);
     return Object.assign(g, { flood, gentle, septic, failed: [fl, sl, se].filter(r => r.status === 'rejected').map(r => String(r.reason && r.reason.message || r.reason)) });
   }
   function buildChip(b) {
@@ -6886,7 +6966,8 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       const acres = numS(a.ACREAGE), price = numS(a.LASTSALEPR), date = screenSaleIso(a.LASTSALEDA);
       const bld = numS(a.Building_V) || 0, yb = numS(a.Year_Built), land = numS(a.Land_Value), def = numS(a.Land_Def_V) || 0;
       const vacant = bld === 0 || (yb && date && yb > Number(date.slice(0, 4)));
-      const market = land != null ? bld + land + def : null;
+      // Empty at sale → compare the price with the land value only (a house built since isn't in the price).
+      const market = land != null ? (vacant ? land + def : bld + land + def) : null;
       const nominal = def === 0 && land != null && acres > 0 && land / acres <= 2000;
       return { pin: trimS(a.PARCELID), acres, price, date, deedBook: trimS(a.CURRENTOWN), vacant, ratio: market && !nominal ? price / market : null, lat: c.y, lng: c.x };
     }).filter(r => r.pin !== subject.pin && r.acres > 0 && r.price > 0 && r.date && isFinite(r.lat) && r.vacant);
@@ -6950,16 +7031,38 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         if (p && price > 10000 && date && date >= cut) rows.push(Object.assign({}, p, { price, date }));
       }
     });
-    return { rows: dropSameDatePrice(rows), caveat: 'Loudoun\'s sale data has no flag for non-market sales; parcels with no street address are treated as vacant.' };
+    // A multi-parcel deed repeats the bundle price on every PIN — including house
+    // parcels outside this candidate set — so look the prices up county-wide.
+    const prices = [...new Set(rows.map(r => r.price))];
+    const pinsBy = new Map();
+    await screenPool(Array.from({ length: Math.ceil(prices.length / 80) }, (_, i) => prices.slice(i * 80, i * 80 + 80)), 2, async batch => {
+      for (let off = 0; off < 9000; off += 3000) {
+        const j = await arcgisForm(GIS_X.L_SALES, { where: `LATEST_SALE_PRICE IN (${batch.map(Number).filter(isFinite).join(',')})`, outFields: 'PIN_NO,LATEST_SALE_PRICE,LATEST_SALE_DATE', returnGeometry: 'false', orderByFields: 'OBJECTID', resultOffset: String(off), resultRecordCount: '3000', f: 'json' }, 25000);
+        for (const f of (j && j.features) || []) {
+          const ms = f.attributes.LATEST_SALE_DATE;
+          const d = ms == null ? null : new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+          const key = `${d}|${Number(f.attributes.LATEST_SALE_PRICE)}`;
+          if (!pinsBy.has(key)) pinsBy.set(key, new Set());
+          pinsBy.get(key).add(trimS(f.attributes.PIN_NO));
+        }
+        if (!j || !j.exceededTransferLimit) break;
+      }
+    });
+    const single = rows.filter(r => { const set = pinsBy.get(`${r.date}|${r.price}`); return !set || set.size <= 1; });
+    return { rows: single, caveat: 'Loudoun\'s sale data has no flag for non-market sales; parcels with no street address are treated as vacant, and multi-parcel sales are left out.' };
   }
   function summarizeComps(rows, subject) {
     for (const r of rows) r.mi = haversineM(subject.lat, subject.lng, r.lat, r.lng) * MI_PER_M;
     for (const radius of COMP_RADII_MI) {
-      const sel = rows.filter(r => r.mi <= radius);
+      const near = rows.filter(r => r.mi <= radius);
+      // Drop sales far from the local norm ($99M data-centre land, $1 transfers):
+      // more than 4× or under ¼ of the median $/acre.
+      const mid = quantile(near.map(r => r.price / r.acres).sort((a, b) => a - b), 0.5);
+      const sel = mid ? near.filter(r => { const v = r.price / r.acres; return v <= mid * 4 && v >= mid / 4; }) : near;
       if (sel.length < COMP_MIN_N && radius !== COMP_RADII_MI[COMP_RADII_MI.length - 1]) continue;
       const per = sel.map(r => r.price / r.acres).sort((a, b) => a - b);
       return {
-        radius, n: sel.length, enough: sel.length >= COMP_MIN_N,
+        radius, n: sel.length, enough: sel.length >= COMP_MIN_N, outliers: near.length - sel.length,
         median: quantile(per, 0.5), p25: quantile(per, 0.25), p75: quantile(per, 0.75),
         list: sel.slice().sort((a, b) => a.mi - b.mi).slice(0, 8),
       };
@@ -6985,7 +7088,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     const county = a.noMarket ? '' : a.building > 0 && a.land != null
       ? `County land value: ${fmtMoney(a.land)} (plus a ${fmtMoney(a.building)} building)`
       : (a.marketTotal != null || a.total != null) ? `County assessed value: ${fmtMoney(a.marketTotal != null ? a.marketTotal : a.total)}` : '';
-    return `${kv('Nearby land sales', `<strong>${escapeHtml(range)}</strong><div class="fc-pc-dim">middle half of ${c.n} sales · ${lo}–${hi} ac · within ${c.radius} mi · last 3 years · median ${fmtMoney(c.median)}/ac</div>`)}
+    return `${kv('Nearby land sales', `<strong>${escapeHtml(range)}</strong><div class="fc-pc-dim">middle half of ${c.n} sales · ${lo}–${hi} ac · within ${c.radius} mi · last 3 years · median ${fmtMoney(c.median)}/ac${c.outliers ? ` · ${c.outliers} far-off sale${c.outliers === 1 ? '' : 's'} set aside` : ''}</div>`)}
       ${kv(`At ${fmtAcres(pc.acres)}`, `${escapeHtml(implied)}${county ? `<div class="fc-pc-dim">${escapeHtml(county)}</div>` : ''}`)}
       <details class="fc-comps"><summary>See the ${c.list.length} closest sales</summary>
         ${c.list.map(r => `<div class="fc-comp"><span>${escapeHtml(fmtDay(r.date))}</span><span>${fmtAcres(r.acres)}</span><span>${fmtMoney(r.price)}</span><span>${fmtMoney(r.price / r.acres)}/ac</span><span>${r.mi.toFixed(1)} mi</span></div>`).join('')}
@@ -7003,7 +7106,9 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   function wireBuildValue(el, pc) {
     // Results land only in this parcel's section — the panel may show another parcel by then.
     const key = pc.jurisdiction + ':' + pc.pin;
-    const mine = sel => [...el.querySelectorAll('[data-bv]')].filter(n => n.getAttribute('data-bv') === key).map(n => n.querySelector(sel))[0] || null;
+    // Update every on-screen copy of this parcel's section (the card may have re-rendered meanwhile).
+    const mineAll = sel => [...document.querySelectorAll('[data-bv]')].filter(n => n.getAttribute('data-bv') === key).map(n => n.querySelector(sel)).filter(Boolean);
+    const mine = sel => ({ set innerHTML(v) { mineAll(sel).forEach(n => { n.innerHTML = v; }); } });
     const b = el.querySelector('[data-act="check-build"]');
     if (b) b.addEventListener('click', async () => {
       pc.build = { pending: true };
