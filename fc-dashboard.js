@@ -2026,7 +2026,7 @@
     if (view === 'listings' && window.__fcData) renderListings(window.__fcData);
     if (view === 'zillow-queue' && window.__fcData) renderZillowQueue(window.__fcData);
     if (view === 'financing-203k' && window.__fcData) render203k(window.__fcData);
-    if (view === 'settings') wireSettingsView();
+    if (view === 'settings') { wireSettingsView(); if (typeof window.fcWireOutreachSettings === 'function') window.fcWireOutreachSettings(); }
   }
 
   // ─── Settings view: Zillow sync token UI ────────────────────────────────
@@ -4651,7 +4651,7 @@
 
   async function fauquierParcelAt(lat, lng, byPin) {
     const fields = {
-      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,Building_V,Land_Value,Final_Valu,ASSESS_LND,Total_ASSE,Year_Built',
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,Building_V,Land_Value,Land_Def_V,Final_Valu,Year_Built',
       returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
     };
     const j = await arcgis(GIS.F_PARCELS, /^\d{4}-\d{2}-\d{4}-\d{3}$/.test(byPin || '')
@@ -4662,7 +4662,10 @@
     const a = f.properties || {};
     const pin = trimS(a.PARCELID);
     if (!/^\d{4}-\d{2}-\d{4}-\d{3}$/.test(pin)) return null;
-    const final = numS(a.Final_Valu), mktLand = numS(a.ASSESS_LND), mktTotal = numS(a.Total_ASSE);
+    // Market value = building + land + the land-use deferral. (ASSESS_LND /
+    // Total_ASSE are unreliable: 1.8k farm parcels show ≥ $100k/acre there.)
+    const final = numS(a.Final_Valu), bldV = numS(a.Building_V) || 0, landV = numS(a.Land_Value), defV = numS(a.Land_Def_V) || 0;
+    const acresV = numS(a.ACREAGE);
     const salePrice = numS(a.LASTSALEPR);
     const yb = numS(a.Year_Built);
     return {
@@ -4676,7 +4679,12 @@
       yearBuilt: yb && yb > 1700 ? yb : null,
       // Final_Valu = assessed total. Total_ASSE is market value ONLY for land-use-program
       // parcels (ASSESS_LND > 0); elsewhere it is just the building value.
-      assessed: { year: null, land: numS(a.Land_Value), building: numS(a.Building_V), total: final, marketTotal: mktLand > 0 ? mktTotal : null, landUseProgram: mktLand > 0 },
+      assessed: {
+        year: null, land: landV != null ? landV + defV : null, building: bldV, total: final,
+        marketTotal: defV > 0 && landV != null ? bldV + landV + defV : null, landUseProgram: defV > 0,
+        // ~1k big parcels carry a flat ~$525–1,500/acre land value with no deferral: no market value in the layer.
+        noMarket: defV === 0 && landV != null && acresV >= 5 && landV / acresV <= 2000,
+      },
       sale: { date: isoDate(a.LASTSALEDA), price: salePrice, nonMarket: salePrice === 0, deedType: trimS(a.Deed_Type) || null },
       geometry: f.geometry,
     };
@@ -4863,6 +4871,7 @@
     pc.loadingParcel = false;
     if (base) Object.assign(pc, base);
     if (base && !pc.address && opts.address) pc.address = opts.address;
+    if (base && opts.build) pc.build = opts.build;
     if (base) {
       // Already tracked — as a saved parcel or as a pasted listing on this parcel?
       const hit = __savedListings.find(x => x.id === `parcel:${base.jurisdiction}:${base.pin}`) ||
@@ -4921,7 +4930,7 @@
   // building, the market value for land-use-program parcels, else the total.
   function perAcreBasis(pc) {
     const a = pc.assessed;
-    if (!a || !(pc.acres > 0)) return null;
+    if (!a || !(pc.acres > 0) || a.noMarket) return null;
     if (a.landUseProgram && a.marketTotal != null) return { label: 'Market value per acre', value: a.marketTotal / pc.acres };
     if (a.building > 0 && a.land != null) return { label: 'Land value per acre', value: a.land / pc.acres };
     if (a.total != null) return { label: 'Assessed per acre', value: a.total / pc.acres };
@@ -5018,6 +5027,7 @@
       else assessedHtml = skel();
     } else assessedHtml = loading ? skel() : '—';
 
+    if (a && a.noMarket) assessedHtml += '<div class="fc-pc-dim">The county layer lists only a nominal land value here (no market value), so this isn\'t a price guide.</div>';
     let perAcre = '';
     const valueForAcre = a && (a.marketTotal != null ? a.marketTotal : a.total);
     const pa = perAcreBasis(pc);
@@ -5097,6 +5107,7 @@
       ${pc.yearBuilt ? kv('Year built', String(pc.yearBuilt)) : ''}
       ${rezoningHtml}${easementHtml}
       ${renderSiteSection(pc)}
+      ${buildValueSectionHtml(pc)}
       <div class="fc-pc-links">${o.embedded ? '' : `<button class="fc-btn fc-btn-sm fc-btn-dark fc-area-admin" data-act="${pc.savedId ? 'open-saved' : 'save-parcel'}"${saveWaits ? ' disabled' : ''}>${pc.savedId ? 'Open in Saved' : saveWaits ? 'Loading address…' : '★ Save parcel'}</button>`}${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
       ${pc.failed ? `<div class="fc-pc-note">${pc.failed} county lookup${pc.failed === 1 ? '' : 's'} did not respond; some fields may be missing.</div>` : ''}
     </div>`;
@@ -5153,6 +5164,7 @@
       dropRadiusCenter(L.latLng(pc.lat, pc.lng));
     }));
     el.querySelectorAll('[data-act="connect"]').forEach(b => b.addEventListener('click', () => { setView('settings'); }));
+    wireBuildValue(el, pc);
     el.querySelectorAll('[data-act="save-parcel"], [data-act="open-saved"]').forEach(b => b.addEventListener('click', () => {
       if (b.getAttribute('data-act') === 'open-saved' && pc.savedId) { drawParcelHighlight(null); openListing(pc.savedId); return; }
       saveParcelFromCard(pc, b);
@@ -5371,18 +5383,24 @@
       return;
     }
     const order = { interested: 0, contacted: 1, watching: 2, sold: 3, passed: 4 };
-    const rows = __savedListings.slice().sort((a, b) => (order[a.watch_status] ?? 1) - (order[b.watch_status] ?? 1) || String(b.updated_at).localeCompare(String(a.updated_at)));
-    listEl.innerHTML = rows.map(s => {
+    const today = todayIso();
+    const dueOf = s => s.follow_up_on && s.follow_up_on <= today && !['passed', 'sold'].includes(s.watch_status);
+    // Follow-ups that are due come first, then by status.
+    const rows = __savedListings.slice().sort((a, b) => (dueOf(b) ? 1 : 0) - (dueOf(a) ? 1 : 0) || (order[a.watch_status] ?? 1) - (order[b.watch_status] ?? 1) || String(b.updated_at).localeCompare(String(a.updated_at)));
+    const dueN = rows.filter(dueOf).length;
+    const header = `<div class="fc-sl-head fc-area-admin"><span class="fc-pc-dim">${dueN ? `<strong>${dueN} follow-up${dueN === 1 ? '' : 's'} due</strong>` : ''}</span><button class="fc-btn fc-btn-sm" data-act="letters">🖨 Letters</button></div>`;
+    listEl.innerHTML = header + rows.map(s => {
       const ppa = s.price && s.acres ? fmtMoney(s.price / s.acres) + '/ac' : '';
       const needs = s.status !== 'located';
       return `<div class="fc-sl-row" data-id="${escapeHtml(s.id)}">
         <div class="fc-sl-title">${escapeHtml(listingTitle(s))}</div>
         <div class="fc-sl-sub">${escapeHtml(SOURCE_LABEL[s.source] || s.source)} · ${escapeHtml(WATCH_LABEL[s.watch_status] || 'Watching')}${s.county ? ' · ' + escapeHtml(s.county) : ''}</div>
         <div class="fc-sl-foot"><strong>${s.price ? fmtMoney(s.price) : 'Price ?'}</strong><span>${s.acres ? fmtAcres(s.acres) : ''}${ppa ? ' · ' + ppa : ''}</span></div>
-        <div class="fc-pc-flags">${needs ? '<span class="fc-pill gold">📍 Needs a pin</span>' : ''}${s.loc_precision === 'approximate' ? '<span class="fc-pill">Approximate spot</span>' : ''}${enrichmentBadges(s.enrichment)}</div>
+        <div class="fc-pc-flags">${dueOf(s) ? '<span class="fc-pill coral">Follow-up due</span>' : s.follow_up_on && !['passed', 'sold'].includes(s.watch_status) ? `<span class="fc-pill gold">Follow up ${escapeHtml(fmtDay(s.follow_up_on))}</span>` : ''}${needs ? '<span class="fc-pill gold">📍 Needs a pin</span>' : ''}${s.loc_precision === 'approximate' ? '<span class="fc-pill">Approximate spot</span>' : ''}${enrichmentBadges(s.enrichment)}</div>
       </div>`;
     }).join('');
     listEl.querySelectorAll('[data-id]').forEach(row => row.addEventListener('click', () => openListing(row.getAttribute('data-id'))));
+    listEl.querySelector('[data-act="letters"]').addEventListener('click', () => openLetters([], 'saved'));
   }
 
   function openListing(id) {
@@ -5431,9 +5449,11 @@
       </div>
       ${precisionNote ? `<div class="fc-pc-note">${escapeHtml(precisionNote)}</div>` : ''}
       ${fetchNote}
+      ${outreachBlockHtml(s)}
       ${s.status === 'located' ? '<h4>Parcel at this spot</h4><div id="fc-listing-parcel"></div>' : ''}
     </div>`;
     wirePanelBack(listEl);
+    wireOutreachBlock(listEl, s);
     listEl.querySelectorAll('[data-field]').forEach(inp => {
       const evName = inp.tagName === 'SELECT' ? 'change' : 'blur';
       inp.addEventListener(evName, () => saveListingField(s, inp.getAttribute('data-field'), inp.value));
@@ -5511,10 +5531,14 @@
       delinquent: !!(pc.delinquent && pc.delinquent.serious),
       acreMismatch: !!acreMismatch(s, pc),
       slopePct: pc.elev && pc.elev.slopePct != null ? Math.round(pc.elev.slopePct * 10) / 10 : null,
+      ownerSinceIso: pc.ownerSinceIso || null,
     };
+    // Parcels saved before outreach existed lack the owner fields letters need.
+    const backfill = s.source === 'parcel' && !pc.ownerHidden && !s.owner_name && pc.owner
+      ? { owner_name: pc.owner, owner_mail: pc.mail || null } : null;
     const prev = s.enrichment ? JSON.stringify(s.enrichment) : '';
-    if (prev === JSON.stringify(e)) return;
-    const body = { enrichment: e };
+    if (prev === JSON.stringify(e) && !backfill) return;
+    const body = Object.assign({ enrichment: e }, backfill || {});
     if (pc.pin && pc.jurisdiction && s.source !== 'parcel' && s.loc_precision !== 'approximate') { body.parcel_pin = pc.pin; body.parcel_jurisdiction = pc.jurisdiction; }
     const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body });
     if (r.ok) {
@@ -5522,6 +5546,7 @@
       if (i >= 0) __savedListings[i] = r.listing;
       const note = document.getElementById('fc-listing-ppa');
       if (note && __openListingId === s.id) note.innerHTML = ppaNoteHtml(r.listing);
+      if (backfill && __areaPanel === 'listing' && __openListingId === s.id) refreshOutreachFields(r.listing);
     }
   }
 
@@ -5663,11 +5688,14 @@
   };
   const SCREEN_DEFAULTS = { area: 'map', minAcres: 10, maxAcres: 0, water: 'any', rawOnly: false, keepEasements: false, signals: { tax: true, estate: true, away: true, held: true } };
   const SCREEN_PAGE = 2000;
+  const SCREEN_SMALL = 5;        // below this many acres, search only the map view
+  const SCREEN_VIEW_MAX = 8000;  // most small parcels one map-view search will load per county
   const SCREEN_LIST_STEP = 200;
   const SCREEN_MAP_MAX = 1000;
   const __screen = {
     recs: { fauquier: null, loudoun: null },     // normalized records per county
     minLoaded: { fauquier: Infinity, loudoun: Infinity },
+    viewCache: { fauquier: null, loudoun: null },  // last small-lot (map view) load per county
     aux: { delinquent: null, fEase: null, lEase: null }, // filled per layer; a failed layer retries next search
     filters: null, results: null, summary: null, shown: SCREEN_LIST_STEP,
     running: false, runSeq: 0, status: '', errors: [], restoreIndex: null,
@@ -5773,16 +5801,27 @@
   }
 
   // Every parcel ≥ minAcres for one county, paged in parallel (count first).
-  async function screenLoadCounty(key, minAcres, progress) {
-    if (__screen.recs[key] && __screen.minLoaded[key] <= minAcres) return __screen.recs[key];
+  // view (bounds) = small-lot search: only the parcels on screen, not cached
+  // county-wide (under 5 acres there are ~35,000 across both counties).
+  async function screenLoadCounty(key, minAcres, progress, view) {
     const src = SCREEN_SOURCES[key];
-    const base = { where: src.where(minAcres) };
-    if (key === 'loudoun') {
+    let viewKey = null, box = key === 'loudoun' ? src.box : null;
+    if (view) {
       const b = src.box;
-      Object.assign(base, { geometry: `${b.w},${b.s},${b.e},${b.n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
-    }
+      box = { s: Math.max(view.s, b.s), n: Math.min(view.n, b.n), w: Math.max(view.w, b.w), e: Math.min(view.e, b.e) };
+      viewKey = `${minAcres}|${[box.s, box.n, box.w, box.e].map(v => v.toFixed(4)).join(',')}`;
+      const hit = __screen.viewCache[key];
+      if (hit && hit.key === viewKey) return hit.recs;
+    } else if (__screen.recs[key] && __screen.minLoaded[key] <= minAcres) return __screen.recs[key];
+    const base = { where: src.where(minAcres) };
+    if (box) Object.assign(base, { geometry: `${box.w},${box.s},${box.e},${box.n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
     const cnt = await arcgis(src.url, Object.assign({}, base, { returnCountOnly: 'true', f: 'json' }), 20000);
     const total = (cnt && cnt.count) || 0;
+    if (view && total > SCREEN_VIEW_MAX) {
+      const err = new Error(`${total.toLocaleString()} ${src.label} parcels of ${minAcres}+ acres are on screen — zoom in and search again (the limit for small lots is ${SCREEN_VIEW_MAX.toLocaleString()}).`);
+      err.friendly = true;
+      throw err;
+    }
     const offsets = [];
     for (let off = 0; off < total; off += SCREEN_PAGE) offsets.push(off);
     let done = 0;
@@ -5806,9 +5845,11 @@
       r.label = screenLabelPoint(r.geom);
       if (r.label) recs.push(r);
     }
-    __screen.recs[key] = screenCollapseStacks(recs);
+    const collapsed = screenCollapseStacks(recs);
+    if (view) { __screen.viewCache[key] = { key: viewKey, recs: collapsed }; return collapsed; }
+    __screen.recs[key] = collapsed;
     __screen.minLoaded[key] = minAcres;
-    return __screen.recs[key];
+    return collapsed;
   }
 
   // Loudoun keeps deed dates in a separate table that times out on ID lists
@@ -5863,6 +5904,10 @@
         const b = __areaMap.getBounds();
         bounds = { s: b.getSouth(), n: b.getNorth(), w: b.getWest(), e: b.getEast() };
       }
+      if (f.minAcres < SCREEN_SMALL && !bounds) {
+        __screen.results = []; __screen.summary = { checked: 0, counties: [], smallNeedsMap: true, filters: f };
+        return;
+      }
       const counties = Object.keys(SCREEN_SOURCES).filter(k => !bounds || boxesIntersect(bounds, SCREEN_SOURCES[k].box));
       if (!counties.length) {
         __screen.results = []; __screen.summary = { checked: 0, counties: [], outside: true, filters: f };
@@ -5878,8 +5923,9 @@
         f.water = 'any';
       }
       stage = 'loading parcels';
-      const loaded = await Promise.all(counties.map(k => screenLoadCounty(k, f.minAcres, progress).catch(err => {
-        errors.push(`${SCREEN_SOURCES[k].label} parcels (county GIS) did not load: ${err.message || err}`);
+      const view = f.minAcres < SCREEN_SMALL ? bounds : null;
+      const loaded = await Promise.all(counties.map(k => screenLoadCounty(k, f.minAcres, progress, view).catch(err => {
+        errors.push(err.friendly ? err.message : `${SCREEN_SOURCES[k].label} parcels (county GIS) did not load: ${err.message || err}`);
         return [];
       })));
       const recs = [].concat(...loaded);
@@ -5967,6 +6013,7 @@
     // swap in a neighbour; reuse the list's water reading so the two agree.
     inspectParcelAt(x.rec.label.lat, x.rec.label.lng, {
       back: 'find', pin: x.rec.pin, jurisdiction: x.rec.jurisdiction, address: x.rec.address,
+      build: x.rec._build && !x.rec._build.pending && !x.rec._build.error ? x.rec._build : null,
       water: x.ev.water && !x.ev.water.unavailable ? x.ev.water : null,
     });
   }
@@ -5993,6 +6040,8 @@
       const sum = __screen.summary || {};
       if (sum.outside) {
         resultsHtml = '<div class="fc-area-empty">The map isn\'t over Fauquier or western Loudoun. Pan there, or switch Area to both counties.</div>';
+      } else if (sum.smallNeedsMap) {
+        resultsHtml = '<div class="fc-area-empty">Parcels under 5 acres search the <strong>map view</strong> only — there are about 35,000 of them across both counties. Set Area to Map view, zoom to the area you like, and search again.</div>';
       } else {
         const rows = res.slice(0, __screen.shown).map((x, i) => {
           const r = x.rec, w = x.ev.water;
@@ -6000,13 +6049,15 @@
           return `<div class="fc-sl-row" data-sr="${i}">
             <div class="fc-sl-title">${escapeHtml(screenTitle(r))}</div>
             <div class="fc-sl-sub">${escapeHtml(r.county)} · ${fmtAcres(r.acres)} · ${screenWaterText(w)}</div>
-            <div class="fc-pc-flags">${chips}</div>
+            <div class="fc-pc-flags"><span class="fc-build-chip">${buildChip(r._build)}</span>${chips}</div>
           </div>`;
         }).join('');
         const more = res.length > __screen.shown ? `<button class="fc-btn fc-btn-sm" data-act="more">Show ${Math.min(SCREEN_LIST_STEP, res.length - __screen.shown)} more of ${(res.length - __screen.shown).toLocaleString()}</button>` : '';
         const mapNote = res.length > SCREEN_MAP_MAX ? ` The map shows the top ${SCREEN_MAP_MAX.toLocaleString()}.` : '';
         const ran = sum.filters ? `<div class="fc-pc-dim">${escapeHtml(screenFilterSummary(sum.filters))}</div>` : '';
-        resultsHtml = `<div class="fc-find-summary"><strong>${res.length.toLocaleString()} parcel${res.length === 1 ? '' : 's'}</strong> match out of ${(sum.checked || 0).toLocaleString()} checked in ${escapeHtml((sum.counties || []).map(k => SCREEN_SOURCES[k].label).join(' + '))}.${mapNote}${ran}</div>
+        const topN = Math.min(25, res.length);
+        const checkBtn = res.length ? `<div class="fc-pc-links"><button class="fc-btn fc-btn-sm" data-act="check-top"${__screen.checking ? ' disabled' : ''}>${__screen.checking ? `Checking ${__screen.checking.done} of ${__screen.checking.total}…` : `Check buildability of the top ${topN}`}</button></div>` : '';
+        resultsHtml = `<div class="fc-find-summary"><strong>${res.length.toLocaleString()} parcel${res.length === 1 ? '' : 's'}</strong> match out of ${(sum.checked || 0).toLocaleString()} checked in ${escapeHtml((sum.counties || []).map(k => SCREEN_SOURCES[k].label).join(' + '))}.${mapNote}${ran}${checkBtn}</div>
           ${rows || '<div class="fc-area-empty">Nothing matches. Try fewer filters or a bigger area.</div>'}
           ${more}`;
       }
@@ -6016,11 +6067,11 @@
       <div class="fc-pc-title">Find land that might sell</div>
       <details class="fc-find-filters"${res && !running ? '' : ' open'}>
       <summary>${escapeHtml(screenFilterSummary(f))}</summary>
-      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name.</div>
+      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name. Under 5 acres, only the map view is searched.</div>
       <div class="fc-find-grid">
         <label>Area<select class="fc-area-input" data-f="area"${dis}>${opt('map', f.area, 'Map view')}${opt('all', f.area, 'Both counties')}</select></label>
-        <label>Size<select class="fc-area-input" data-f="minAcres"${dis}>${[5, 10, 20, 50, 100].map(v => opt(v, f.minAcres, v + '+ acres')).join('')}</select></label>
-        <label>Up to<select class="fc-area-input" data-f="maxAcres"${dis}>${opt(0, f.maxAcres, 'No limit')}${[25, 50, 100, 250].map(v => opt(v, f.maxAcres, v + ' acres')).join('')}</select></label>
+        <label>Size<select class="fc-area-input" data-f="minAcres"${dis}>${[0.5, 1, 2, 3, 5, 10, 20, 50, 100].map(v => opt(v, f.minAcres, (v === 0.5 ? '½' : v) + (v <= 1 ? '+ acre' : '+ acres'))).join('')}</select></label>
+        <label>Up to<select class="fc-area-input" data-f="maxAcres"${dis}>${opt(0, f.maxAcres, 'No limit')}${[2, 3, 5, 10, 25, 50, 100, 250].map(v => opt(v, f.maxAcres, v + ' acres')).join('')}</select></label>
         <label>Water<select class="fc-area-input" data-f="water"${dis}>${opt('any', f.water, 'Any distance')}${opt('1000', f.water, 'Within 1,000 ft')}${opt('300', f.water, 'Within 300 ft')}${opt('on', f.water, 'On the parcel')}</select></label>
       </div>
       <div class="fc-find-sigs">
@@ -6057,6 +6108,8 @@
     if (clear) clear.addEventListener('click', () => { __screen.results = null; __screen.summary = null; __screen.errors = []; __screen.restoreIndex = null; drawScreenMarkers(); renderFindPanel(); setAreaCount(''); });
     const more = listEl.querySelector('[data-act="more"]');
     if (more) more.addEventListener('click', () => { __screen.shown += SCREEN_LIST_STEP; renderFindPanel(); });
+    const checkTop = listEl.querySelector('[data-act="check-top"]');
+    if (checkTop) checkTop.addEventListener('click', () => checkTopResults(25));
     listEl.querySelectorAll('[data-sr]').forEach(row => row.addEventListener('click', () => openScreenResult(Number(row.getAttribute('data-sr')))));
     if (res) setAreaCount(`${res.length.toLocaleString()} found`);
     // Coming back from a parcel card: return once to the row that was opened.
@@ -6074,6 +6127,7 @@
     const body = {
       jurisdiction: pc.jurisdiction, pin: pc.pin, lat: pc.lat, lng: pc.lng, acres: pc.acres,
       title: pc.address ? titleish(pc.address) : `${pc.county} parcel ${pc.pin}`, street: pc.address || null,
+      owner_name: pc.ownerHidden ? null : pc.owner || null, owner_mail: pc.ownerHidden ? null : pc.mail || null,
     };
     const r = await apiFetch('/api/listings/parcel', { method: 'POST', body });
     if (btn) btn.disabled = false;
@@ -6088,9 +6142,909 @@
     if (btn) { btn.textContent = 'Open in Saved'; btn.setAttribute('data-act', 'open-saved'); }
   }
 
+  // ─── Outreach: owner contact, letters, follow-ups ──────────────────────
+  // Phone and email are whatever AJ finds and types in; nothing is looked up.
+  // Letters print for a #10 double-window envelope (letter folded in thirds).
+  // Every contact attempt is logged per listing (Worker → D1 outreach_events).
+  const EVENT_LABEL = { letter: 'Letter sent', call: 'Called', email: 'Emailed', text: 'Texted', reply: 'Owner replied', meeting: 'Met / walked the land', offer: 'Offer made', note: 'Note' };
+  let __outreachProfile = null;
+  let __outreachProfileLoad = null;
+  const __eventsCache = new Map(); // listing id → events[]
+  let __letterIds = [];            // listings in the open letter preview
+  let __letterBack = 'saved';
+
+  function loadOutreachProfile(force) {
+    if (__outreachProfileLoad && !force) return __outreachProfileLoad;
+    __outreachProfileLoad = apiFetch('/api/settings/outreach').then(r => {
+      __outreachProfile = r.ok ? (r.profile || {}) : null;
+      if (!r.ok) __outreachProfileLoad = null; // retry next time
+      return __outreachProfile;
+    });
+    return __outreachProfileLoad;
+  }
+  function profileReady(p) {
+    return !!(p && p.sender_name && p.sender_line1 && p.sender_city && p.sender_state && p.sender_zip);
+  }
+  function localIso(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function todayIso() { return localIso(new Date()); }
+  function addDaysIso(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return localIso(new Date(y, m - 1, d + n));
+  }
+  function followUpDays() { return Number((__outreachProfile || {}).follow_up_days) || 42; }
+  function fmtDay(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  }
+
+  // ── Owner names as county records write them → how to address a letter ──
+  // "BROOKS, NELSON C HEIRS; WILLIAMS, ELLA" / "SMITH, JOHN A & SMITH, MARY B" /
+  // "SMITH FAMILY TRUST" / "GREEN ACRES LLC".
+  const OWNER_ENTITY = /\b(LLC|L\.L\.C|INC|CORP|CORPORATION|COMPANY|CO|LP|L P|LLP|LTD|PARTNERSHIP|PTNRSHP|ASSOCIATES|HOLDINGS|PROPERTIES|PARTNERS|ENTERPRISES|LIMITED|LC|BANK|CHURCH|FOUNDATION)\b/;
+  const OWNER_TRUST = /\bTRUST\b|\bTRUSTEES?\b|\bTR\b|\bTRS\b/;
+  function titleCase(s) {
+    return String(s || '').toLowerCase().replace(/\b([a-z])([a-z']*)/g, (m, a, b) => a.toUpperCase() + b)
+      .replace(/\bMc([a-z])/g, (m, a) => 'Mc' + a.toUpperCase()).replace(/\b(Ii|Iii|Iv)\b/g, m => m.toUpperCase());
+  }
+  function ownerParts(owner) {
+    return String(owner || '').toUpperCase().split(/;|&/).map(x => x.trim()).filter(Boolean)
+      .filter(x => !/^(A\/K\/A|AKA)\b/.test(x));
+  }
+  // "LAST, FIRST M JR HEIRS" → { last: 'Last', first: 'First', full: 'First M Last Jr' }
+  function personName(part) {
+    const clean = part.replace(/\b(HEIRS?|HRS|ESTATE|EST|TRUSTEES?|TR|TRS|ET ?AL|ET ?UX|DECEASED|DEC'?D|A\/K\/A|AKA)\b.*$/, '').replace(/[.,]\s*$/, '').trim();
+    const m = clean.match(/^([A-Z' -]+),\s*([A-Z][A-Z' .-]*)$/);
+    if (!m) return null;
+    const last = titleCase(m[1].trim());
+    const given = m[2].trim().split(/\s+/);
+    const suffix = given.length > 1 && /^(JR|SR|II|III|IV)$/.test(given[given.length - 1]) ? given.pop() : '';
+    return { last, first: titleCase(given[0]), full: `${titleCase(given.join(' '))} ${last}${suffix ? ' ' + titleCase(suffix) : ''}` };
+  }
+  function ownerSummary(owner) {
+    const raw = String(owner || '').toUpperCase().trim();
+    if (!raw) return { kind: 'unknown', addressee: 'Property Owner', salutation: 'Dear Property Owner,' };
+    const parts = ownerParts(raw);
+    const people = parts.map(personName).filter(Boolean);
+    if (screenIsEstate(raw)) {
+      const fam = people[0] ? people[0].last : null;
+      return { kind: 'estate', addressee: people[0] ? `Heirs of ${people[0].full}` : titleCase(parts[0]), salutation: fam ? `Dear ${fam} family,` : 'Dear Family,' };
+    }
+    if (OWNER_ENTITY.test(raw) && !people.length) return { kind: 'entity', addressee: titleCase(parts[0]), salutation: 'Hello,' };
+    if (OWNER_TRUST.test(raw) && !people.length) return { kind: 'trust', addressee: titleCase(parts[0]), salutation: 'Dear Trustee,' };
+    if (!people.length) return { kind: 'unknown', addressee: titleCase(parts[0]), salutation: 'Dear Property Owner,' };
+    const uniq = [];
+    for (const p of people) if (!uniq.some(q => q.full === p.full)) uniq.push(p);
+    const trustNote = OWNER_TRUST.test(raw) ? ', Trustee' : '';
+    if (uniq.length === 1) return { kind: 'person', addressee: uniq[0].full + trustNote, salutation: `Dear ${uniq[0].first} ${uniq[0].last},` };
+    if (uniq.length === 2) {
+      const [a, b] = uniq;
+      return a.last === b.last
+        ? { kind: 'people', addressee: `${a.first} & ${b.first} ${a.last}`, salutation: `Dear ${a.first} and ${b.first} ${a.last},` }
+        : { kind: 'people', addressee: `${a.full} & ${b.full}`, salutation: `Dear ${a.first} ${a.last} and ${b.first} ${b.last},` };
+    }
+    return { kind: 'people', addressee: `${uniq[0].full} et al.`, salutation: `Dear ${uniq[0].last} family,` };
+  }
+
+  function letterPlace(s) {
+    const pin = s.parcel_pin || (s.source === 'parcel' ? s.source_id : null);
+    const county = (s.county || '').replace(/ County$/, '') + ' County';
+    if (s.street && /\d/.test(s.street)) return `your property at ${titleish(s.street)}`;
+    if (s.street) return `your land on ${titleish(s.street)} in ${county}`;
+    return `your land in ${county}${pin ? ` (tax map parcel ${pin})` : ''}`;
+  }
+  function letterVariant(s) {
+    const owner = ownerSummary(s.owner_name);
+    if (owner.kind === 'estate') return 'estate';
+    if (screenAwayFrom(s.owner_mail)) return 'away';
+    const since = s.enrichment && s.enrichment.ownerSinceIso;
+    if (since && since < screenHeldCutoff()) return 'held';
+    return 'general';
+  }
+  // Plain-text paragraphs; AJ can edit the preview before printing.
+  function letterParagraphs(s, p) {
+    const name = p.sender_name || 'your name';
+    const county = (s.county || '').replace(/ County$/, '') + ' County';
+    const acres = s.acres ? ` (about ${s.acres >= 10 ? Math.round(s.acres) : s.acres.toFixed(1)} acres)` : '';
+    const place = letterPlace(s) + acres;
+    const reach = [p.sender_phone && `call or text me at ${p.sender_phone}`, p.sender_email && `email me at ${p.sender_email}`].filter(Boolean).join(', or ');
+    const close = `If you'd be open to a conversation, please ${reach || 'write back to the address above'}. Thank you for taking the time to read this.`;
+    const intro = {
+      general: `My name is ${name}. I'm looking for land in ${county} to build a home, and I'm writing about ${place}.`,
+      estate: `My name is ${name}, and I'm writing about ${place}. County records list the land under an estate or the family's heirs, so I'm sorry if this letter reaches you at a difficult time.`,
+      away: `My name is ${name}, and I'm writing about ${place}. I understand from county records that you live outside Virginia.`,
+      held: `My name is ${name}, and I'm writing about ${place}, which I understand you've owned for many years.`,
+    };
+    const middle = {
+      general: `I'm not a developer and this isn't a sales pitch — I'm hoping to find a place to live. If you have ever thought about selling, now or down the road, I would welcome the chance to talk. There's no obligation, and I'm flexible on timing.`,
+      estate: `I'm looking for land in ${county} to build a home. If the family has talked about what to do with the property, I'd be glad to speak with you or whoever is handling it, at whatever pace works for everyone. There's no obligation.`,
+      away: `I'm looking for land in ${county} to build a home. Owning land from a distance can be a lot to keep up with; if you've ever thought about selling, I'd welcome the chance to talk. There's no obligation, and I'm flexible on timing.`,
+      held: `I'm looking for land in ${county} to build a home. If you've ever thought about what comes next for the land, I would welcome the chance to talk, with no obligation and on your timeline.`,
+    };
+    const v = letterVariant(s);
+    return [ownerSummary(s.owner_name).salutation, intro[v], middle[v], close];
+  }
+  function addressLines(lines) { return lines.filter(Boolean).map(escapeHtml).join('<br>'); }
+  function letterPageHtml(s, p, paragraphs, editable) {
+    const m = s.owner_mail || {};
+    const owner = ownerSummary(s.owner_name);
+    const cityLine = (a, b, c) => [a, [b, c].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const sig = [p.signature || p.sender_name, [p.sender_phone, p.sender_email].filter(Boolean).join(' · ')].filter(Boolean);
+    const body = paragraphs.map((t, i) => `<p${editable ? ` contenteditable="true" data-para="${i}"` : ''}>${escapeHtml(t)}</p>`).join('');
+    return `<div class="fc-letter">
+      <div class="fc-letter-from">${addressLines([p.sender_name, p.sender_line1, p.sender_line2, cityLine(p.sender_city, p.sender_state, p.sender_zip)])}</div>
+      <div class="fc-letter-to">${addressLines([owner.addressee, m.line1, cityLine(m.city, m.state, m.zip), m.country && !/^(US|USA)$/i.test(m.country) ? m.country : ''])}</div>
+      <div class="fc-letter-date">${escapeHtml(fmtDay(todayIso()))}</div>
+      <div class="fc-letter-body">${body}<p>Sincerely,</p><p class="fc-letter-sig">${addressLines(sig)}</p></div>
+    </div>`;
+  }
+  function emailDraft(s, p) {
+    const paras = letterParagraphs(s, p);
+    const where = s.street ? titleish(s.street) : `${(s.county || '').replace(/ County$/, '')} County`;
+    return {
+      subject: `About your land at ${where}`,
+      body: paras.join('\n\n') + `\n\nThank you,\n${p.signature || p.sender_name || ''}${p.sender_phone ? '\n' + p.sender_phone : ''}`,
+    };
+  }
+  function telHref(phone) { const d = String(phone || '').replace(/[^\d+]/g, ''); return d.length >= 7 ? 'tel:' + d : null; }
+  function mailHref(email, draft) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ''))) return null;
+    const addr = String(email).replace(/[^A-Za-z0-9._%+\-@]/g, '');
+    return `mailto:${addr}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
+  }
+
+  // ── Printing: render pages into a body-level root, print, clean up ──
+  function printPages(html) {
+    let root = document.getElementById('fc-print-root');
+    if (!root) { root = document.createElement('div'); root.id = 'fc-print-root'; document.body.appendChild(root); }
+    root.innerHTML = html;
+    document.body.classList.add('fc-printing');
+    const done = () => { document.body.classList.remove('fc-printing'); root.innerHTML = ''; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
+  }
+
+  async function logEvent(s, kind, detail, opts) {
+    opts = opts || {};
+    const body = { kind, detail: detail || null, at: opts.at || todayIso() };
+    if (opts.followUp !== undefined) body.follow_up_on = opts.followUp;
+    const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id) + '/events', { method: 'POST', body });
+    if (!r.ok) { areaToast('Could not log it: ' + (r.error || 'error'), 'red'); return null; }
+    if (r.listing) upsertLocalListing(r.listing);
+    const list = __eventsCache.get(s.id);
+    if (list && r.event) list.unshift(r.event);
+    // First contact moves a watched parcel to "Contacted owner".
+    if (['letter', 'call', 'email', 'text'].includes(kind) && ['watching', 'interested'].includes((r.listing || s).watch_status)) {
+      const u = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { watch_status: 'contacted' } });
+      if (u.ok) upsertLocalListing(u.listing);
+    }
+    return r;
+  }
+
+  // ── Outreach block inside a saved listing ──
+  function outreachBlockHtml(s) {
+    const m = s.owner_mail || {};
+    const due = s.follow_up_on && s.follow_up_on <= todayIso();
+    return `<div class="fc-or fc-area-admin">
+      <h4>Owner &amp; outreach</h4>
+      <label class="fc-or-full">Owner<input class="fc-area-input" data-of="owner_name" value="${escapeHtml(s.owner_name || '')}" placeholder="From county records"></label>
+      <div class="fc-or-grid">
+        <label class="fc-or-full">Mailing address<input class="fc-area-input" data-om="line1" value="${escapeHtml(m.line1 || '')}"></label>
+        <label>City<input class="fc-area-input" data-om="city" value="${escapeHtml(m.city || '')}"></label>
+        <label>State<input class="fc-area-input" data-om="state" value="${escapeHtml(m.state || '')}" maxlength="2"></label>
+        <label>ZIP<input class="fc-area-input" data-om="zip" value="${escapeHtml(m.zip || '')}" inputmode="numeric"></label>
+      </div>
+      <div class="fc-or-grid2">
+        <label>Phone<input class="fc-area-input" type="tel" data-of="owner_phone" value="${escapeHtml(s.owner_phone || '')}" placeholder="If you find one"></label>
+        <label>Email<input class="fc-area-input" type="email" data-of="owner_email" value="${escapeHtml(s.owner_email || '')}" placeholder="If you find one"></label>
+      </div>
+      <div class="fc-pc-links" id="fc-or-actions"></div>
+      <div class="fc-or-follow">
+        <label>Follow up on<input class="fc-area-input" type="date" data-of="follow_up_on" value="${escapeHtml(s.follow_up_on || '')}"></label>
+        <button class="fc-btn fc-btn-sm" data-act="fu">+${followUpDays()} days</button>
+        ${due ? '<span class="fc-pill coral">Follow-up due</span>' : ''}
+      </div>
+      <div class="fc-or-log" id="fc-or-logform" hidden>
+        <div class="fc-or-grid2">
+          <label>What happened<select class="fc-area-input" data-lf="kind">${Object.entries(EVENT_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+          <label>When<input class="fc-area-input" type="date" data-lf="at" value="${todayIso()}"></label>
+        </div>
+        <label class="fc-or-full">Note<input class="fc-area-input" data-lf="detail" placeholder="e.g. left a voicemail · open to selling in spring"></label>
+        <label class="fc-find-check"><input type="checkbox" data-lf="fu" checked> Set the next follow-up for ${followUpDays()} days from then</label>
+        <div class="fc-pc-links"><button class="fc-btn fc-btn-sm fc-btn-dark" data-act="log-save">Save</button><button class="fc-btn fc-btn-sm fc-btn-ghost" data-act="log-cancel">Cancel</button></div>
+      </div>
+      <div id="fc-or-timeline" class="fc-or-timeline">${skel('Loading history…')}</div>
+    </div>`;
+  }
+  // Fill owner fields that arrived after the panel rendered (backfill), without
+  // touching anything AJ has typed.
+  function refreshOutreachFields(s) {
+    const el = document.getElementById('fc-area-list');
+    if (!el) return;
+    const fill = (sel, v) => { const i = el.querySelector(sel); if (i && !i.value && v) i.value = v; };
+    fill('[data-of="owner_name"]', s.owner_name);
+    const m = s.owner_mail || {};
+    for (const k of ['line1', 'city', 'state', 'zip']) fill(`[data-om="${k}"]`, m[k]);
+    renderOutreachActions(el, s);
+  }
+  function renderOutreachActions(el, s) {
+    const box = el.querySelector('#fc-or-actions');
+    if (!box) return;
+    const p = __outreachProfile || {};
+    const tel = telHref(s.owner_phone);
+    const mail = mailHref(s.owner_email, emailDraft(s, p));
+    box.innerHTML = `${tel ? `<a class="fc-btn fc-btn-sm" href="${escapeHtml(tel)}" data-pre="call">📞 Call</a><a class="fc-btn fc-btn-sm" href="${escapeHtml(tel.replace('tel:', 'sms:'))}" data-pre="text">💬 Text</a>` : ''}
+      ${mail ? `<a class="fc-btn fc-btn-sm" href="${escapeHtml(mail)}" data-pre="email">✉️ Email</a>` : ''}
+      <button class="fc-btn fc-btn-sm" data-act="letter">🖨 Letter</button>
+      <button class="fc-btn fc-btn-sm" data-act="log-open">＋ Log contact</button>`;
+    box.querySelectorAll('[data-pre]').forEach(a => a.addEventListener('click', () => openLogForm(el, a.getAttribute('data-pre'))));
+    box.querySelector('[data-act="letter"]').addEventListener('click', () => openLetters([s.id], 'listing'));
+    box.querySelector('[data-act="log-open"]').addEventListener('click', () => openLogForm(el, 'note'));
+  }
+  function openLogForm(el, kind) {
+    const f = el.querySelector('#fc-or-logform');
+    if (!f) return;
+    f.hidden = false;
+    f.querySelector('[data-lf="kind"]').value = kind;
+    f.querySelector('[data-lf="at"]').value = todayIso();
+  }
+  async function renderTimeline(el, s) {
+    const box = el.querySelector('#fc-or-timeline');
+    if (!box) return;
+    let events = __eventsCache.get(s.id);
+    if (!events) {
+      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id) + '/events');
+      if (!r.ok) { box.innerHTML = `<span class="fc-pc-dim">History did not load: ${escapeHtml(r.error || 'error')}</span>`; return; }
+      events = r.events || [];
+      __eventsCache.set(s.id, events);
+    }
+    if (!document.body.contains(box)) return;
+    box.innerHTML = events.length ? events.map(ev => `<div class="fc-or-ev">
+        <span class="fc-or-ev-day">${escapeHtml(fmtDay(ev.at))}</span>
+        <span><strong>${escapeHtml(EVENT_LABEL[ev.kind] || ev.kind)}</strong>${ev.detail ? ' — ' + escapeHtml(ev.detail) : ''}</span>
+        <button class="fc-or-ev-del" data-ev="${Number(ev.id)}" title="Remove">×</button></div>`).join('')
+      : '<span class="fc-pc-dim">No contact logged yet.</span>';
+    box.querySelectorAll('[data-ev]').forEach(b => b.addEventListener('click', async () => {
+      if (!window.confirm('Remove this entry from the history?')) return;
+      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id) + '/events/' + b.getAttribute('data-ev'), { method: 'DELETE' });
+      if (!r.ok) { areaToast('Could not remove: ' + (r.error || 'error'), 'red'); return; }
+      __eventsCache.set(s.id, (__eventsCache.get(s.id) || []).filter(e => String(e.id) !== b.getAttribute('data-ev')));
+      renderTimeline(el, s);
+    }));
+  }
+  function wireOutreachBlock(el, s) {
+    loadOutreachProfile().then(() => { if (document.body.contains(el)) renderOutreachActions(el, __savedListings.find(x => x.id === s.id) || s); });
+    renderOutreachActions(el, s);
+    renderTimeline(el, s);
+    const cur = () => __savedListings.find(x => x.id === s.id) || s;
+    el.querySelectorAll('[data-of]').forEach(inp => inp.addEventListener(inp.type === 'date' ? 'change' : 'blur', async () => {
+      const k = inp.getAttribute('data-of');
+      const v = inp.value.trim();
+      if ((cur()[k] || '') === v) return;
+      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { [k]: v || null } });
+      if (!r.ok) { areaToast(r.status === 400 ? `That ${k.replace('owner_', '')} doesn't look right` : 'Could not save: ' + (r.error || 'error'), 'red'); return; }
+      upsertLocalListing(r.listing);
+      renderOutreachActions(el, r.listing);
+      areaToast('Saved');
+    }));
+    el.querySelectorAll('[data-om]').forEach(inp => inp.addEventListener('blur', async () => {
+      const mail = Object.assign({}, cur().owner_mail || {});
+      const k = inp.getAttribute('data-om');
+      const v = k === 'state' ? inp.value.trim().toUpperCase() : inp.value.trim();
+      if ((mail[k] || '') === v) return;
+      mail[k] = v;
+      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { owner_mail: mail } });
+      if (!r.ok) { areaToast('Could not save: ' + (r.error || 'error'), 'red'); return; }
+      upsertLocalListing(r.listing);
+      areaToast('Saved');
+    }));
+    const fuBtn = el.querySelector('[data-act="fu"]');
+    if (fuBtn) fuBtn.addEventListener('click', async () => {
+      const day = addDaysIso(todayIso(), followUpDays());
+      const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { follow_up_on: day } });
+      if (!r.ok) { areaToast('Could not save: ' + (r.error || 'error'), 'red'); return; }
+      upsertLocalListing(r.listing);
+      const d = el.querySelector('[data-of="follow_up_on"]');
+      if (d) d.value = day;
+      areaToast('Follow-up set for ' + fmtDay(day));
+    });
+    const form = el.querySelector('#fc-or-logform');
+    if (form) {
+      form.querySelector('[data-act="log-cancel"]').addEventListener('click', () => { form.hidden = true; });
+      form.querySelector('[data-act="log-save"]').addEventListener('click', async () => {
+        const kind = form.querySelector('[data-lf="kind"]').value;
+        const at = form.querySelector('[data-lf="at"]').value || todayIso();
+        const detail = form.querySelector('[data-lf="detail"]').value.trim();
+        const fu = form.querySelector('[data-lf="fu"]').checked ? addDaysIso(at, followUpDays()) : undefined;
+        const r = await logEvent(cur(), kind, detail, { at, followUp: fu });
+        if (!r) return;
+        form.hidden = true;
+        form.querySelector('[data-lf="detail"]').value = '';
+        if (fu) { const d = el.querySelector('[data-of="follow_up_on"]'); if (d) d.value = fu; }
+        renderTimeline(el, cur());
+        areaToast('Logged');
+      });
+    }
+  }
+
+  // Mail service (PostGrid on the Worker): { configured, mode: 'test'|'live', dailyCap, sentToday }
+  let __mailStatus = null;
+  async function mailStatus(force) {
+    if (__mailStatus && !force && Date.now() - __mailStatus.at < 60000) return __mailStatus;
+    const r = await apiFetch('/api/outreach/mail');
+    __mailStatus = r.ok ? Object.assign({ at: Date.now() }, r) : null;
+    return __mailStatus;
+  }
+
+  // ── Letters panel (one listing or a batch) ──
+  function letterCandidates() {
+    return __savedListings.filter(s => s.owner_mail && s.owner_mail.line1 && !['passed', 'sold'].includes(s.watch_status));
+  }
+  function openLetters(ids, back) {
+    __letterIds = ids;
+    __letterBack = back || 'saved';
+    __areaPanel = 'letters';
+    syncTabs();
+    renderLettersPanel();
+    revealPanelOnPhone();
+  }
+  async function renderLettersPanel() {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl || __areaPanel !== 'letters') return;
+    listEl.innerHTML = `<div class="fc-area-empty">${skel('Loading your letter details…')}</div>`;
+    const [p, ms] = await Promise.all([loadOutreachProfile(), mailStatus().catch(() => null)]);
+    if (__areaPanel !== 'letters') return;
+    const backBtn = __letterBack === 'listing' ? panelBack('listing') : panelBack('saved');
+    if (!profileReady(p)) {
+      listEl.innerHTML = backBtn + `<div class="fc-pc"><div class="fc-pc-title">Add your letter details first</div>
+        <div class="fc-pc-sub">Letters need your name and return address. Add them once in Settings → Letter details.</div>
+        <div class="fc-pc-links"><button class="fc-btn fc-btn-sm fc-btn-dark" data-act="settings">Open Settings</button></div></div>`;
+      wirePanelBack(listEl);
+      listEl.querySelector('[data-act="settings"]').addEventListener('click', () => setView('settings'));
+      return;
+    }
+    const single = __letterIds.length === 1;
+    const items = (single ? __letterIds.map(id => __savedListings.find(x => x.id === id)) : letterCandidates()).filter(Boolean);
+    if (single && !(items[0] && items[0].owner_mail && items[0].owner_mail.line1)) {
+      listEl.innerHTML = backBtn + '<div class="fc-area-empty">Add the owner\'s mailing address in this listing\'s Owner &amp; outreach section first.</div>';
+      wirePanelBack(listEl);
+      return;
+    }
+    if (!items.length) {
+      listEl.innerHTML = backBtn + '<div class="fc-area-empty">No saved parcels have an owner mailing address yet. Save parcels from Find land — their county mailing address comes with them.</div>';
+      wirePanelBack(listEl);
+      return;
+    }
+    const chosen = new Set(single ? [items[0].id] : (__letterIds.length ? __letterIds : items.filter(s => s.watch_status !== 'contacted').map(s => s.id)));
+    const pick = single ? '' : `<div class="fc-find-h">Who gets a letter</div>${items.map(s => `<label class="fc-find-check"><input type="checkbox" data-pick="${escapeHtml(s.id)}"${chosen.has(s.id) ? ' checked' : ''}> ${escapeHtml(listingTitle(s))} <span class="fc-pc-dim">${escapeHtml(ownerSummary(s.owner_name).addressee)}${s.watch_status === 'contacted' ? ' · already contacted' : ''}</span></label>`).join('')}`;
+    const preview = single ? `<div class="fc-letter-preview">${letterPageHtml(items[0], p, letterParagraphs(items[0], p), true)}</div>
+      <div class="fc-pc-note">Tap the text to edit it. Edits apply to this printout only.</div>` : '';
+    listEl.innerHTML = backBtn + `<div class="fc-pc">
+      <div class="fc-pc-title">${single ? 'Letter to the owner' : 'Letters to owners'}</div>
+      <div class="fc-pc-sub">Prints on plain letter paper. Fold in thirds for a #10 double-window envelope — your return address and theirs show through the windows.</div>
+      ${pick}${preview}
+      <div class="fc-pc-links">
+        <button class="fc-btn fc-btn-sm fc-btn-dark" data-act="print">🖨 Print ${single ? 'letter' : `<span id="fc-letter-n">${chosen.size}</span> letters`}</button>
+        <button class="fc-btn fc-btn-sm" data-act="sent" hidden>Mark as sent</button>
+        ${ms && ms.configured ? `<button class="fc-btn fc-btn-sm" data-act="mail">${ms.mode === 'test' ? '📮 Send to PostGrid (test — nothing is mailed)' : '📮 Mail it for me'}</button>` : ''}
+      </div>
+      ${ms && ms.configured ? `<div class="fc-pc-dim">${ms.mode === 'live' ? 'PostGrid prints and mails First Class — about $1.06 a letter plus the address page.' : 'PostGrid test mode: you get a PDF preview; nothing is printed or mailed.'} ${Number(ms.sentToday) || 0} of ${Number(ms.dailyCap) || 0} sent today.</div>` : '<div class="fc-pc-dim">Prefer not to print? Nestscoop can mail letters through PostGrid once its key is added to your server.</div>'}
+      <div class="fc-pc-note" id="fc-letter-msg"></div>
+    </div>`;
+    wirePanelBack(listEl);
+    listEl.querySelectorAll('[data-pick]').forEach(cb => cb.addEventListener('change', () => {
+      if (cb.checked) chosen.add(cb.getAttribute('data-pick')); else chosen.delete(cb.getAttribute('data-pick'));
+      const n = listEl.querySelector('#fc-letter-n'); if (n) n.textContent = String(chosen.size);
+    }));
+    const mailBtn = listEl.querySelector('[data-act="mail"]');
+    if (mailBtn) mailBtn.addEventListener('click', async () => {
+      const ids = [...chosen];
+      if (!ids.length) { areaToast('Pick at least one owner', 'red'); return; }
+      if (ms.mode === 'live' && !window.confirm(`Mail ${ids.length} letter${ids.length === 1 ? '' : 's'} through PostGrid?\n\nThis sends real mail, charged to your PostGrid account (about $1.06 each plus the address page).`)) return;
+      const edited = single ? [...listEl.querySelectorAll('.fc-letter-preview [data-para]')].map(el => el.innerText.trim()) : null;
+      const msg = listEl.querySelector('#fc-letter-msg');
+      mailBtn.disabled = true;
+      const out = [];
+      for (const id of ids) {
+        const s = __savedListings.find(x => x.id === id);
+        if (!s) continue;
+        msg.textContent = `Sending ${out.length + 1} of ${ids.length}…`;
+        const r = await apiFetch('/api/outreach/mail', { method: 'POST', body: { listing_id: id, addressee: ownerSummary(s.owner_name).addressee, paragraphs: edited || letterParagraphs(s, p) } });
+        out.push({ s, r });
+        if (r.ok) { if (r.listing) upsertLocalListing(r.listing); __eventsCache.delete(id); }
+        else if (r.status === 429 || r.status === 503) break;
+      }
+      mailBtn.disabled = false;
+      __mailStatus = null;
+      msg.innerHTML = out.map(({ s, r }) => {
+        if (!r.ok) return `✗ ${escapeHtml(listingTitle(s))}: ${escapeHtml(r.error || 'error')}`;
+        const pdf = safeHttps(r.letter && r.letter.url);
+        return `✓ ${escapeHtml(listingTitle(s))}${r.mode === 'test' ? ' — test, not mailed' : ' — mailed'}${pdf ? ` · <a href="${escapeHtml(pdf)}" target="_blank" rel="noopener">PDF preview ↗</a>` : ''}`;
+      }).join('<br>');
+    });
+    const sentBtn = listEl.querySelector('[data-act="sent"]');
+    listEl.querySelector('[data-act="print"]').addEventListener('click', () => {
+      const ids = [...chosen];
+      if (!ids.length) { areaToast('Pick at least one owner', 'red'); return; }
+      let pages;
+      if (single) {
+        const paras = [...listEl.querySelectorAll('.fc-letter-preview [data-para]')].map(el => el.innerText.trim());
+        pages = letterPageHtml(items[0], p, paras, false);
+      } else {
+        pages = ids.map(id => __savedListings.find(x => x.id === id)).filter(Boolean).map(s => letterPageHtml(s, p, letterParagraphs(s, p), false)).join('');
+      }
+      printPages(pages);
+      sentBtn.hidden = false;
+      sentBtn.textContent = ids.length === 1 ? 'Mark as sent' : `Mark ${ids.length} as sent`;
+      sentBtn.onclick = async () => {
+        sentBtn.disabled = true;
+        const fu = addDaysIso(todayIso(), followUpDays());
+        let okN = 0;
+        for (const id of ids) {
+          const s = __savedListings.find(x => x.id === id);
+          if (s && await logEvent(s, 'letter', null, { followUp: fu })) okN++;
+        }
+        sentBtn.hidden = true;
+        listEl.querySelector('#fc-letter-msg').textContent = `${okN} letter${okN === 1 ? '' : 's'} logged. Follow-up set for ${fmtDay(fu)}.`;
+        drawSavedMarkers();
+      };
+    });
+  }
+
+  // ── Settings → Letter details ──
+  const PROFILE_INPUTS = ['sender_name', 'sender_line1', 'sender_line2', 'sender_city', 'sender_state', 'sender_zip', 'sender_phone', 'sender_email', 'signature', 'follow_up_days'];
+  async function wireOutreachSettings() {
+    const card = document.getElementById('fc-outreach-settings');
+    if (!card) return;
+    const msg = card.querySelector('#fc-or-settings-msg');
+    if (!getZillowSyncToken()) { msg.textContent = 'Connect this device (Device sync, above) to save letter details.'; return; }
+    msg.textContent = 'Loading…';
+    const p = await loadOutreachProfile(true);
+    msg.textContent = p ? '' : 'Could not load your letter details.';
+    for (const k of PROFILE_INPUTS) { const inp = card.querySelector(`[data-pf="${k}"]`); if (inp) inp.value = (p && p[k]) || (k === 'follow_up_days' ? '42' : ''); }
+    const mailEl = card.querySelector('#fc-or-mail-status');
+    mailStatus(true).then(ms => {
+      if (!mailEl) return;
+      mailEl.textContent = !ms ? '' : !ms.configured ? 'Mail service: not set up — letters are print-only.'
+        : ms.mode === 'test' ? 'Mail service: PostGrid in TEST mode — letters produce a PDF preview, nothing is mailed.'
+        : `Mail service: PostGrid LIVE — letters are printed and mailed (limit ${Number(ms.dailyCap) || 0} a day).`;
+    }).catch(() => {});
+    const btn = card.querySelector('#fc-or-settings-save');
+    btn.onclick = async () => {
+      const body = {};
+      for (const k of PROFILE_INPUTS) { const inp = card.querySelector(`[data-pf="${k}"]`); if (inp) body[k] = inp.value.trim(); }
+      btn.disabled = true;
+      const r = await apiFetch('/api/settings/outreach', { method: 'PUT', body });
+      btn.disabled = false;
+      if (!r.ok) { msg.textContent = 'Not saved: ' + (r.error || 'error'); return; }
+      __outreachProfile = r.profile; __outreachProfileLoad = Promise.resolve(r.profile);
+      msg.textContent = 'Saved. Letters will use these details.';
+    };
+  }
+  window.fcWireOutreachSettings = wireOutreachSettings;
+
+  // ─── Buildability check + value reference (on demand) ──────────────────
+  // Buildability samples a grid inside the parcel: FEMA floodplain, slope from
+  // USGS elevations, and septic soils (Loudoun's county ratings; NRCS soil
+  // survey with limitation reasons in Fauquier). Value reference = recent
+  // nearby land sales, shown as a range with its sample size — data, not advice.
+  const GIS_X = {
+    L_SALES: 'https://logis.loudoun.gov/gis/rest/services/COL/FSview_PRM_inter/MapServer/11/query',
+    L_SOILS: 'https://logis.loudoun.gov/gis/rest/services/COL/Environmental/MapServer/1/query',
+  };
+  const BUILD_SLOPE_MAX = 15;          // % — steeper ground is hard to site a house + drain field on
+  const COMP_RADII_MI = [5, 8, 12];
+  const COMP_MIN_N = 5;
+  const COMP_MONTHS = 36;
+  // NRCS septic limitation reasons, by how badly they block a drain field.
+  const SEPTIC_HARD = /flood|ponding/i;
+  const SEPTIC_EVAL = /depth to (saturated zone|bedrock|soft bedrock|cemented pan|thin cemented pan|hard bedrock)|water table/i;
+
+  // Points on a regular grid over the parcel's bbox (≤ ~400), flagged inside/outside.
+  function sampleGrid(geom, acres) {
+    const bb = screenBBox(geom);
+    if (!bb) return null;
+    const lat0 = (bb[1] + bb[3]) / 2, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    const wM = Math.max(1, (bb[2] - bb[0]) * kx), hM = Math.max(1, (bb[3] - bb[1]) * ky);
+    const areaM = (acres > 0 ? acres * 4046.86 : wM * hM * 0.6);
+    let step = Math.max(8, Math.sqrt(areaM / 60));
+    while (Math.ceil(wM / step) * Math.ceil(hM / step) > 400) step *= 1.2;
+    const nx = Math.max(2, Math.ceil(wM / step)), ny = Math.max(2, Math.ceil(hM / step));
+    const pts = [];
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const lng = bb[0] + ((i + 0.5) * step) / kx, lat = bb[1] + ((j + 0.5) * step) / ky;
+      pts.push({ i, j, lng, lat, inside: screenContains(geom, lng, lat) });
+    }
+    if (!pts.some(p => p.inside)) { const lp = screenLabelPoint(geom); if (lp) pts.push({ i: -1, j: -1, lng: lp.lng, lat: lp.lat, inside: true }); }
+    return { pts, nx, ny, step, bb };
+  }
+  // Even-odd point-in-polygon over every ring of an Esri polygon.
+  function inEsriRings(rings, lng, lat) {
+    let inside = false;
+    for (const r of rings || []) if (screenRingInside(lng, lat, r)) inside = !inside;
+    return inside;
+  }
+  const envOf = bb => `${bb[0]},${bb[1]},${bb[2]},${bb[3]}`;
+  const envParams = bb => ({ geometry: envOf(bb), geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects', outSR: '4326' });
+
+  async function floodShare(grid) {
+    const j = await arcgis(GIS.FEMA, Object.assign(envParams(grid.bb), {
+      where: "SFHA_TF='T'", outFields: 'FLD_ZONE', returnGeometry: 'true', maxAllowableOffset: '0.00005', geometryPrecision: '6', f: 'json',
+    }), 15000);
+    const polys = ((j && j.features) || []).map(f => f.geometry && f.geometry.rings).filter(Boolean);
+    const inside = grid.pts.filter(p => p.inside);
+    for (const p of inside) p.flood = polys.some(r => inEsriRings(r, p.lng, p.lat));
+    return inside.filter(p => p.flood).length / inside.length;
+  }
+  async function elevationSamples(geometry) {
+    const t = withTimeout(15000);
+    try {
+      // POST: a 400-point multipoint is too long for a URL.
+      const res = await fetch(GIS.ELEV, { method: 'POST', body: new URLSearchParams({ geometry, geometryType: 'esriGeometryMultipoint', returnFirstValueOnly: 'true', interpolation: 'RSP_BilinearInterpolation', f: 'json' }), signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } finally { t.done(); }
+  }
+  async function slopeShare(grid) {
+    const geometry = JSON.stringify({ points: grid.pts.map(p => [p.lng, p.lat]), spatialReference: { wkid: 4326 } });
+    let j;
+    try { j = await elevationSamples(geometry); }
+    catch (e) { j = await elevationSamples(geometry); } // 3DEP's first call can stall; one retry
+    const samples = (j && j.samples) || [];
+    if (samples.length !== grid.pts.length) throw new Error(`elevation service returned ${samples.length} of ${grid.pts.length} points`);
+    for (const s of samples) { const p = grid.pts[s.locationId]; if (p) p.z = parseFloat(s.value); }
+    const at = (i, j2) => grid.pts.find(p => p.i === i && p.j === j2);
+    const inside = grid.pts.filter(p => p.inside && isFinite(p.z));
+    for (const p of inside) {
+      const xl = at(p.i - 1, p.j), xr = at(p.i + 1, p.j), yd = at(p.i, p.j - 1), yu = at(p.i, p.j + 1);
+      const gx = xl && xr && isFinite(xl.z) && isFinite(xr.z) ? (xr.z - xl.z) / (2 * grid.step) : xr && isFinite(xr.z) ? (xr.z - p.z) / grid.step : xl && isFinite(xl.z) ? (p.z - xl.z) / grid.step : 0;
+      const gy = yd && yu && isFinite(yd.z) && isFinite(yu.z) ? (yu.z - yd.z) / (2 * grid.step) : yu && isFinite(yu.z) ? (yu.z - p.z) / grid.step : yd && isFinite(yd.z) ? (p.z - yd.z) / grid.step : 0;
+      p.slope = Math.hypot(gx, gy) * 100; // 3DEP values are metres; grid step is metres
+    }
+    const rated = inside.filter(p => p.slope != null);
+    return rated.length ? rated.filter(p => p.slope <= BUILD_SLOPE_MAX).length / rated.length : null;
+  }
+  // Loudoun county soils: per-point septic potential.
+  async function septicLoudoun(grid) {
+    const j = await arcgis(GIS_X.L_SOILS, Object.assign(envParams(grid.bb), {
+      outFields: 'SL_CWSD_POTENTIAL,SL_CWSD_LIMITATIONS', returnGeometry: 'true', maxAllowableOffset: '0.00005', geometryPrecision: '6', f: 'json',
+    }), 15000);
+    const polys = ((j && j.features) || []).filter(f => f.geometry && f.geometry.rings);
+    const inside = grid.pts.filter(p => p.inside);
+    for (const p of inside) {
+      const hit = polys.find(f => inEsriRings(f.geometry.rings, p.lng, p.lat));
+      const pot = hit ? trimS(hit.attributes.SL_CWSD_POTENTIAL) : '';
+      p.septic = /^(Good|Fair)/i.test(pot) ? 'ok' : /^Poor/i.test(pot) ? 'eval' : /^Very Poor/i.test(pot) ? 'hard' : 'unknown';
+    }
+    const n = inside.length, share = k => inside.filter(p => p.septic === k).length / n;
+    return { ok: share('ok'), eval: share('eval'), hard: share('hard'), unknown: share('unknown'), basis: 'Loudoun County soil ratings for conventional septic', pointwise: true };
+  }
+  // Fauquier: NRCS soil survey acres by map unit, classified by limitation reasons.
+  async function septicNrcs(geom) {
+    let poly = screenRings(geom).slice().sort((a, b) => b[0].length - a[0].length)[0];
+    if (!poly) return null;
+    let ring = poly[0];
+    if (ring.length > 160) { const k = Math.ceil(ring.length / 160); ring = ring.filter((p, i) => i % k === 0); }
+    if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring = ring.concat([ring[0]]);
+    if (ring.length < 4) return null;
+    const wkt = 'POLYGON((' + ring.map(p => `${Number(p[0]).toFixed(6)} ${Number(p[1]).toFixed(6)}`).join(', ') + '))';
+    const sql = SEPTIC_SQL.split('WKT_PLACEHOLDER').join(wkt);
+    const t = withTimeout(25000);
+    let j;
+    try {
+      const res = await fetch(GIS.SDA, { method: 'POST', body: new URLSearchParams({ query: sql, format: 'JSON+COLUMNNAME' }), signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      j = await res.json();
+    } finally { t.done(); }
+    const tbl = (j && j.Table) || [];
+    if (tbl.length < 2) return null;
+    const cols = tbl[0], rows = tbl.slice(1).map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]])));
+    let total = 0; const acres = { ok: 0, eval: 0, hard: 0, unknown: 0 };
+    const why = new Set();
+    for (const r of rows) {
+      const a = Number(r.acres) || 0;
+      total += a;
+      const reasons = String(r.reasons || '');
+      const cls = !r.septic_class || /not rated/i.test(r.septic_class) ? 'unknown'
+        : SEPTIC_HARD.test(reasons) ? 'hard' : SEPTIC_EVAL.test(reasons) ? 'eval' : 'ok';
+      acres[cls] += a;
+      if (cls !== 'ok') reasons.split(';').map(x => x.trim()).filter(x => SEPTIC_HARD.test(x) || SEPTIC_EVAL.test(x)).forEach(x => why.add(x.toLowerCase()));
+    }
+    if (!total) return null;
+    return { ok: acres.ok / total, eval: acres.eval / total, hard: acres.hard / total, unknown: acres.unknown / total, basis: 'NRCS soil survey (septic limitations)', reasons: [...why].slice(0, 4), pointwise: false };
+  }
+  const SEPTIC_SQL = `SELECT a.mukey, mu.muname, a.acres, d.septic_class, r.reasons FROM (
+  SELECT mp.mukey, SUM(CASE WHEN x.gg.EnvelopeAngle() >= 90 THEN x.gg.ReorientObject().STArea() ELSE x.gg.STArea() END) / 4046.8564224 AS acres
+  FROM mupolygon mp CROSS JOIN (SELECT geometry::STPolyFromText('WKT_PLACEHOLDER', 4326).MakeValid() AS aoi) g
+  CROSS APPLY (SELECT geography::STGeomFromWKB(mp.mupolygongeo.STIntersection(g.aoi).STAsBinary(), 4326).MakeValid() AS gg) x
+  WHERE mp.mupolygonkey IN (SELECT mupolygonkey FROM SDA_Get_Mupolygonkey_from_intersection_with_WktWgs84('WKT_PLACEHOLDER'))
+  GROUP BY mp.mukey) a
+INNER JOIN mapunit mu ON mu.mukey = a.mukey
+LEFT JOIN (SELECT mukey, septic_class FROM (
+  SELECT c.mukey, ISNULL(ci.interphrc, 'Not rated') AS septic_class, ROW_NUMBER() OVER (PARTITION BY c.mukey ORDER BY SUM(c.comppct_r) DESC) AS rn
+  FROM component c LEFT JOIN cointerp ci ON ci.cokey = c.cokey AND ci.mrulename = 'ENG - Septic Tank Absorption Fields' AND ci.ruledepth = 0
+  WHERE c.mukey IN (SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('WKT_PLACEHOLDER'))
+  GROUP BY c.mukey, ISNULL(ci.interphrc, 'Not rated')) t WHERE rn = 1) d ON d.mukey = a.mukey
+LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM component c
+  INNER JOIN cointerp ci ON ci.cokey = c.cokey AND ci.mrulename = 'ENG - Septic Tank Absorption Fields' AND ci.ruledepth = 1 AND ci.interphr > 0
+  WHERE c.majcompflag = 'Yes' AND c.mukey IN (SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('WKT_PLACEHOLDER'))
+  GROUP BY c.mukey) r ON r.mukey = a.mukey`;
+
+  // Grades a parcel Ready / Check first / Skip from the three checks.
+  // need = how much dry, gentle, septic-capable ground a house + drain field wants.
+  function gradeBuildability(acres, flood, gentle, septic, grid) {
+    const need = acres >= 2.5 ? 1 : Math.max(0.25, 0.4 * acres);
+    const inside = grid.pts.filter(p => p.inside);
+    const usable = p => !p.flood && (p.slope == null || p.slope <= BUILD_SLOPE_MAX);
+    let dryGentle = inside.filter(usable).length / inside.length;
+    let buildable, buildableStrict;
+    if (septic && septic.pointwise) {
+      buildable = inside.filter(p => usable(p) && (p.septic === 'ok' || p.septic === 'eval')).length / inside.length * acres;
+      buildableStrict = inside.filter(p => usable(p) && p.septic === 'ok').length / inside.length * acres;
+    } else if (septic) {
+      buildable = dryGentle * (septic.ok + septic.eval) * acres;
+      buildableStrict = dryGentle * septic.ok * acres;
+    } else {
+      buildable = dryGentle * acres; buildableStrict = null;
+    }
+    const unknown = gentle == null || flood == null || !septic;
+    let grade, headline;
+    if (buildable < need / 4 && !unknown) grade = 'skip';
+    else if (buildable >= need && !unknown && (buildableStrict == null || buildableStrict >= need / 2)) grade = 'ready';
+    else grade = 'check';
+    if (grade === 'check') {
+      headline = unknown ? 'some checks did not load'
+        : buildable < need ? `only ~${buildable < 1 ? buildable.toFixed(2) : buildable.toFixed(1)} ac usable`
+        : 'septic needs a site evaluation';
+    }
+    const notes = [];
+    if (flood != null && flood > 0.05) notes.push(`floodplain on ${Math.round(flood * 100)}%`);
+    if (gentle != null && gentle < 0.8) notes.push(`${Math.round((1 - gentle) * 100)}% steeper than ${BUILD_SLOPE_MAX}%`);
+    if (septic) {
+      if (septic.hard > 0.05) notes.push(`${Math.round(septic.hard * 100)}% soils unsuitable for septic`);
+      if (septic.eval > 0.05) notes.push(`${Math.round(septic.eval * 100)}% needs a septic site evaluation`);
+    }
+    if (unknown) notes.push('some checks did not load');
+    if (grade === 'skip') {
+      const worst = [[flood || 0, 'mostly floodplain'], [gentle != null ? 1 - gentle : 0, 'mostly steep'], [septic ? septic.hard : 0, 'soils unsuitable for septic']].sort((a, b) => b[0] - a[0])[0];
+      headline = worst[0] > 0 ? worst[1] : 'hard to build';
+    }
+    return { grade, headline, buildable, need, notes };
+  }
+
+  async function checkBuildability(geom, jurisdiction, acres) {
+    const grid = sampleGrid(geom, acres);
+    if (!grid) return { error: 'no parcel outline' };
+    const [fl, sl, se] = await Promise.allSettled([
+      floodShare(grid), slopeShare(grid),
+      jurisdiction === 'loudoun' ? septicLoudoun(grid) : septicNrcs(geom),
+    ]);
+    const flood = fl.status === 'fulfilled' ? fl.value : null;
+    const gentle = sl.status === 'fulfilled' ? sl.value : null;
+    const septic = se.status === 'fulfilled' ? se.value : null;
+    const g = gradeBuildability(acres || 0, flood, gentle, septic, grid);
+    return Object.assign(g, { flood, gentle, septic, failed: [fl, sl, se].filter(r => r.status === 'rejected').map(r => String(r.reason && r.reason.message || r.reason)) });
+  }
+  function buildChip(b) {
+    if (!b) return '';
+    if (b.pending) return '<span class="fc-pill">Checking…</span>';
+    if (b.error) return '<span class="fc-pill">Check failed</span>';
+    const ac = b.buildable >= 10 ? Math.round(b.buildable) : b.buildable.toFixed(1);
+    if (b.grade === 'ready') return `<span class="fc-pill sage">✅ ~${ac} ac buildable</span>`;
+    if (b.grade === 'skip') return `<span class="fc-pill coral">⛔ ${escapeHtml(b.headline || 'hard to build')}</span>`;
+    return `<span class="fc-pill gold">⚠️ Check: ${escapeHtml(b.headline || `~${ac} ac usable`)}</span>`;
+  }
+  function buildDetailHtml(b) {
+    if (!b) return '';
+    if (b.pending) return skel('Checking floodplain, slope and soils…');
+    if (b.error) return `<span class="fc-pc-dim">Could not check: ${escapeHtml(b.error)}</span>`;
+    const pct = v => v == null ? '—' : Math.round(v * 100) + '%';
+    const s = b.septic;
+    const septicLine = s ? `${pct(s.ok)} no major limits · ${pct(s.eval)} needs a site evaluation · ${pct(s.hard)} unsuitable${s.reasons && s.reasons.length ? `<div class="fc-pc-dim">${escapeHtml(s.reasons.join(', '))}</div>` : ''}<div class="fc-pc-dim">${escapeHtml(s.basis)}</div>` : '<span class="fc-pc-dim">Soils did not load</span>';
+    return `${buildChip(b)}
+      ${kv('Floodplain (100-yr)', b.flood == null ? '<span class="fc-pc-dim">FEMA did not respond</span>' : pct(b.flood) + ' of the parcel')}
+      ${kv(`Gentle ground (≤ ${BUILD_SLOPE_MAX}%)`, b.gentle == null ? '<span class="fc-pc-dim">USGS did not respond</span>' : pct(b.gentle) + ' of the parcel')}
+      ${kv('Septic soils', septicLine)}
+      ${kv('Estimated buildable', `~${b.buildable >= 10 ? Math.round(b.buildable) : b.buildable.toFixed(1)} ac <span class="fc-pc-dim">(a house + drain field wants about ${b.need >= 1 ? '1 acre' : b.need.toFixed(2) + ' ac'})</span>`)}
+      ${b.failed && b.failed.length ? `<div class="fc-pc-dim">Didn't load: ${escapeHtml(b.failed.join(' · '))}</div>` : ''}
+      <div class="fc-pc-note">A screening estimate from sampled points, not a survey or a septic permit. Road access isn't checked.</div>`;
+  }
+
+  // ── Value reference ──
+  function quantile(sorted, q) {
+    if (!sorted.length) return null;
+    const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  }
+  function envelopeAround(lat, lng, miles) {
+    const dLat = miles / 69.0, dLng = miles / (69.17 * Math.cos(lat * Math.PI / 180));
+    return [lng - dLng, lat - dLat, lng + dLng, lat + dLat];
+  }
+  function monthsAgoIso(n) { const d = new Date(); d.setMonth(d.getMonth() - n); return localIso(d); }
+
+  async function pagedQuery(url, params, page, maxPages) {
+    const out = [];
+    for (let k = 0; k < (maxPages || 4); k++) {
+      const j = await arcgis(url, Object.assign({}, params, { resultOffset: String(k * page), resultRecordCount: String(page) }), 20000);
+      const fs = (j && j.features) || [];
+      out.push(...fs);
+      if (!j.exceededTransferLimit || !fs.length) break;
+    }
+    return out;
+  }
+
+  async function fauquierComps(subject) {
+    const lo = subject.acres * 0.5, hi = subject.acres * 2, cut = monthsAgoIso(COMP_MONTHS);
+    const feats = await pagedQuery(GIS.F_PARCELS, Object.assign(envParams(envelopeAround(subject.lat, subject.lng, COMP_RADII_MI[COMP_RADII_MI.length - 1])), {
+      where: `LASTSALEDA >= '${cut}' AND CAST(LASTSALEPR AS FLOAT) > 10000 AND CAST(ACREAGE AS FLOAT) >= ${lo.toFixed(3)} AND CAST(ACREAGE AS FLOAT) <= ${hi.toFixed(3)} AND Deed_Type IN ('DEED','WD')`,
+      outFields: 'PARCELID,ACREAGE,LASTSALEDA,LASTSALEPR,CURRENTOWN,Building_V,Year_Built,Land_Value,Land_Def_V',
+      returnGeometry: 'false', returnCentroid: 'true', orderByFields: 'FID', f: 'json',
+    }), 2000, 3);
+    let rows = feats.map(f => {
+      const a = f.attributes || {}, c = f.centroid || {};
+      const acres = numS(a.ACREAGE), price = numS(a.LASTSALEPR), date = screenSaleIso(a.LASTSALEDA);
+      const bld = numS(a.Building_V) || 0, yb = numS(a.Year_Built), land = numS(a.Land_Value), def = numS(a.Land_Def_V) || 0;
+      const vacant = bld === 0 || (yb && date && yb > Number(date.slice(0, 4)));
+      const market = land != null ? bld + land + def : null;
+      const nominal = def === 0 && land != null && acres > 0 && land / acres <= 2000;
+      return { pin: trimS(a.PARCELID), acres, price, date, deedBook: trimS(a.CURRENTOWN), vacant, ratio: market && !nominal ? price / market : null, lat: c.y, lng: c.x };
+    }).filter(r => r.pin !== subject.pin && r.acres > 0 && r.price > 0 && r.date && isFinite(r.lat) && r.vacant);
+    // One deed covering several parcels repeats the bundle price on each: drop shared deed books.
+    const books = [...new Set(rows.map(r => r.deedBook).filter(Boolean))];
+    const shared = new Set();
+    for (let i = 0; i < books.length; i += 120) {
+      const batch = books.slice(i, i + 120).filter(b => /^[\w\/-]+$/.test(b));
+      if (!batch.length) continue;
+      const j = await arcgisForm(GIS.F_PARCELS, { where: `CURRENTOWN IN (${batch.map(b => `'${b}'`).join(',')}) AND CAST(LASTSALEPR AS FLOAT) > 0`, outFields: 'PARCELID,CURRENTOWN', returnGeometry: 'false', f: 'json', resultRecordCount: '2000' }, 20000);
+      const n = new Map();
+      for (const f of (j && j.features) || []) { const b = trimS(f.attributes.CURRENTOWN); n.set(b, (n.get(b) || 0) + 1); }
+      for (const [b, c] of n) if (c > 1) shared.add(b);
+    }
+    rows = rows.filter(r => !r.deedBook || !shared.has(r.deedBook));
+    rows = dropSameDatePrice(rows);
+    // Price far from the county's value usually means a non-market sale.
+    rows = rows.filter(r => r.ratio == null || (r.ratio >= 0.5 && r.ratio <= 2.5));
+    return { rows, caveat: 'Fauquier deeds recorded as DEED/WD, vacant at sale, one parcel per deed.' };
+  }
+  // Form-encoded POST ("simple" CORS request) for queries with long where clauses.
+  async function arcgisForm(url, params, ms) {
+    const t = withTimeout(ms || 20000);
+    try {
+      const res = await fetch(url, { method: 'POST', body: new URLSearchParams(params), signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      if (j && j.error) throw new Error((j.error && j.error.message) || 'GIS error');
+      return j;
+    } finally { t.done(); }
+  }
+  function dropSameDatePrice(rows) {
+    const k = r => `${r.date}|${r.price}`, n = new Map();
+    for (const r of rows) n.set(k(r), (n.get(k(r)) || 0) + 1);
+    return rows.filter(r => n.get(k(r)) === 1);
+  }
+  async function loudounComps(subject) {
+    const lo = subject.acres * 0.5, hi = subject.acres * 2, cut = monthsAgoIso(COMP_MONTHS);
+    const cand = await pagedQuery(GIS.L_OWNER, Object.assign(envParams(envelopeAround(subject.lat, subject.lng, COMP_RADII_MI[COMP_RADII_MI.length - 1])), {
+      where: `PA_LEGAL_ACRE >= ${lo.toFixed(3)} AND PA_LEGAL_ACRE <= ${hi.toFixed(3)} AND (PRI_PREMISE_ADD IS NULL OR PRI_PREMISE_ADD = '')`,
+      outFields: 'PA_MCPI,PA_LEGAL_ACRE', returnGeometry: 'false', returnCentroid: 'true', orderByFields: 'OBJECTID', f: 'json',
+    }), 2000, 3);
+    const byPin = new Map();
+    for (const f of cand) {
+      const pin = trimS(f.attributes.PA_MCPI), c = f.centroid || {};
+      if (/^\d{12}$/.test(pin) && pin !== subject.pin && isFinite(c.y)) byPin.set(pin, { pin, acres: f.attributes.PA_LEGAL_ACRE, lat: c.y, lng: c.x });
+    }
+    const pins = [...byPin.keys()];
+    const rows = [];
+    const seen = new Set();
+    await screenPool(Array.from({ length: Math.ceil(pins.length / 300) }, (_, i) => pins.slice(i * 300, i * 300 + 300)), 3, async batch => {
+      // POST: 300 PINs make a URL too long for GET.
+      const j = await arcgisForm(GIS_X.L_SALES, { where: `PIN_NO IN (${batch.map(p => `'${p}'`).join(',')})`, outFields: 'PIN_NO,LATEST_SALE_PRICE,LATEST_SALE_DATE', returnGeometry: 'false', f: 'json' }, 20000);
+      for (const f of (j && j.features) || []) {
+        const pin = trimS(f.attributes.PIN_NO);
+        if (seen.has(pin)) continue;
+        seen.add(pin);
+        const price = Number(f.attributes.LATEST_SALE_PRICE), ms = f.attributes.LATEST_SALE_DATE;
+        const date = ms == null ? null : screenSaleIso(new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }));
+        const p = byPin.get(pin);
+        if (p && price > 10000 && date && date >= cut) rows.push(Object.assign({}, p, { price, date }));
+      }
+    });
+    return { rows: dropSameDatePrice(rows), caveat: 'Loudoun\'s sale data has no flag for non-market sales; parcels with no street address are treated as vacant.' };
+  }
+  function summarizeComps(rows, subject) {
+    for (const r of rows) r.mi = haversineM(subject.lat, subject.lng, r.lat, r.lng) * MI_PER_M;
+    for (const radius of COMP_RADII_MI) {
+      const sel = rows.filter(r => r.mi <= radius);
+      if (sel.length < COMP_MIN_N && radius !== COMP_RADII_MI[COMP_RADII_MI.length - 1]) continue;
+      const per = sel.map(r => r.price / r.acres).sort((a, b) => a - b);
+      return {
+        radius, n: sel.length, enough: sel.length >= COMP_MIN_N,
+        median: quantile(per, 0.5), p25: quantile(per, 0.25), p75: quantile(per, 0.75),
+        list: sel.slice().sort((a, b) => a.mi - b.mi).slice(0, 8),
+      };
+    }
+    return { n: 0, enough: false, radius: COMP_RADII_MI[COMP_RADII_MI.length - 1], list: [] };
+  }
+  async function valueReference(pc) {
+    const subject = { pin: pc.pin, acres: pc.acres, lat: pc.lat, lng: pc.lng };
+    if (!(subject.acres > 0)) return { error: 'parcel acreage unknown' };
+    const r = pc.jurisdiction === 'loudoun' ? await loudounComps(subject) : await fauquierComps(subject);
+    return Object.assign(summarizeComps(r.rows, subject), { caveat: r.caveat, acres: subject.acres });
+  }
+  function compsHtml(c, pc) {
+    if (!c) return '';
+    if (c.pending) return skel('Finding recent nearby land sales…');
+    if (c.error) return `<span class="fc-pc-dim">Could not load sales: ${escapeHtml(c.error)}</span>`;
+    const lo = Math.round(pc.acres * 0.5 * 10) / 10, hi = Math.round(pc.acres * 2 * 10) / 10;
+    if (!c.enough) return `<div class="fc-pc-note">Only ${c.n} usable land sale${c.n === 1 ? '' : 's'} of ${lo}–${hi} acres within ${c.radius} miles in the last 3 years — not enough to give a range.</div>`;
+    const range = `${fmtMoney(c.p25)}–${fmtMoney(c.p75)} / acre`;
+    const implied = `${fmtMoney(c.p25 * pc.acres)}–${fmtMoney(c.p75 * pc.acres)}`;
+    const a = pc.assessed || {};
+    // Sales are of land, so compare with the county's LAND value when there's a house.
+    const county = a.noMarket ? '' : a.building > 0 && a.land != null
+      ? `County land value: ${fmtMoney(a.land)} (plus a ${fmtMoney(a.building)} building)`
+      : (a.marketTotal != null || a.total != null) ? `County assessed value: ${fmtMoney(a.marketTotal != null ? a.marketTotal : a.total)}` : '';
+    return `${kv('Nearby land sales', `<strong>${escapeHtml(range)}</strong><div class="fc-pc-dim">middle half of ${c.n} sales · ${lo}–${hi} ac · within ${c.radius} mi · last 3 years · median ${fmtMoney(c.median)}/ac</div>`)}
+      ${kv(`At ${fmtAcres(pc.acres)}`, `${escapeHtml(implied)}${county ? `<div class="fc-pc-dim">${escapeHtml(county)}</div>` : ''}`)}
+      <details class="fc-comps"><summary>See the ${c.list.length} closest sales</summary>
+        ${c.list.map(r => `<div class="fc-comp"><span>${escapeHtml(fmtDay(r.date))}</span><span>${fmtAcres(r.acres)}</span><span>${fmtMoney(r.price)}</span><span>${fmtMoney(r.price / r.acres)}/ac</span><span>${r.mi.toFixed(1)} mi</span></div>`).join('')}
+      </details>
+      <div class="fc-pc-note">${escapeHtml(c.caveat)} Land estimates from sales like these typically miss by about a third — a reference point, not an appraisal or an offer price. Confirm with an agent or appraiser.</div>`;
+  }
+  function buildValueSectionHtml(pc) {
+    if (!pc.jurisdiction || !pc.geometry) return '';
+    return `<h4>Buildability &amp; value</h4>
+      <div data-bv="${escapeHtml(pc.jurisdiction + ':' + pc.pin)}">
+      <div id="fc-pc-build">${pc.build ? buildDetailHtml(pc.build) : '<button class="fc-btn fc-btn-sm" data-act="check-build">Check buildability</button>'}</div>
+      <div id="fc-pc-comps" style="margin-top:8px">${pc.comps ? compsHtml(pc.comps, pc) : '<button class="fc-btn fc-btn-sm" data-act="check-comps">Nearby land sales</button>'}</div>
+      </div>`;
+  }
+  function wireBuildValue(el, pc) {
+    // Results land only in this parcel's section — the panel may show another parcel by then.
+    const key = pc.jurisdiction + ':' + pc.pin;
+    const mine = sel => [...el.querySelectorAll('[data-bv]')].filter(n => n.getAttribute('data-bv') === key).map(n => n.querySelector(sel))[0] || null;
+    const b = el.querySelector('[data-act="check-build"]');
+    if (b) b.addEventListener('click', async () => {
+      pc.build = { pending: true };
+      const box = mine('#fc-pc-build'); if (box) box.innerHTML = buildDetailHtml(pc.build);
+      try { pc.build = await checkBuildability(pc.geometry, pc.jurisdiction, pc.acres); }
+      catch (e) { pc.build = { error: e.message || String(e) }; }
+      const box2 = mine('#fc-pc-build'); if (box2) box2.innerHTML = buildDetailHtml(pc.build);
+    });
+    const c = el.querySelector('[data-act="check-comps"]');
+    if (c) c.addEventListener('click', async () => {
+      pc.comps = { pending: true };
+      const box = mine('#fc-pc-comps'); if (box) box.innerHTML = compsHtml(pc.comps, pc);
+      try { pc.comps = await valueReference(pc); }
+      catch (e) { pc.comps = { error: e.message || String(e) }; }
+      const box2 = mine('#fc-pc-comps'); if (box2) box2.innerHTML = compsHtml(pc.comps, pc);
+    });
+  }
+
+  // Find land: run the buildability check over the top results.
+  async function checkTopResults(n) {
+    const res = (__screen.results || []).slice(0, n).filter(x => !x.rec._build || x.rec._build.error);
+    if (!res.length) return;
+    __screen.checking = { done: 0, total: res.length };
+    for (const x of res) x.rec._build = { pending: true };
+    renderFindPanel();
+    await screenPool(res, 2, async x => {
+      try { x.rec._build = await checkBuildability(x.rec.geom, x.rec.jurisdiction, x.rec.acres); }
+      catch (e) { x.rec._build = { error: e.message || String(e) }; }
+      __screen.checking.done++;
+      const row = document.querySelector(`#fc-area-list [data-sr="${(__screen.results || []).indexOf(x)}"] .fc-build-chip`);
+      if (row) row.innerHTML = buildChip(x.rec._build);
+      const st = document.getElementById('fc-find-status');
+      if (st) st.textContent = `Checked ${__screen.checking.done} of ${__screen.checking.total}…`;
+    });
+    __screen.checking = null;
+    if (__areaPanel === 'find') renderFindPanel();
+  }
+
   // ─── Panel plumbing ────────────────────────────────────────────────────
   function panelBack(to) {
-    const label = { results: 'Radius results', find: 'Find land results', saved: 'Saved listings' }[to] || 'Back';
+    const label = { results: 'Radius results', find: 'Find land results', saved: 'Saved listings', listing: 'Back to listing' }[to] || 'Back';
     return `<button class="fc-area-back" data-back="${to}">← ${label}</button>`;
   }
   function wirePanelBack(el) {
@@ -6120,6 +7074,7 @@
     else if (name === 'add') { renderAddPanel(arg); revealPanelOnPhone(); }
     else if (name === 'listing') renderListingPanel();
     else if (name === 'find') renderFindPanel();
+    else if (name === 'letters') renderLettersPanel();
   }
 
   function setAreaMode(mode) {
@@ -8746,6 +9701,27 @@ Return ONLY the 2-sentence analysis.`,
                      color:var(--muted);min-height:18px;white-space:pre-wrap"></div>
               </div>
             </div>
+            <div class="fc-card fc-area-admin" id="fc-outreach-settings" style="max-width:640px;margin-top:16px">
+              <div class="fc-card-hd"><div class="fc-card-title">Letter details</div></div>
+              <div style="padding:16px 18px;font-size:13px;color:var(--ink-2);line-height:1.55">
+                <p style="margin-bottom:12px">Your name and return address print on letters to landowners. Phone and email are how owners reach you. Saved to your Nestscoop server, so every device uses them.</p>
+                <div class="fc-or-settings">
+                  <label class="fc-or-full">Your name<input class="fc-area-input" data-pf="sender_name" autocomplete="name"></label>
+                  <label class="fc-or-full">Street address<input class="fc-area-input" data-pf="sender_line1" autocomplete="address-line1"></label>
+                  <label class="fc-or-full">Address line 2<input class="fc-area-input" data-pf="sender_line2" autocomplete="address-line2"></label>
+                  <label>City<input class="fc-area-input" data-pf="sender_city" autocomplete="address-level2"></label>
+                  <label>State<input class="fc-area-input" data-pf="sender_state" maxlength="2" autocomplete="address-level1"></label>
+                  <label>ZIP<input class="fc-area-input" data-pf="sender_zip" inputmode="numeric" autocomplete="postal-code"></label>
+                  <label>Phone<input class="fc-area-input" type="tel" data-pf="sender_phone" autocomplete="tel"></label>
+                  <label>Email<input class="fc-area-input" type="email" data-pf="sender_email" autocomplete="email"></label>
+                  <label>Sign letters as<input class="fc-area-input" data-pf="signature" placeholder="Defaults to your name"></label>
+                  <label>Follow up after (days)<input class="fc-area-input" data-pf="follow_up_days" inputmode="numeric"></label>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px"><button id="fc-or-settings-save" class="fc-btn fc-btn-dark">Save letter details</button></div>
+                <div id="fc-or-settings-msg" class="fc-pc-note"></div>
+                <div id="fc-or-mail-status" class="fc-pc-note"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -10230,6 +11206,45 @@ Return ONLY the 2-sentence analysis.`,
   .fc-pc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .fc-pc-skel { color: var(--muted-2); font-style: italic; }
   .fc-find { background: var(--white); border: 1px solid var(--hair); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+  /* Outreach */
+  .fc-btn[hidden], .fc-or-log[hidden] { display: none !important; }
+  .fc-or { margin-top: 6px; }
+  .fc-or label, .fc-or-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); min-width: 0; }
+  .fc-or-full { grid-column: 1 / -1; margin-top: 6px; }
+  .fc-or-grid { display: grid; grid-template-columns: 2fr 0.7fr 1fr; gap: 6px; margin-top: 6px; }
+  .fc-or-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .fc-or-follow { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .fc-or-follow label { flex: 0 1 170px; }
+  .fc-or-log { background: var(--paper-2); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .fc-or-timeline { margin-top: 10px; font-size: 12px; }
+  .fc-or-ev { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--hair); }
+  .fc-or-ev-day { font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .fc-or-ev-del { background: transparent; border: 0; color: var(--muted-2); cursor: pointer; font-size: 14px; padding: 0 4px; }
+  .fc-or-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fc-sl-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  /* Letters — screen preview scales a page down; print shows only #fc-print-root */
+  .fc-letter-preview { margin-top: 10px; border: 1px solid var(--hair); border-radius: 6px; overflow: hidden; background: #fff; height: 4.6in; }
+  .fc-letter-preview .fc-letter { transform: scale(0.42); transform-origin: top left; }
+  .fc-letter { position: relative; width: 8.5in; height: 11in; box-sizing: border-box; background: #fff; color: #111; font-family: Georgia, "Times New Roman", serif; font-size: 11.5pt; line-height: 1.45; }
+  .fc-letter-from { position: absolute; top: 0.55in; left: 0.6in; width: 3.3in; font-size: 10pt; line-height: 1.3; }
+  .fc-letter-to { position: absolute; top: 2.1in; left: 1in; width: 3.6in; font-size: 11pt; line-height: 1.3; }
+  .fc-letter-date { position: absolute; top: 3.45in; left: 1in; }
+  .fc-letter-body { position: absolute; top: 3.9in; left: 1in; right: 1in; }
+  .fc-letter-body p { margin: 0 0 0.14in; }
+  .fc-letter-body [contenteditable="true"] { outline: 1px dashed transparent; }
+  .fc-letter-body [contenteditable="true"]:focus { outline-color: var(--sky); }
+  .fc-letter-sig { margin-top: 0.3in !important; }
+  #fc-print-root { display: none; }
+  @media print {
+    @page { size: letter; margin: 0; }
+    body.fc-printing > *:not(#fc-print-root) { display: none !important; }
+    body.fc-printing #fc-print-root { display: block !important; }
+    body.fc-printing { background: #fff !important; }
+    #fc-print-root .fc-letter { break-after: page; page-break-after: always; }
+  }
+  .fc-comps { margin-top: 6px; font-size: 12px; }
+  .fc-comps > summary { cursor: pointer; color: var(--sky); }
+  .fc-comp { display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 0.6fr; gap: 6px; padding: 4px 0; border-top: 1px solid var(--hair); font-family: var(--f-mono); font-size: 11px; }
   .fc-find-filters { margin-top: 6px; }
   .fc-find-filters > summary { cursor: pointer; font-size: 12px; color: var(--sky); padding: 4px 0; list-style-position: inside; }
   .fc-find-filters[open] > summary { color: var(--muted); }
@@ -10262,6 +11277,10 @@ Return ONLY the 2-sentence analysis.`,
     .fc-pc-row { font-size: 13px; }
     .fc-area-tab { padding: 11px 6px; font-size: 13px; }
     .fc-find-check { font-size: 14px; padding: 3px 0; }
+    .fc-or-grid { grid-template-columns: 1fr 1fr; }
+    .fc-or-settings { grid-template-columns: 1fr; }
+    .fc-letter-preview { height: 3.9in; }
+    .fc-letter-preview .fc-letter { transform: scale(0.36); }
     .fc-find-check input { width: 18px; height: 18px; }
   }
 
