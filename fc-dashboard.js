@@ -750,7 +750,20 @@
   const ZILLOW_LS_PREFIX = 'fs_zillow_';
   // Standalone Nestscoop worker — deliberately NOT on sales-hq-api so a
   // Nestscoop bug can't affect BeyondPayroll / AJAX Dev.
-  const ZILLOW_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/zillow';
+  const NESTSCOOP_API_PROD = 'https://nestscoop-api.ajbb705.workers.dev';
+  function nestscoopApiBase() {
+    // Local dev can point at `wrangler dev`; production always uses the Worker.
+    const h = location.hostname;
+    if (h === '127.0.0.1' || h === 'localhost') {
+      try {
+        const o = localStorage.getItem('fs_api_base');
+        if (o && /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(o)) return o;
+      } catch (e) { /* ignore */ }
+    }
+    return NESTSCOOP_API_PROD;
+  }
+  window.fcApiBase = nestscoopApiBase;
+  const ZILLOW_SYNC_BASE = nestscoopApiBase() + '/api/zillow';
   const ZILLOW_TOKEN_LS_KEY = 'fs_zillow_sync_token';
 
   function getZillowSyncToken() {
@@ -818,7 +831,7 @@
   // ─── Assessor intelligence (server-side fetch, D1-cached) ────────────────
   // Calls the nestscoop-api /api/assessor/<jurisdiction> endpoint which
   // does the county-portal scrape worker-side and caches 30d in D1.
-  const ASSESSOR_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/assessor';
+  const ASSESSOR_BASE = nestscoopApiBase() + '/api/assessor';
 
   // Dispatch per jurisdiction. Arlington is the only one wired up today;
   // returns null for everything else so the section self-hides.
@@ -975,7 +988,7 @@
   // a structured prompt and caches the result 90d in D1. Per-property cost
   // is one Static Maps call (~free at our volume) + one Gemini Vision call
   // (~$0.001 per drawer open, capped by the 90d cache).
-  const ROOF_API = 'https://nestscoop-api.ajbb705.workers.dev/api/roof/analyze';
+  const ROOF_API = nestscoopApiBase() + '/api/roof/analyze';
 
   function buildSatelliteUrl(lat, lng, zoom = 20, size = 600) {
     const key = window.GOOGLE_MAPS_API_KEY || '';
@@ -1110,7 +1123,7 @@
   // DC is the only jurisdiction wired today (DCRA Building Permits feature
   // service via /api/permits/dc). Fairfax / Arlington / Loudoun / etc. would
   // each get their own endpoint and routing in permitsJurisdiction().
-  const PERMITS_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/permits';
+  const PERMITS_BASE = nestscoopApiBase() + '/api/permits';
 
   function permitsJurisdiction(p) {
     const state = (p.state || '').toUpperCase();
@@ -1250,7 +1263,7 @@
   // here. Cached in localStorage for instant reads + synced to nestscoop-api
   // D1 so desktop + iPhone see the same intelligence.
   const LIEN_LS_PREFIX = 'fs_liens_';
-  const LIEN_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/liens';
+  const LIEN_SYNC_BASE = nestscoopApiBase() + '/api/liens';
 
   function getLiens(propId) {
     if (!propId) return null;
@@ -1318,7 +1331,7 @@
   // auction time into the drawer. Saved per-device + synced via worker D1
   // so iPhone/desktop see the same numbers. Same shape as liens.
   const AUCTION_LS_PREFIX = 'fs_auction_';
-  const AUCTION_SYNC_BASE = 'https://nestscoop-api.ajbb705.workers.dev/api/auction';
+  const AUCTION_SYNC_BASE = nestscoopApiBase() + '/api/auction';
 
   function getAuction(propId) {
     if (!propId) return null;
@@ -1949,6 +1962,8 @@
     if (view === 'deals' && typeof window.fcRenderDeals === 'function') {
       window.fcRenderDeals();
     }
+    // Phone CSS drops the page head on Area Focus so the map is on screen.
+    document.body.classList.toggle('fc-on-area-focus', view === 'area-focus');
     // Area Focus initializes Leaflet lazily on first entry so the map tiles
     // only fetch when the view is actually visible.
     if (view === 'area-focus' && typeof window.fcInitAreaFocus === 'function') {
@@ -3857,12 +3872,13 @@
   // Debounced via setTimeout so we don't block the initial render.
   setTimeout(() => { try { window.fcRenderDeals(); } catch (e) {} }, 1500);
 
-  // ─── Area Focus (Phase 2a) ─────────────────────────────────────────────
-  // Leaflet-powered map centered on western Loudoun / Fauquier. User clicks
-  // to drop a search center; a radius circle filters land listings around
-  // the point. Water polygons/lines from OpenStreetMap drawn as a layer so
-  // adjacency to rivers/lakes is visible. Water-adjacency score computed
-  // per listing as haversine distance to nearest hydrography vertex.
+  // ─── Area Focus ────────────────────────────────────────────────────────
+  // Leaflet map over western Loudoun / Fauquier. A map click does one of:
+  //   inspect (default) → live county parcel lookup at that point: one card
+  //                        with ownership/value/sale, zoning, overlays, site
+  //   radius            → drop a search center; land listings within N mi
+  //   placing           → set the spot for a saved listing that needs a pin
+  // Saved listings (pasted links) persist in D1 via the Worker /api/listings.
   let __areaMap = null;
   let __areaCenterMarker = null;
   let __areaRadiusCircle = null;
@@ -3872,6 +3888,66 @@
   let __areaListingLayer = null;
   let __areaHydro = null; // GeoJSON FeatureCollection
   let __areaHydroPoints = null; // flat [[lat,lng,name,kind], ...] for fast nearest lookup
+  let __areaHydroPromise = null;
+  let __areaMode = 'inspect';
+  let __areaPanel = 'saved'; // saved | results | parcel | listing | add
+  let __areaGisData = []; // [{cfg, fc, bboxes}]
+  let __parcelLayer = null;
+  let __parcelHighlight = null;
+  let __parcelReqSeq = 0;
+  let __inspectSeq = 0;
+  let __savedLayer = null;
+  let __savedListings = [];
+  let __savedState = 'idle'; // idle | loading | ready | no-token | error
+  let __savedError = '';
+  let __openListingId = null;
+  let __placing = null; // listing awaiting a pin
+  let __placeMarker = null;
+  let __listingParcel = null; // {key, pc} — last parcel lookup for an open listing
+  let __pendingAddPayload = null; // facts from the "Send to Nestscoop" bookmarklet
+
+  // The bookmarklet opens nestscoop.com/...#area-focus&add=<json>. Consume it
+  // before view routing reads the hash, and keep AJ in the loop: it only
+  // pre-fills the Add panel, it never saves without a tap.
+  function consumeAddPayload() {
+    const m = (location.hash || '').match(/[#&]add=([^&]*)/);
+    if (!m) return false;
+    try {
+      const obj = JSON.parse(decodeURIComponent(m[1]));
+      if (obj && typeof obj === 'object' && !Array.isArray(obj) && typeof obj.u === 'string') __pendingAddPayload = obj;
+    } catch (e) { /* malformed payload — ignore */ }
+    history.replaceState(null, '', location.pathname + location.search + '#area-focus');
+    return true;
+  }
+  consumeAddPayload();
+  // Same-tab hand-off (hash change, no reload). Registered before the view
+  // router's listener, which then sees a clean #area-focus and opens the panel.
+  window.addEventListener('hashchange', consumeAddPayload);
+
+  async function apiFetch(path, opts) {
+    opts = opts || {};
+    const token = getZillowSyncToken();
+    if (!token) return { ok: false, reason: 'no-token', error: 'This device is not connected yet.' };
+    const headers = { 'X-Nestscoop-Token': token };
+    if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+    let res;
+    try {
+      res = await fetch(nestscoopApiBase() + path, { method: opts.method || 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
+    } catch (e) {
+      return { ok: false, reason: 'network', error: 'Could not reach the Nestscoop server.' };
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* non-JSON */ }
+    if (!res.ok) {
+      return { ok: false, reason: res.status === 401 ? 'unauthorized' : 'http', status: res.status, error: (data && data.error) || ('HTTP ' + res.status), data };
+    }
+    return Object.assign({ ok: true }, data || {});
+  }
+
+  function safeHttps(u) {
+    try { const x = new URL(String(u)); return x.protocol === 'https:' ? x.href : null; } catch (e) { return null; }
+  }
+  const isPhone = () => window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
 
   // Haversine distance in meters.
   function haversineM(lat1, lng1, lat2, lng2) {
@@ -3886,46 +3962,43 @@
   const MI_PER_M = 1 / 1609.344;
   const FT_PER_M = 3.28084;
 
-  async function loadAreaHydro() {
-    if (__areaHydro) return __areaHydro;
-    try {
-      const res = await fetch('data/hydro_western_dmv.geojson', { cache: 'force-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      __areaHydro = await res.json();
-      // Flatten vertices into a dense point list for cheap nearest-neighbor
-      // scanning. 3,849 features × avg 4 points each = ~15k points — small
-      // enough to brute-force per listing without indexing.
-      const pts = [];
-      for (const f of __areaHydro.features) {
-        const name = f.properties.name || null;
-        const kind = f.properties.kind || 'water';
-        const g = f.geometry;
-        const walk = (coords, isPoly) => {
-          if (isPoly) {
-            for (const ring of coords) {
-              for (const [lng, lat] of ring) pts.push([lat, lng, name, kind]);
-            }
-          } else {
-            for (const [lng, lat] of coords) pts.push([lat, lng, name, kind]);
-          }
-        };
-        if (g.type === 'LineString') walk(g.coordinates, false);
-        else if (g.type === 'Polygon') walk(g.coordinates, true);
-        else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => walk(poly, true));
+  function loadAreaHydro() {
+    if (__areaHydroPromise) return __areaHydroPromise;
+    __areaHydroPromise = (async () => {
+      try {
+        const res = await fetch('data/hydro_western_dmv.geojson', { cache: 'force-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        __areaHydro = await res.json();
+        // Flatten vertices into a dense point list for cheap nearest-neighbor
+        // scanning (~15k points; brute force is fine).
+        const pts = [];
+        for (const f of __areaHydro.features) {
+          const name = f.properties.name || null;
+          const kind = f.properties.kind || 'water';
+          const g = f.geometry;
+          const walk = (coords, isPoly) => {
+            if (isPoly) { for (const ring of coords) for (const [lng, lat] of ring) pts.push([lat, lng, name, kind]); }
+            else { for (const [lng, lat] of coords) pts.push([lat, lng, name, kind]); }
+          };
+          if (g.type === 'LineString') walk(g.coordinates, false);
+          else if (g.type === 'Polygon') walk(g.coordinates, true);
+          else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => walk(poly, true));
+        }
+        __areaHydroPoints = pts;
+      } catch (e) {
+        console.warn('Area Focus: hydro fetch failed', e);
+        __areaHydro = { features: [] };
+        __areaHydroPoints = [];
       }
-      __areaHydroPoints = pts;
-    } catch (e) {
-      console.warn('Area Focus: hydro fetch failed', e);
-      __areaHydro = { features: [] };
-      __areaHydroPoints = [];
-    }
-    return __areaHydro;
+      return __areaHydro;
+    })();
+    return __areaHydroPromise;
   }
 
-  // Nearest water feature to (lat,lng). Returns { distM, name, kind } or null.
+  // Nearest mapped water vertex to (lat,lng). Returns { distM, name, kind } or null.
+  // Vertex distance overstates the gap to a long straight segment slightly.
   function nearestWater(lat, lng) {
     if (!__areaHydroPoints || !__areaHydroPoints.length) return null;
-    // Bounding-box prefilter: only consider points within ~2 miles for speed.
     const LAT_RANGE = 0.03; // ~2 miles
     const LNG_RANGE = 0.04;
     let best = null;
@@ -3935,7 +4008,6 @@
       const d = haversineM(lat, lng, p[0], p[1]);
       if (!best || d < best.distM) best = { distM: d, name: p[2], kind: p[3] };
     }
-    // Fallback: widen if nothing found in 2-mile band
     if (!best) {
       for (const p of __areaHydroPoints) {
         const d = haversineM(lat, lng, p[0], p[1]);
@@ -3945,8 +4017,7 @@
     return best;
   }
 
-  // Seed listings from the existing foreclosure pool, filtering to land type
-  // (or anything with a positive lot size as a near-approximation).
+  // Foreclosure-pool land listings (legacy source) for the radius search.
   function getAreaFocusCandidates() {
     const pool = (window.__fcData && window.__fcData.foreclosures) || [];
     return pool.filter(p => {
@@ -3962,199 +4033,1180 @@
     if (!__areaMap || !__areaHydro) return;
     const style = f => {
       const k = f.properties.kind;
-      // Rivers heavier; streams lighter; polygons filled.
       const strong = k === 'river' || k === 'canal' || k === 'reservoir';
-      return {
-        color: '#3a7a9b',
-        weight: strong ? 2.4 : 1.1,
-        opacity: 0.75,
-        fillColor: '#8dc1d9',
-        fillOpacity: 0.42,
-      };
+      return { color: '#3a7a9b', weight: strong ? 2.4 : 1.1, opacity: 0.75, fillColor: '#8dc1d9', fillOpacity: 0.42 };
     };
-    L.geoJSON(__areaHydro, { style }).addTo(__areaMap);
+    L.geoJSON(__areaHydro, { style, interactive: false }).addTo(__areaMap);
   }
 
-  // ─── Phase 2b: county GIS growth-signal + exclusion layers ─────────────
-  // Each entry: {file, label, style, popup, defaultOn}
-  // Style palette:
-  //   Rezoning cases      → yellow stroke, light yellow fill (growth signal)
-  //   Service / Growth    → green shade (county-planned growth areas)
-  //   Transition Policy   → tan shade (rural-becoming-suburban buffer)
-  //   Conservation easmt  → red hatched (🔴 CANNOT develop — critical exclusion)
+  // ─── County growth-signal + exclusion overlays (static GeoJSON) ────────
+  // Non-interactive: a map click is always ONE parcel lookup, and the parcel
+  // card reports which of these the clicked point falls in.
   const AREA_GIS_LAYERS = [
-    {
-      file: 'data/gis_fauquier_zoning_cases.geojson',
-      label: 'Fauquier rezoning cases',
-      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }),
-      popup: p => `<strong>Fauquier rezoning case</strong><br>Case: ${p.CASE_NUMBER || '—'}<br>Status: ${p.STATUS || '—'}<br>Zone type: ${p.ZONETYPE || '—'}<br>Zone code: ${p.ZONECODE || '—'}`,
-      defaultOn: true,
-    },
-    {
-      file: 'data/gis_loudoun_rezoning_zmap.geojson',
-      label: 'Loudoun rezoning (ZMAP)',
-      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }),
-      popup: p => `<strong>Loudoun ZMAP</strong><br>Zone: ${p.ZO_ZONE || '—'}<br>Project #: ${p.ZO_PROJ_NUM || '—'}<br>Ordinance: ${p.ZO_ORDINANCE || '—'}<br>Date: ${p.ZO_ZONE_DATE || '—'}`,
-      defaultOn: true,
-    },
-    {
-      file: 'data/gis_fauquier_service_districts.geojson',
-      label: 'Fauquier growth areas (Service Districts)',
-      style: () => ({ color: '#2d6a4f', weight: 1.4, opacity: 0.9, fillColor: '#95d5b2', fillOpacity: 0.25 }),
-      popup: p => `<strong>Fauquier Service District</strong><br>District: ${p.DISTRICTNA || '—'}<br>Code: ${p.SVCDISTRIC || '—'}`,
-      defaultOn: true,
-    },
-    {
-      file: 'data/gis_loudoun_transition_policy_area.geojson',
-      label: 'Loudoun Transition Policy Area',
-      style: () => ({ color: '#a67b4a', weight: 1.6, opacity: 0.9, fillColor: '#d4b48a', fillOpacity: 0.22 }),
-      popup: () => `<strong>Loudoun Transition Policy Area</strong><br>2019 Comp Plan — rural becoming suburban. Growth is formally contemplated here.`,
-      defaultOn: true,
-    },
-    {
-      file: 'data/gis_fauquier_conservation_easements.geojson',
-      label: 'Fauquier conservation easements (🔴 no development)',
-      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }),
-      popup: p => `<strong>Conservation easement</strong><br>${p.NAME || 'Unnamed'}<br>Type: ${p.EASEMENTTY || '—'}<br>⚠️ Land cannot be developed.`,
-      defaultOn: true,
-    },
-    {
-      file: 'data/gis_loudoun_conservation_easements.geojson',
-      label: 'Loudoun conservation easements (🔴 no development)',
-      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }),
-      popup: p => `<strong>Conservation easement</strong><br>Holder: ${p.CE_HOLDER1 || '—'}<br>Type: ${p.CE_TYPE || '—'}<br>Class: ${p.CE_CLASSIFICATION || '—'}<br>Acres: ${p.CE_GIS_ACRES ? Number(p.CE_GIS_ACRES).toFixed(1) : '—'}<br>Recorded: ${p.CE_RECORDATION_DATE || '—'}<br>⚠️ Land cannot be developed.`,
-      defaultOn: true,
-    },
+    { key: 'f_rezoning', file: 'data/gis_fauquier_zoning_cases.geojson', label: 'Fauquier rezoning cases',
+      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }) },
+    { key: 'l_rezoning', file: 'data/gis_loudoun_rezoning_zmap.geojson', label: 'Loudoun rezoning (ZMAP)',
+      style: () => ({ color: '#b8860b', weight: 1.6, opacity: 0.9, fillColor: '#f3d680', fillOpacity: 0.35 }) },
+    { key: 'f_growth', file: 'data/gis_fauquier_service_districts.geojson', label: 'Fauquier growth areas (Service Districts)',
+      style: () => ({ color: '#2d6a4f', weight: 1.4, opacity: 0.9, fillColor: '#95d5b2', fillOpacity: 0.25 }) },
+    { key: 'l_transition', file: 'data/gis_loudoun_transition_policy_area.geojson', label: 'Loudoun Transition Policy Area',
+      style: () => ({ color: '#a67b4a', weight: 1.6, opacity: 0.9, fillColor: '#d4b48a', fillOpacity: 0.22 }) },
+    { key: 'f_easement', file: 'data/gis_fauquier_conservation_easements.geojson', label: 'Fauquier conservation easements',
+      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }) },
+    { key: 'l_easement', file: 'data/gis_loudoun_conservation_easements.geojson', label: 'Loudoun conservation easements',
+      style: () => ({ color: '#c84b2f', weight: 1.0, opacity: 0.85, fillColor: '#c84b2f', fillOpacity: 0.25, dashArray: '4 3' }) },
   ];
 
-  // Cached layer objects so the layer control toggles can show/hide without
-  // re-fetching.
-  let __areaGisLayerObjs = null;
+  function ringBBox(coords, bb) {
+    for (const c of coords) {
+      if (typeof c[0] === 'number') {
+        if (c[0] < bb[0]) bb[0] = c[0]; if (c[1] < bb[1]) bb[1] = c[1];
+        if (c[0] > bb[2]) bb[2] = c[0]; if (c[1] > bb[3]) bb[3] = c[1];
+      } else ringBBox(c, bb);
+    }
+    return bb;
+  }
+  function pointInRingLL(lng, lat, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function featureContains(geom, lng, lat) {
+    if (!geom) return false;
+    const inPoly = poly => poly[0] && pointInRingLL(lng, lat, poly[0]) && !poly.slice(1).some(h => pointInRingLL(lng, lat, h));
+    if (geom.type === 'Polygon') return inPoly(geom.coordinates);
+    if (geom.type === 'MultiPolygon') return geom.coordinates.some(inPoly);
+    return false;
+  }
+  function bboxDistanceM(bb, lng, lat) {
+    const cx = Math.min(Math.max(lng, bb[0]), bb[2]);
+    const cy = Math.min(Math.max(lat, bb[1]), bb[3]);
+    return haversineM(lat, lng, cy, cx);
+  }
 
   async function loadAreaGisLayers() {
-    if (__areaGisLayerObjs) return __areaGisLayerObjs;
-    __areaGisLayerObjs = {};
-    // Fetch all layers in parallel — each is independent.
+    if (__areaGisData.length) return __areaGisData;
     const results = await Promise.allSettled(AREA_GIS_LAYERS.map(cfg =>
       fetch(cfg.file, { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)
     ));
     const overlays = {};
     results.forEach((res, i) => {
       const cfg = AREA_GIS_LAYERS[i];
-      if (res.status !== 'fulfilled' || !res.value) {
-        console.warn('GIS layer failed:', cfg.file);
-        return;
-      }
+      if (res.status !== 'fulfilled' || !res.value) { console.warn('GIS layer failed:', cfg.file); return; }
       const fc = res.value;
-      const layer = L.geoJSON(fc, {
-        style: cfg.style,
-        onEachFeature: (feature, lyr) => {
-          lyr.bindPopup(cfg.popup(feature.properties || {}));
-        },
-      });
-      __areaGisLayerObjs[cfg.label] = layer;
+      const bboxes = (fc.features || []).map(f => f.geometry ? ringBBox(f.geometry.coordinates, [Infinity, Infinity, -Infinity, -Infinity]) : null);
+      __areaGisData.push({ cfg, fc, bboxes });
+      const layer = L.geoJSON(fc, { style: cfg.style, interactive: false });
       overlays[cfg.label] = layer;
-      if (cfg.defaultOn) layer.addTo(__areaMap);
+      layer.addTo(__areaMap);
     });
-    // Add a Leaflet layer-control so the user can toggle each overlay.
-    L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(__areaMap);
-    return __areaGisLayerObjs;
+    if (__parcelLayer) overlays['Parcel lines (zoom in)'] = __parcelLayer;
+    if (__savedLayer) overlays['My saved listings'] = __savedLayer;
+    L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(__areaMap);
+    return __areaGisData;
+  }
+
+  // Rezoning layers hold ~20 years of cases, including the 2005 countywide
+  // AR rezoning. Only the last 10 years count as a growth signal.
+  const REZONING_RECENT_YEAR = new Date().getFullYear() - 10;
+  function rezoningCaseYear(key, p) {
+    if (key === 'l_rezoning' && isFinite(p.ZO_ZONE_DATE) && p.ZO_ZONE_DATE > 0) {
+      const y = new Date(p.ZO_ZONE_DATE).getUTCFullYear();
+      if (y > 1950 && y < 2100) return y;
+    }
+    const m = String((key === 'l_rezoning' ? p.ZO_PROJ_NUM : p.CASE_NUMBER) || '').match(/(?:19|20)\d{2}/);
+    return m ? Number(m[0]) : null;
+  }
+
+  function cleanCaseId(v) {
+    const t = trimS(v);
+    return t && !/^no value$/i.test(t) ? t : null;
+  }
+
+  // Which overlays contain the point, plus recent rezoning cases within 1 mile.
+  function overlaysAt(lat, lng) {
+    const out = { rezoningOn: [], rezoningNear: 0, growth: null, transition: false, easementSpatial: false };
+    for (const { cfg, fc, bboxes } of __areaGisData) {
+      const feats = fc.features || [];
+      for (let i = 0; i < feats.length; i++) {
+        const bb = bboxes[i];
+        if (!bb) continue;
+        const isRezoning = cfg.key === 'f_rezoning' || cfg.key === 'l_rezoning';
+        const near = bboxDistanceM(bb, lng, lat);
+        if (isRezoning && near > 1609.344) continue;
+        if (!isRezoning && near > 0) continue;
+        const inside = featureContains(feats[i].geometry, lng, lat);
+        const p = feats[i].properties || {};
+        if (isRezoning) {
+          const year = rezoningCaseYear(cfg.key, p);
+          const caseId = cleanCaseId(cfg.key === 'l_rezoning' ? p.ZO_PROJ_NUM : p.CASE_NUMBER);
+          if (!caseId && year == null) continue; // unlabeled shapes are not cases
+          if (cfg.key === 'l_rezoning' && trimS(p.ZO_ZONE).toUpperCase() === 'TOWNS') continue; // town limits, not a rezoning
+          const recent = year != null && year >= REZONING_RECENT_YEAR;
+          if (inside) out.rezoningOn.push(cfg.key === 'l_rezoning'
+            ? { id: caseId, zone: trimS(p.ZO_ZONE) || null, year, recent }
+            : { id: caseId, zone: trimS(p.ZONECODE) || null, status: titleish(trimS(p.STATUS)) || null, year, recent });
+          else if (recent) out.rezoningNear++;
+        } else if (inside) {
+          if (cfg.key === 'f_growth') out.growth = trimS(p.DISTRICTNA) || 'Fauquier Service District';
+          if (cfg.key === 'l_transition') out.transition = true;
+          if (cfg.key === 'f_easement' || cfg.key === 'l_easement') out.easementSpatial = true;
+        }
+      }
+    }
+    return out;
+  }
+
+  // ─── County parcel lookups (browser → county ArcGIS; CORS verified) ────
+  const GIS = {
+    L_PARCELS: 'https://logis.loudoun.gov/gis/rest/services/COL/LandRecords/MapServer/5/query',
+    L_OWNER: 'https://services1.arcgis.com/MxjRokvPm7bjslyR/arcgis/rest/services/Stacked_Parcels_Owner/FeatureServer/0/query',
+    L_LMIS0: 'https://logis.loudoun.gov/gis/rest/services/COL/LMIS_ParcelsPlatfile/MapServer/0/query',
+    L_LMIS2: 'https://logis.loudoun.gov/gis/rest/services/COL/LMIS_ParcelsPlatfile/MapServer/2/query',
+    L_EASE: 'https://logis.loudoun.gov/gis/rest/services/COL/Districts/MapServer/6/query',
+    L_LANDUSE: 'https://logis.loudoun.gov/gis/rest/services/Projects/BuildOut_LandUse/MapServer/1/query',
+    L_ZONING: 'https://logis.loudoun.gov/gis/rest/services/COL/Zoning/MapServer/3/query',
+    F_PARCELS: 'https://services.arcgis.com/oAoeYJ1kqmAwcEC2/arcgis/rest/services/Tax_Parcels_DL/FeatureServer/0/query',
+    F_ZONING: 'https://services.arcgis.com/oAoeYJ1kqmAwcEC2/arcgis/rest/services/Zoning_Districts_DL/FeatureServer/0/query',
+    F_EASE: 'https://services.arcgis.com/oAoeYJ1kqmAwcEC2/arcgis/rest/services/Conservation_Easements_DL/FeatureServer/0/query',
+    F_DELINQ: 'https://agol.gis.fauquiercounty.gov/arcgis/rest/services/MapServices/DelinquentParcels/MapServer/0/query',
+    FEMA: 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query',
+    SDA: 'https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest',
+    ELEV: 'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples',
+  };
+  // Rough county extents — only used to skip a county query for views far away.
+  const LOUDOUN_BOX = { s: 38.84, n: 39.33, w: -77.97, e: -77.32 };
+  const FAUQUIER_BOX = { s: 38.43, n: 39.00, w: -78.14, e: -77.53 };
+  const PARCEL_MIN_ZOOM = 15;
+
+  const FAUQ_ZONING = {
+    'RC': 'Rural Conservation', 'RA': 'Rural Agricultural', 'RR-2': 'Rural Residential', 'V': 'Village',
+    'R-1': 'Residential, 1 unit/acre', 'R-2': 'Residential, 2 units/acre', 'R-3': 'Residential, 3 units/acre', 'R-4': 'Residential, 4 units/acre',
+    'TH': 'Townhouse', 'GA': 'Garden Apartment', 'MDP': 'Manufactured Dwelling Park', 'C-1': 'Commercial Neighborhood',
+    'C-2': 'Commercial Highway', 'C-3': 'Shopping Center, Community/Regional', 'CV': 'Commercial Village', 'I-1': 'Industrial Park',
+    'I-2': 'Industrial General', 'PDMU': 'Mixed Use', 'MU-BLTN': 'Mixed Use Bealeton', 'PRD': 'Planned Residential Development',
+    'PCID': 'Planned Commercial Industrial Development', 'M-G': 'Marshall Gateway', 'M-R': 'Marshall Residential', 'M-T': 'Marshall Town', 'BP': 'Business Park',
+  };
+
+  const trimS = v => (v == null ? '' : String(v).trim());
+  const numS = v => {
+    if (v == null) return null;
+    const s = String(v).replace(/[$,\s]/g, '');
+    if (!s) return null;
+    const n = Number(s);
+    return isFinite(n) ? n : null;
+  };
+  // Loudoun stores dates as epoch ms at local midnight ET; 1899-12-30 = null, 9999 = open.
+  function etDate(ms) {
+    if (ms == null || !isFinite(ms)) return null;
+    const d = new Date(ms);
+    const y = d.getUTCFullYear();
+    if (y < 1901 || y >= 9999) return null;
+    return d.toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function isoDate(s) {
+    const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m || m[1] === '1900') return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  // Tyler prints MM/DD/YYYY; show it like the GIS dates.
+  function usDate(s) {
+    const m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2])).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  const fmtMoney = v => (v == null || !isFinite(v)) ? '—' : '$' + Math.round(v).toLocaleString();
+  const fmtAcres = v => (v == null || !isFinite(v)) ? '—' : (v >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' ac';
+  const titleish = s => String(s || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  function withTimeout(ms) {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return { signal: c.signal, done: () => clearTimeout(t) };
+  }
+  async function arcgis(url, params, ms) {
+    const t = withTimeout(ms || 9000);
+    try {
+      const res = await fetch(url + '?' + new URLSearchParams(params), { signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      if (j && j.error) throw new Error((j.error && j.error.message) || 'GIS error');
+      return j;
+    } finally { t.done(); }
+  }
+  const pointParams = (lat, lng, extra) => Object.assign({
+    geometry: `${lng},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects', returnGeometry: 'false', f: 'json',
+  }, extra);
+  const firstAttrs = j => (j && j.features && j.features[0] && j.features[0].attributes) || null;
+
+  async function loudounParcelAt(lat, lng) {
+    const j = await arcgis(GIS.L_PARCELS, pointParams(lat, lng, {
+      where: "PA_TYPE<>'W'", outFields: 'PA_MCPI,PA_LEGAL_ACRE,PA_SUBD_NAME',
+      returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
+    }));
+    const f = j && j.features && j.features[0];
+    if (!f) return null;
+    const pin = trimS(f.properties.PA_MCPI);
+    if (!/^\d{12}$/.test(pin)) return null;
+    return { jurisdiction: 'loudoun', county: 'Loudoun', pin, acres: numS(f.properties.PA_LEGAL_ACRE), subdivision: trimS(f.properties.PA_SUBD_NAME) || null, geometry: f.geometry };
+  }
+
+  async function fauquierParcelAt(lat, lng) {
+    const j = await arcgis(GIS.F_PARCELS, pointParams(lat, lng, {
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,SITEADDRES,ACREAGE,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,Building_V,Land_Value,Final_Valu,ASSESS_LND,Total_ASSE,Year_Built',
+      returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
+    }));
+    const f = j && j.features && j.features[0];
+    if (!f) return null;
+    const a = f.properties || {};
+    const pin = trimS(a.PARCELID);
+    if (!/^\d{4}-\d{2}-\d{4}-\d{3}$/.test(pin)) return null;
+    const final = numS(a.Final_Valu), mktLand = numS(a.ASSESS_LND), mktTotal = numS(a.Total_ASSE);
+    const salePrice = numS(a.LASTSALEPR);
+    const yb = numS(a.Year_Built);
+    return {
+      jurisdiction: 'fauquier', county: 'Fauquier', pin,
+      acres: numS(a.ACREAGE), address: trimS(a.SITEADDRES) || null,
+      owner: [trimS(a.OWNERNME1), trimS(a.Co_Owner2)].filter(Boolean).join(' & ') || null,
+      landUse: trimS(a.Primary__1) || null, district: trimS(a.District_D) || null,
+      yearBuilt: yb && yb > 1700 ? yb : null,
+      // Final_Valu = assessed total. Total_ASSE is market value ONLY for land-use-program
+      // parcels (ASSESS_LND > 0); elsewhere it is just the building value.
+      assessed: { year: null, land: numS(a.Land_Value), building: numS(a.Building_V), total: final, marketTotal: mktLand > 0 ? mktTotal : null, landUseProgram: mktLand > 0 },
+      sale: { date: isoDate(a.LASTSALEDA), price: salePrice, nonMarket: salePrice === 0, deedType: trimS(a.Deed_Type) || null },
+      geometry: f.geometry,
+    };
+  }
+
+  async function loudounDetails(pc, lat, lng) {
+    const [own, lmis0, lmis2, ease, lu, zon] = await Promise.allSettled([
+      arcgis(GIS.L_OWNER, { where: `PA_MCPI='${pc.pin}'`, outFields: 'OWNER,HIDENAME,PRI_PREMISE_ADD', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.L_LMIS0, pointParams(lat, lng, { outFields: 'VPC_PRIZONE_SUBCD,VPC_PRI_STR_ADDR,VPC_PRI_CTYST,VPC_PROJ_APL_KEY' })),
+      arcgis(GIS.L_LMIS2, { where: `VPC_PARCEL_KEY='${pc.pin}'`, outFields: 'VPC_OWN_SALE_DT,VPC_REC_END_DT', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.L_EASE, { where: `CE_MCPI='${pc.pin}'`, outFields: 'CE_CLASSIFICATION,CE_HOLDER1,CE_TYPE,CE_GIS_ACRES', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.L_LANDUSE, pointParams(lat, lng, { outFields: 'LU_USE,LU_DISPLAY,LU_DEVELOPABLE_PCT' })),
+      arcgis(GIS.L_ZONING, pointParams(lat, lng, { outFields: 'ZO_ZONE,ZD_ZONE_NAME' })),
+    ]);
+    const o = own.status === 'fulfilled' ? firstAttrs(own.value) : null;
+    if (o) {
+      // HIDENAME='Y' = owner asked the county to withhold the name (Va. Code § 58.1-3122.2).
+      if (trimS(o.HIDENAME).toUpperCase() === 'Y') { pc.owner = null; pc.ownerHidden = true; }
+      else pc.owner = trimS(o.OWNER) || null;
+    }
+    const l0 = lmis0.status === 'fulfilled' ? firstAttrs(lmis0.value) : null;
+    if (l0) {
+      const addr = trimS(l0.VPC_PRI_STR_ADDR), city = trimS(l0.VPC_PRI_CTYST);
+      if (addr) pc.address = addr + (city ? ', ' + titleish(city.replace(/\s+VA.*$/i, '')) : '');
+      pc.zoningCode = trimS(l0.VPC_PRIZONE_SUBCD) || null;
+      const app = trimS(l0.VPC_PROJ_APL_KEY);
+      if (app && !/^NO VALUE$/i.test(app)) pc.landApplication = app;
+    }
+    const z = zon.status === 'fulfilled' ? firstAttrs(zon.value) : null;
+    if (z) {
+      const code = trimS(z.ZO_ZONE);
+      if (code === 'TOWNS') pc.zoningInTown = true;
+      else { if (!pc.zoningCode) pc.zoningCode = code || null; pc.zoningName = trimS(z.ZD_ZONE_NAME) || null; }
+    }
+    if (lmis2.status === 'fulfilled') {
+      const rows = ((lmis2.value && lmis2.value.features) || []).map(f => f.attributes || {});
+      const cur = rows.find(r => r.VPC_REC_END_DT != null && new Date(r.VPC_REC_END_DT).getUTCFullYear() >= 9999) || rows[0];
+      // Deed date for the current owner. Kept apart from the assessor's sale
+      // record: the two can differ (non-sale transfers, assessor lag).
+      if (cur) pc.ownerSince = etDate(cur.VPC_OWN_SALE_DT);
+    }
+    if (ease.status === 'fulfilled') {
+      const e = firstAttrs(ease.value);
+      if (e) pc.easement = { holder: trimS(e.CE_HOLDER1) || null, type: trimS(e.CE_TYPE) || null, kind: trimS(e.CE_CLASSIFICATION) || null, acres: numS(e.CE_GIS_ACRES) };
+    }
+    const u = lu.status === 'fulfilled' ? firstAttrs(lu.value) : null;
+    if (u) { pc.landUse = trimS(u.LU_DISPLAY) || titleish(trimS(u.LU_USE)) || null; pc.vacant = /^VACANT/i.test(trimS(u.LU_USE)); }
+    pc.failed = (pc.failed || 0) + [own, lmis0, lmis2, ease, lu, zon].filter(r => r.status === 'rejected').length;
+  }
+
+  async function loudounAssessmentFor(pc) {
+    pc.assessmentState = 'loading';
+    const r = await apiFetch('/api/parcels/loudoun/assessment?pin=' + encodeURIComponent(pc.pin));
+    if (!r.ok) { pc.assessmentState = r.reason === 'no-token' ? 'no-token' : 'error'; pc.assessmentError = r.error || ''; return; }
+    const d = r.data || {};
+    pc.assessmentState = 'ready';
+    if (d.values) pc.assessed = { year: d.values.year, land: d.values.land, building: d.values.building, total: d.values.total, landUseValue: d.values.landUse || null };
+    pc.assessHistory = d.history || [];
+    if (d.lastSale) {
+      pc.sale = { date: usDate(d.lastSale.date), price: d.lastSale.price, multiParcel: d.lastSale.multiParcel, valuationCode: d.lastSale.valuationCode, nonMarket: d.lastSale.price === 0 };
+    }
+  }
+
+  async function fauquierDetails(pc, lat, lng) {
+    const [zon, ease, del] = await Promise.allSettled([
+      arcgis(GIS.F_ZONING, pointParams(lat, lng, { outFields: 'ZONECLASS' })),
+      arcgis(GIS.F_EASE, { where: `NAME='${pc.pin}'`, outFields: 'NAME,EASEMENTTY', returnGeometry: 'false', f: 'json' }),
+      arcgis(GIS.F_DELINQ, { where: `PARCELID='${pc.pin}'`, outFields: 'MAIN_DaysDelinquent,MAIN_DelinquentBalance', returnGeometry: 'false', f: 'json' }, 7000),
+    ]);
+    const z = zon.status === 'fulfilled' ? firstAttrs(zon.value) : null;
+    if (z) { pc.zoningCode = trimS(z.ZONECLASS) || null; pc.zoningName = FAUQ_ZONING[pc.zoningCode] || null; }
+    const e = ease.status === 'fulfilled' ? firstAttrs(ease.value) : null;
+    if (e) pc.easement = { holder: trimS(e.EASEMENTTY) || null, type: null, kind: null, acres: null };
+    const d = del.status === 'fulfilled' ? firstAttrs(del.value) : null;
+    if (d) {
+      const days = numS(d.MAIN_DaysDelinquent), bal = numS(d.MAIN_DelinquentBalance);
+      if (days != null || bal != null) pc.delinquent = { days, balance: bal, serious: (days || 0) >= 322 && (bal || 0) >= 500 };
+    }
+    pc.failed = (pc.failed || 0) + [zon, ease, del].filter(r => r.status === 'rejected').length;
+  }
+
+  async function floodAt(lat, lng) {
+    const j = await arcgis(GIS.FEMA, pointParams(lat, lng, { outFields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF' }), 9000);
+    const a = firstAttrs(j);
+    if (!a) return { zone: null };
+    return { zone: trimS(a.FLD_ZONE) || null, subtype: trimS(a.ZONE_SUBTY) || null, sfha: trimS(a.SFHA_TF).toUpperCase() === 'T' };
+  }
+
+  async function soilsAt(lat, lng) {
+    const wkt = `point(${Number(lng).toFixed(6)} ${Number(lat).toFixed(6)})`;
+    const sql = "SELECT TOP 1 mu.muname, c.compname, c.drainagecl, c.slope_r, c.hydricrating, ci.interphrc AS septic_rating, ma.brockdepmin, ma.wtdepannmin, " +
+      "(SELECT STRING_AGG(r.interphrc, '; ') FROM cointerp r WHERE r.cokey = c.cokey AND r.mrulename = 'ENG - Septic Tank Absorption Fields' AND r.ruledepth = 1 AND r.interphr > 0) AS septic_reasons " +
+      "FROM mapunit mu INNER JOIN muaggatt ma ON ma.mukey = mu.mukey INNER JOIN component c ON c.mukey = mu.mukey AND c.majcompflag = 'Yes' " +
+      "LEFT JOIN cointerp ci ON ci.cokey = c.cokey AND ci.mrulename = 'ENG - Septic Tank Absorption Fields' AND ci.ruledepth = 0 " +
+      `WHERE mu.mukey IN (SELECT * FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('${wkt}')) ORDER BY c.comppct_r DESC`;
+    const t = withTimeout(20000);
+    try {
+      // Form-encoded POST = "simple" request, no CORS preflight.
+      const res = await fetch(GIS.SDA, { method: 'POST', body: new URLSearchParams({ query: sql, format: 'JSON+COLUMNNAME' }), signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      const tbl = j && j.Table;
+      if (!tbl || tbl.length < 2) return null;
+      const o = {};
+      tbl[0].forEach((c, i) => { o[c] = tbl[1][i]; });
+      return o;
+    } finally { t.done(); }
+  }
+
+  async function elevationAt(lat, lng) {
+    const dLat = 30 / 111320, dLng = 30 / (111320 * Math.cos(lat * Math.PI / 180));
+    const pts = [[lng, lat], [lng, lat + dLat], [lng, lat - dLat], [lng + dLng, lat], [lng - dLng, lat]];
+    const j = await arcgis(GIS.ELEV, {
+      geometry: JSON.stringify({ points: pts, spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryMultipoint',
+      returnFirstValueOnly: 'true', interpolation: 'RSP_BilinearInterpolation', f: 'json',
+    }, 12000);
+    const v = {};
+    for (const s of (j && j.samples) || []) v[s.locationId] = Number(s.value);
+    const c = v[0], n = v[1], s = v[2], e = v[3], w = v[4];
+    if (!isFinite(c)) return null;
+    const slopePct = [n, s, e, w].every(isFinite) ? Math.hypot((e - w) / 60, (n - s) / 60) * 100 : null;
+    return { elevFt: c * FT_PER_M, slopePct };
+  }
+
+  async function siteConditions(pc, lat, lng, rerender) {
+    const jobs = [
+      floodAt(lat, lng).then(f => { pc.flood = f; }).catch(() => { pc.flood = { error: true }; }),
+      soilsAt(lat, lng).then(s => { pc.soils = s || { none: true }; }).catch(() => { pc.soils = { error: true }; }),
+      elevationAt(lat, lng).then(el => { pc.elev = el || { error: true }; }).catch(() => { pc.elev = { error: true }; }),
+    ].map(p => p.then(rerender));
+    await Promise.allSettled(jobs);
+  }
+
+  // Full inspection of a point: parcel, county details, overlays, site.
+  // target = element to render into (listing card); default = side panel.
+  async function inspectParcelAt(lat, lng, opts) {
+    opts = opts || {};
+    const seq = ++__inspectSeq;
+    const pc = { lat, lng, loadingParcel: true, loadingDetails: true };
+    const target = opts.target || null;
+    const isLive = () => target ? (opts.isLive ? opts.isLive() : true) : (seq === __inspectSeq && __areaPanel === 'parcel');
+    const render = () => {
+      if (!isLive()) return;
+      const el = target || document.getElementById('fc-area-list');
+      if (!el) return;
+      el.innerHTML = (target ? '' : panelBack('saved')) + renderParcelCard(pc, { embedded: !!target, listing: opts.listing || null });
+      wireParcelCard(el, pc);
+    };
+    if (!target) { __areaPanel = 'parcel'; syncTabs(); revealPanelOnPhone(); }
+    render();
+
+    const [lo, fq] = await Promise.allSettled([loudounParcelAt(lat, lng), fauquierParcelAt(lat, lng)]);
+    const base = (lo.status === 'fulfilled' && lo.value) || (fq.status === 'fulfilled' && fq.value) || null;
+    pc.loadingParcel = false;
+    if (base) Object.assign(pc, base);
+    else pc.noParcel = (lo.status === 'rejected' && fq.status === 'rejected') ? 'error' : 'none';
+    if (!target && isLive()) drawParcelHighlight(base && base.geometry);
+    await loadAreaHydro();
+    pc.water = nearestWater(lat, lng);
+    pc.overlays = overlaysAt(lat, lng);
+    render();
+
+    const jobs = [siteConditions(pc, lat, lng, render)];
+    if (pc.jurisdiction === 'loudoun') {
+      jobs.push(loudounDetails(pc, lat, lng).then(render));
+      jobs.push(loudounAssessmentFor(pc).then(render));
+    } else if (pc.jurisdiction === 'fauquier') {
+      jobs.push(fauquierDetails(pc, lat, lng).then(render));
+    }
+    await Promise.allSettled(jobs);
+    pc.loadingDetails = false;
+    render();
+    return pc;
+  }
+
+  function drawParcelHighlight(geometry) {
+    if (__parcelHighlight) { __parcelHighlight.remove(); __parcelHighlight = null; }
+    if (!geometry || !__areaMap) return;
+    __parcelHighlight = L.geoJSON(geometry, { style: { color: '#c84b2f', weight: 2.5, opacity: 1, fillColor: '#c84b2f', fillOpacity: 0.08 }, interactive: false }).addTo(__areaMap);
+  }
+
+  // Listing acres vs the parcel under its pin. More than a third apart
+  // usually means a misplaced pin or a multi-parcel listing.
+  function acreMismatch(listing, pc) {
+    if (!listing || !(listing.acres > 0) || !(pc.acres > 0)) return null;
+    const r = listing.acres / pc.acres;
+    if (r > 1.33) return 'bigger';
+    if (r < 0.75) return 'smaller';
+    return null;
+  }
+
+  // Per-acre figure for comparing land: land value alone when there is a
+  // building, the market value for land-use-program parcels, else the total.
+  function perAcreBasis(pc) {
+    const a = pc.assessed;
+    if (!a || !(pc.acres > 0)) return null;
+    if (a.landUseProgram && a.marketTotal != null) return { label: 'Market value per acre', value: a.marketTotal / pc.acres };
+    if (a.building > 0 && a.land != null) return { label: 'Land value per acre', value: a.land / pc.acres };
+    if (a.total != null) return { label: 'Assessed per acre', value: a.total / pc.acres };
+    return null;
+  }
+
+  function kv(label, valueHtml) {
+    return `<div class="fc-pc-row"><span>${escapeHtml(label)}</span><span>${valueHtml}</span></div>`;
+  }
+  const skel = t => `<span class="fc-pc-skel">${escapeHtml(t || 'loading…')}</span>`;
+
+  function parcelLinks(pc) {
+    const links = [];
+    if (pc.jurisdiction === 'loudoun' && /^\d{12}$/.test(pc.pin || '')) {
+      links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://loudounvapa.tylerhost.net/Datalets/Datalet.aspx?UseSearch=no&amp;mode=profileall&amp;jur=107&amp;pin=${pc.pin}">County record ↗</a>`);
+    } else if (pc.jurisdiction === 'fauquier') {
+      links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://www.actdatascout.com/RealProperty/Virginia/Fauquier" title="Search Tax Map # = ${escapeHtml(pc.pin || '')}">County record ↗</a>`);
+    }
+    if (isFinite(pc.lat) && isFinite(pc.lng)) {
+      links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/@${pc.lat.toFixed(6)},${pc.lng.toFixed(6)},400m/data=!3m1!1e3">Satellite ↗</a>`);
+    }
+    return links.join('');
+  }
+
+  function renderParcelCard(pc, o) {
+    o = o || {};
+    if (pc.loadingParcel) return `<div class="fc-pc">${skel('Looking up the parcel at this spot…')}</div>`;
+    const flags = [];
+    const ov = pc.overlays || {};
+    const eased = !!pc.easement || !!ov.easementSpatial;
+    if (eased) flags.push('<span class="fc-pill coral">🔴 Conservation easement</span>');
+    if (pc.flood && pc.flood.zone) flags.push(pc.flood.sfha ? `<span class="fc-pill coral">🌊 Flood zone ${escapeHtml(pc.flood.zone)}</span>` : `<span class="fc-pill sky">Flood zone ${escapeHtml(pc.flood.zone)}</span>`);
+    if (pc.water && pc.water.distM * FT_PER_M <= 1000) flags.push(`<span class="fc-pill sky">💧 ${Math.round(pc.water.distM * FT_PER_M).toLocaleString()} ft to water</span>`);
+    if (ov.growth) flags.push(`<span class="fc-pill sage">🟢 Growth area: ${escapeHtml(ov.growth)}</span>`);
+    if (ov.transition) flags.push('<span class="fc-pill gold">🟤 Transition policy area</span>');
+    if (ov.rezoningOn && ov.rezoningOn.some(r => r.recent)) flags.push('<span class="fc-pill gold">🟡 Recent rezoning case on this spot</span>');
+    else if (ov.rezoningNear) flags.push(`<span class="fc-pill gold">🟡 ${ov.rezoningNear} rezoning case${ov.rezoningNear === 1 ? '' : 's'} within 1 mi</span>`);
+    if (pc.delinquent) flags.push(`<span class="fc-pill ${pc.delinquent.serious ? 'coral' : ''}">⚠️ Taxes past due${pc.delinquent.days != null ? ` · ${pc.delinquent.days} days` : ''}</span>`);
+    if (pc.vacant && !(pc.assessed && pc.assessed.building > 0)) flags.push('<span class="fc-pill ink">Vacant land</span>');
+
+    if (pc.noParcel) {
+      return `<div class="fc-pc">
+        <div class="fc-pc-title">${pc.noParcel === 'error' ? 'County parcel servers did not respond' : 'No county parcel here'}</div>
+        <div class="fc-pc-sub">${pc.noParcel === 'error' ? 'Try again in a moment.' : 'This spot is outside Loudoun and Fauquier parcel coverage.'}</div>
+        ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}</div>` : ''}
+        ${renderSiteSection(pc)}
+        <div class="fc-pc-links">${parcelLinks(pc)}</div>
+      </div>`;
+    }
+
+    const title = pc.address || (pc.subdivision ? titleish(pc.subdivision) : `Parcel ${pc.pin}`);
+    const loading = pc.loadingDetails;
+    const mismatch = acreMismatch(o.listing, pc);
+    const mismatchHtml = mismatch ? `<div class="fc-area-warn">This parcel is ${fmtAcres(pc.acres)} but the listing says ${fmtAcres(o.listing.acres)}. ${mismatch === 'bigger'
+      ? 'The listing may cover several parcels, or its map pin may be off.'
+      : 'The listing\'s map pin may be on a neighboring parcel.'} If so, use <strong>Move pin</strong> to put it on the right one.</div>` : '';
+    // Ownership + value
+    let ownerHtml;
+    if (pc.ownerHidden) ownerHtml = '<span title="Owner asked the county to withhold the name (Va. Code § 58.1-3122.2)">Withheld by owner request</span>';
+    else if (pc.owner) ownerHtml = escapeHtml(pc.owner);
+    else ownerHtml = loading ? skel() : '—';
+
+    let assessedHtml;
+    const a = pc.assessed;
+    const useProgram = !!(a && a.landUseProgram && a.marketTotal != null);
+    if (useProgram) {
+      // Land-use parcels: the county's "final" value is the reduced use value
+      // it taxes on; the market value is the number worth comparing.
+      assessedHtml = `<strong>${fmtMoney(a.marketTotal)}</strong>`;
+    } else if (a && a.total != null) {
+      const parts = [];
+      if (a.land != null) parts.push('land ' + fmtMoney(a.land));
+      if (a.building) parts.push('building ' + fmtMoney(a.building));
+      assessedHtml = `<strong>${fmtMoney(a.total)}</strong>${parts.length ? ` <span class="fc-pc-dim">(${escapeHtml(parts.join(' · '))})</span>` : ''}`;
+    } else if (pc.jurisdiction === 'loudoun') {
+      if (pc.assessmentState === 'no-token') assessedHtml = '<button class="fc-btn fc-btn-sm" data-act="connect">Connect device to load</button>';
+      else if (pc.assessmentState === 'error') assessedHtml = '<span class="fc-pc-dim">County site unavailable</span>';
+      else assessedHtml = skel();
+    } else assessedHtml = loading ? skel() : '—';
+
+    let perAcre = '';
+    const valueForAcre = a && (a.marketTotal != null ? a.marketTotal : a.total);
+    const pa = perAcreBasis(pc);
+    if (pa) perAcre = kv(pa.label, fmtMoney(pa.value));
+
+    let trend = '';
+    const hist = (pc.assessHistory || []).filter(h => h.total != null).sort((p, q) => p.year - q.year);
+    if (hist.length >= 2) {
+      const first = hist.length > 6 ? hist[hist.length - 6] : hist[0];
+      const last = hist[hist.length - 1];
+      if (first.total > 0) {
+        const pct = (last.total - first.total) / first.total * 100;
+        trend = kv(`Change ${first.year}→${last.year}`, `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`);
+      }
+    }
+
+    let saleHtml = loading ? skel() : '—';
+    if (pc.jurisdiction === 'loudoun' && !pc.sale) {
+      if (pc.assessmentState === 'no-token') saleHtml = '<span class="fc-pc-dim">Connect device to load</span>';
+      else if (pc.assessmentState === 'error' || pc.assessmentState === 'ready') saleHtml = '—';
+      else saleHtml = skel();
+    }
+    if (pc.sale && (pc.sale.date || pc.sale.price != null)) {
+      const bits = [];
+      if (pc.sale.date) bits.push(escapeHtml(pc.sale.date));
+      if (pc.sale.price != null) bits.push(pc.sale.nonMarket ? 'non-market transfer ($0)' : fmtMoney(pc.sale.price));
+      saleHtml = bits.join(' · ');
+      if (pc.sale.multiParcel > 1) saleHtml += `<div class="fc-pc-dim">Price covers ${Number(pc.sale.multiParcel)} parcels sold together</div>`;
+      else if (pc.jurisdiction === 'fauquier' && pc.sale.price > 0 && valueForAcre > 0 && pc.sale.price > valueForAcre * 3) {
+        saleHtml += '<div class="fc-pc-dim">Well above this parcel\'s assessed value. The price may cover several parcels sold together.</div>';
+      }
+      if (pc.sale.deedType === 'CM/D') saleHtml += '<div class="fc-pc-dim">Commissioner\'s deed — often a tax or court sale</div>';
+    }
+
+    let zoningHtml = loading && !pc.zoningCode ? skel() : '—';
+    if (pc.zoningCode) zoningHtml = `<strong>${escapeHtml(pc.zoningCode)}</strong>${pc.zoningName ? ' · ' + escapeHtml(pc.zoningName) : ''}`;
+    else if (pc.zoningInTown) zoningHtml = 'Inside a town — check the town\'s zoning';
+
+    let rezoningHtml = '';
+    if (ov.rezoningOn && ov.rezoningOn.length) {
+      const cases = ov.rezoningOn.slice().sort((p, q) => (q.year || 0) - (p.year || 0)).slice(0, 3);
+      rezoningHtml = kv('Rezoning case', cases.map(r => escapeHtml([r.id || (r.year ? String(r.year) : 'Case'), r.zone && ('→ ' + r.zone), r.status && ('· ' + r.status)].filter(Boolean).join(' '))).join('<br>') +
+        (cases.some(r => r.recent) ? '' : '<div class="fc-pc-dim">Older case — not a current growth signal.</div>'));
+    } else if (pc.landApplication) rezoningHtml = kv('Land application', escapeHtml(pc.landApplication));
+
+    let easementHtml = '';
+    if (pc.easement) {
+      easementHtml = kv('Easement', escapeHtml([pc.easement.holder, pc.easement.type, pc.easement.kind].filter(Boolean).join(' · ') || 'On record') +
+        '<div class="fc-pc-dim">Development is restricted by the deed of easement.</div>');
+    } else if (ov.easementSpatial) {
+      easementHtml = kv('Easement', 'This spot is inside a mapped easement<div class="fc-pc-dim">May cover only part of the parcel.</div>');
+    }
+
+    const delinquentHtml = pc.delinquent ? kv('Taxes past due', escapeHtml([pc.delinquent.days != null ? pc.delinquent.days + ' days' : null, pc.delinquent.balance != null ? fmtMoney(pc.delinquent.balance) : null].filter(Boolean).join(' · ')) +
+      (pc.delinquent.serious ? '<div class="fc-pc-dim">Two or more missed installments — a possible motivated seller.</div>' : '')) : '';
+
+    return `<div class="fc-pc">
+      ${mismatchHtml}
+      <div class="fc-pc-title">${escapeHtml(title)}</div>
+      <div class="fc-pc-sub">${escapeHtml(pc.county)} County · ${fmtAcres(pc.acres)} · PIN <span class="fc-mono">${escapeHtml(pc.pin)}</span>
+        <button class="fc-pc-copy" data-act="copy-pin" title="Copy PIN">⧉</button></div>
+      ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}</div>` : ''}
+      <h4>Ownership &amp; value</h4>
+      ${kv('Owner', ownerHtml)}
+      ${kv(useProgram ? 'Assessed market value' : (a && a.year ? `Assessed (${a.year})` : 'Assessed'), assessedHtml)}
+      ${useProgram ? kv('Taxed on (land use)', fmtMoney(a.total) + '<div class="fc-pc-dim">In the land-use (ag/forestal) tax program. Rollback taxes can apply if the use changes.</div>') : ''}
+      ${a && a.landUseValue ? kv('Land-use value', fmtMoney(a.landUseValue)) : ''}
+      ${perAcre}${trend}
+      ${kv('Last sale', saleHtml)}
+      ${pc.ownerSince ? kv('Current owner since', escapeHtml(pc.ownerSince)) : ''}
+      ${delinquentHtml}
+      <h4>Zoning &amp; use</h4>
+      ${kv('Zoning', zoningHtml)}
+      ${kv('Land use', pc.landUse ? escapeHtml(pc.landUse) : (loading ? skel() : '—'))}
+      ${pc.yearBuilt ? kv('Year built', String(pc.yearBuilt)) : ''}
+      ${rezoningHtml}${easementHtml}
+      ${renderSiteSection(pc)}
+      <div class="fc-pc-links">${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
+      ${pc.failed ? `<div class="fc-pc-note">${pc.failed} county lookup${pc.failed === 1 ? '' : 's'} did not respond; some fields may be missing.</div>` : ''}
+    </div>`;
+  }
+
+  function renderSiteSection(pc) {
+    const w = pc.water;
+    const waterHtml = w ? `≈ ${Math.round(w.distM * FT_PER_M).toLocaleString()} ft to ${escapeHtml(w.name || 'unnamed water')}${w.kind ? ` <span class="fc-pc-dim">(${escapeHtml(w.kind)})</span>` : ''}` : (__areaHydroPoints ? '—' : skel());
+    let floodHtml = skel();
+    if (pc.flood) {
+      if (pc.flood.error) floodHtml = '<span class="fc-pc-dim">FEMA did not respond</span>';
+      else if (!pc.flood.zone) floodHtml = 'Not mapped';
+      else floodHtml = `<strong>${escapeHtml(pc.flood.zone)}</strong>${pc.flood.sfha ? ' · 1%-annual-chance floodplain' : (pc.flood.subtype ? ' · ' + escapeHtml(titleish(pc.flood.subtype)) : '')}`;
+    }
+    let elevHtml = skel();
+    if (pc.elev) elevHtml = pc.elev.error ? '<span class="fc-pc-dim">USGS did not respond</span>'
+      : `${Math.round(pc.elev.elevFt).toLocaleString()} ft${pc.elev.slopePct != null ? ` · slope ${pc.elev.slopePct.toFixed(1)}%` : ''}`;
+    let soilHtml = skel();
+    if (pc.soils) {
+      if (pc.soils.error) soilHtml = '<span class="fc-pc-dim">USDA did not respond</span>';
+      else if (pc.soils.none) soilHtml = 'No soil survey data';
+      else {
+        const s = pc.soils;
+        const lines = [escapeHtml(s.muname || s.compname || 'Mapped soil')];
+        if (s.drainagecl) lines.push(escapeHtml(s.drainagecl));
+        if (s.septic_rating) lines.push('Septic: ' + escapeHtml(s.septic_rating) + (s.septic_reasons ? ' — ' + escapeHtml(s.septic_reasons) : ''));
+        const bed = numS(s.brockdepmin), wt = numS(s.wtdepannmin);
+        if (bed != null) lines.push(`Bedrock ~${Math.round(bed / 2.54)} in`);
+        if (wt != null) lines.push(`Seasonal water table ~${Math.round(wt / 2.54)} in`);
+        if (s.hydricrating && /yes/i.test(s.hydricrating)) lines.push('Hydric soil (wetland indicator)');
+        soilHtml = lines.join('<br>');
+      }
+    }
+    return `<h4>Site</h4>
+      ${kv('Water', waterHtml)}
+      ${kv('Flood', floodHtml)}
+      ${kv('Elevation', elevHtml)}
+      ${kv('Soils', soilHtml)}
+      <div class="fc-pc-note">Soil ratings are a screening tool. A septic permit needs a health-department site evaluation.</div>`;
+  }
+
+  function wireParcelCard(el, pc) {
+    el.querySelectorAll('[data-act="copy-pin"]').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (navigator.clipboard && pc.pin) navigator.clipboard.writeText(pc.pin).then(() => areaToast('PIN copied')).catch(() => {});
+    }));
+    el.querySelectorAll('[data-act="search-here"]').forEach(b => b.addEventListener('click', () => {
+      setAreaMode('radius');
+      dropRadiusCenter(L.latLng(pc.lat, pc.lng));
+    }));
+    el.querySelectorAll('[data-act="connect"]').forEach(b => b.addEventListener('click', () => { setView('settings'); }));
+    wirePanelBack(el);
+  }
+
+  function areaToast(msg, color) {
+    if (typeof window.showToast === 'function') window.showToast(msg, color || 'green');
+  }
+
+  // ─── Parcel lines (live bbox query at high zoom) ───────────────────────
+  function boxIntersects(b, box) {
+    return !(b.getEast() < box.w || b.getWest() > box.e || b.getNorth() < box.s || b.getSouth() > box.n);
+  }
+  async function refreshParcelLines() {
+    if (!__areaMap || !__parcelLayer) return;
+    const hint = document.getElementById('fc-area-zoomhint');
+    const seq = ++__parcelReqSeq;
+    if (!__areaMap.hasLayer(__parcelLayer)) { if (hint) hint.textContent = ''; return; }
+    if (__areaMap.getZoom() < PARCEL_MIN_ZOOM) {
+      __parcelLayer.clearLayers();
+      if (hint) hint.textContent = 'Zoom in to see parcel lines';
+      return;
+    }
+    const b = __areaMap.getBounds();
+    const env = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(v => v.toFixed(5)).join(',');
+    const common = { geometry: env, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson' };
+    const reqs = [];
+    if (boxIntersects(b, LOUDOUN_BOX)) reqs.push(arcgis(GIS.L_PARCELS, Object.assign({}, common, { where: "PA_TYPE<>'W'", outFields: 'PA_MCPI', resultRecordCount: '3000' }), 15000).catch(() => null));
+    if (boxIntersects(b, FAUQUIER_BOX)) reqs.push(arcgis(GIS.F_PARCELS, Object.assign({}, common, { outFields: 'PARCELID', maxAllowableOffset: '0.00001', resultRecordCount: '2000' }), 15000).catch(() => null));
+    if (hint) hint.textContent = reqs.length ? 'Loading parcel lines…' : '';
+    const results = await Promise.all(reqs);
+    if (seq !== __parcelReqSeq) return; // a newer pan/zoom superseded this one
+    __parcelLayer.clearLayers();
+    let truncated = false, failed = false;
+    for (const fc of results) {
+      if (!fc) { failed = true; continue; }
+      if (fc.exceededTransferLimit || (fc.properties && fc.properties.exceededTransferLimit)) truncated = true;
+      __parcelLayer.addData(fc);
+    }
+    if (hint) hint.textContent = failed ? 'Some parcel lines failed to load' : (truncated ? 'Too many parcels here — zoom in to see them all' : '');
+  }
+
+  // ─── Radius search (legacy flow, now opt-in via the mode toggle) ───────
+  function dropRadiusCenter(latlng) {
+    __areaCenter = { lat: latlng.lat, lng: latlng.lng };
+    if (__areaCenterMarker) __areaCenterMarker.remove();
+    if (__areaRadiusCircle) __areaRadiusCircle.remove();
+    __areaCenterMarker = L.marker(latlng, { interactive: false }).addTo(__areaMap);
+    __areaRadiusCircle = L.circle(latlng, {
+      radius: __areaRadiusMi * 1609.344, color: '#c84b2f', fillColor: '#c84b2f', fillOpacity: 0.07, weight: 2, interactive: false,
+    }).addTo(__areaMap);
+    __areaPanel = 'results';
+    syncTabs();
+    renderAreaListings();
   }
 
   function renderAreaListings() {
     const listEl = document.getElementById('fc-area-list');
-    const countEl = document.getElementById('fc-area-count');
-    const sideCount = document.getElementById('fc-sc-area');
-    if (!listEl) return;
-
-    // Remove any prior listing markers
-    if (__areaListingLayer) {
-      __areaListingLayer.clearLayers();
-    } else if (__areaMap) {
-      __areaListingLayer = L.layerGroup().addTo(__areaMap);
-    }
-
+    if (!listEl || __areaPanel !== 'results') return;
+    if (__areaListingLayer) __areaListingLayer.clearLayers();
     if (!__areaCenter) {
-      listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Click the map to begin.</div>`;
-      if (countEl) countEl.textContent = '—';
+      listEl.innerHTML = `<div class="fc-area-empty">Switch to <strong>📍 Search radius</strong> and click the map to search around a point.</div>`;
+      setAreaCount('');
       return;
     }
-
     const radiusM = __areaRadiusMi * 1609.344;
-    const candidates = getAreaFocusCandidates();
-    const scored = candidates.map(p => {
-      const lat = Number(p.lat || p.latitude);
-      const lng = Number(p.lng || p.longitude);
-      const distM = haversineM(__areaCenter.lat, __areaCenter.lng, lat, lng);
-      if (distM > radiusM) return null;
-      const water = nearestWater(lat, lng);
-      return {
-        p, lat, lng,
-        distM,
-        waterDistM: water ? water.distM : null,
-        waterName: water ? water.name : null,
-        waterKind: water ? water.kind : null,
-      };
-    }).filter(Boolean);
-
-    // Optional water-only filter: within 1,000 ft of water
-    const filtered = __areaOnlyWater
-      ? scored.filter(s => s.waterDistM !== null && (s.waterDistM * FT_PER_M) <= 1000)
-      : scored;
-
-    // Sort: water-adjacent first, then by distance to center
+    const items = [];
+    for (const p of getAreaFocusCandidates()) {
+      items.push({ kind: 'foreclosure', p, lat: Number(p.lat || p.latitude), lng: Number(p.lng || p.longitude), title: p.address || 'Land', price: p.price, acres: Number(p.acres) || (Number(p.lot_size || p.lotSize) || 0) / 43560 || null, county: p.county, url: p.source_url });
+    }
+    for (const s of __savedListings) {
+      if (s.lat == null || s.lng == null) continue;
+      items.push({ kind: 'saved', s, lat: s.lat, lng: s.lng, title: listingTitle(s), price: s.price, acres: s.acres, county: s.county, url: s.url });
+    }
+    const scored = [];
+    for (const it of items) {
+      const distM = haversineM(__areaCenter.lat, __areaCenter.lng, it.lat, it.lng);
+      if (distM > radiusM) continue;
+      const water = nearestWater(it.lat, it.lng);
+      scored.push(Object.assign(it, { distM, waterDistM: water ? water.distM : null, waterName: water ? water.name : null, waterKind: water ? water.kind : null }));
+    }
+    const filtered = __areaOnlyWater ? scored.filter(s => s.waterDistM !== null && s.waterDistM * FT_PER_M <= 1000) : scored;
     filtered.sort((a, b) => {
-      const aW = (a.waterDistM !== null ? a.waterDistM : 1e9);
-      const bW = (b.waterDistM !== null ? b.waterDistM : 1e9);
-      if (Math.abs(aW - bW) > 50) return aW - bW; // meaningful water-dist diff wins
+      const aW = a.waterDistM !== null ? a.waterDistM : 1e9, bW = b.waterDistM !== null ? b.waterDistM : 1e9;
+      if (Math.abs(aW - bW) > 50) return aW - bW;
       return a.distM - b.distM;
     });
-
-    if (countEl) countEl.textContent = filtered.length + ' in radius';
-    if (sideCount) sideCount.textContent = filtered.length || '—';
-
+    setAreaCount(filtered.length + ' in radius');
     if (!filtered.length) {
-      const totalInRadius = scored.length;
-      listEl.innerHTML = `
-        <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">
-          No land listings matched${__areaOnlyWater ? ' (water-adjacent filter on)' : ''}.
-          <div style="margin-top:6px;font-size:11px">${candidates.length} total land listings loaded; ${totalInRadius} inside the current radius.</div>
-          <div style="margin-top:4px;font-size:11px">Phase 2b will pull LandWatch + Lands of America to widen the pool.</div>
-        </div>`;
+      listEl.innerHTML = `<div class="fc-area-empty">No land listings matched${__areaOnlyWater ? ' (water-adjacent filter on)' : ''}.
+        <div>${items.length} listings loaded; ${scored.length} inside the radius.</div>
+        <div>Add listings you find with <strong>＋ Add listing</strong>.</div></div>`;
       return;
     }
-
-    const fmt$ = v => '$' + Math.round(v).toLocaleString();
-    const fmtMi = m => (m * MI_PER_M).toFixed(1) + ' mi';
-    const fmtFt = m => Math.round(m * FT_PER_M).toLocaleString() + ' ft';
-    const cards = filtered.slice(0, 100).map(s => {
-      const p = s.p;
-      const acres = Number(p.acres) || (Number(p.lot_size || p.lotSize) || 0) / 43560;
-      const waterLine = s.waterDistM === null
-        ? '<span style="color:var(--muted)">No water nearby</span>'
-        : `<span style="color:var(--accent2)">${fmtFt(s.waterDistM)} to ${escapeHtml(s.waterName || 'water')}${s.waterKind ? ' ('+escapeHtml(s.waterKind)+')' : ''}</span>`;
-      const latlng = `${s.lat},${s.lng}`;
-      const sourceLink = p.source_url ? `<a href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px">Source →</a>` : '';
-      // Drop a marker on the map for this listing.
-      if (__areaMap) {
-        const m = L.circleMarker([s.lat, s.lng], {
-          radius: 6, color: '#c84b2f', fillColor: '#c84b2f', fillOpacity: 0.75, weight: 1
-        }).bindPopup(`<strong>${escapeHtml(p.address || 'Land')}</strong><br>${acres ? acres.toFixed(2) + ' ac · ' : ''}${p.price ? fmt$(p.price) : ''}<br>${waterLine}`);
-        m.addTo(__areaListingLayer);
+    listEl.innerHTML = filtered.slice(0, 100).map((s, i) => {
+      const waterLine = s.waterDistM === null ? '<span class="fc-pc-dim">No water nearby</span>'
+        : `<span style="color:var(--sky)">${Math.round(s.waterDistM * FT_PER_M).toLocaleString()} ft to ${escapeHtml(s.waterName || 'water')}</span>`;
+      const href = safeHttps(s.url);
+      if (s.kind === 'foreclosure' && __areaListingLayer) {
+        L.circleMarker([s.lat, s.lng], { radius: 6, color: '#c84b2f', fillColor: '#c84b2f', fillOpacity: 0.75, weight: 1, bubblingMouseEvents: false })
+          .bindPopup(`<strong>${escapeHtml(s.title)}</strong><br>${s.price ? fmtMoney(s.price) : ''}`).addTo(__areaListingLayer);
       }
-      return `
-        <div style="padding:10px 8px;border-bottom:1px solid var(--hair);cursor:pointer"
-             onclick="(window.openPropertyDrawer && window.openPropertyDrawer('${escapeHtml(p.id || '')}'))">
-          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px">${escapeHtml(p.address || 'Unnamed parcel')}</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${escapeHtml(p.county || '')} · ${acres ? acres.toFixed(2) + ' ac' : 'size unknown'} · ${fmtMi(s.distM)} from center</div>
-          <div style="font-size:11px;margin-bottom:4px">${waterLine}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;font-weight:600">${p.price ? fmt$(p.price) : '—'}</span>
-            ${sourceLink}
-          </div>
-        </div>`;
+      return `<div class="fc-sl-row" data-result="${i}">
+        <div class="fc-sl-title">${s.kind === 'saved' ? '★ ' : ''}${escapeHtml(s.title)}</div>
+        <div class="fc-sl-sub">${escapeHtml(s.county || '')} · ${s.acres ? fmtAcres(s.acres) : 'size unknown'} · ${(s.distM * MI_PER_M).toFixed(1)} mi from center</div>
+        <div class="fc-sl-sub">${waterLine}</div>
+        <div class="fc-sl-foot"><strong>${s.price ? fmtMoney(s.price) : '—'}</strong>${href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" data-stop="1">Source ↗</a>` : ''}</div>
+      </div>`;
     }).join('');
-    listEl.innerHTML = cards;
+    const top = filtered.slice(0, 100);
+    listEl.querySelectorAll('[data-result]').forEach(row => row.addEventListener('click', ev => {
+      if (ev.target.closest('[data-stop]')) return;
+      const s = top[Number(row.getAttribute('data-result'))];
+      if (!s) return;
+      if (s.kind === 'saved') openListing(s.s.id);
+      else if (s.p && s.p.id && window.openPropertyDrawer) window.openPropertyDrawer(s.p.id);
+    }));
+  }
+
+  // ─── Saved listings ────────────────────────────────────────────────────
+  function listingTitle(s) {
+    if (s.title) return s.title;
+    const place = [s.street, s.city].filter(Boolean).join(', ') || s.county || '';
+    return (SOURCE_LABEL[s.source] || 'Listing') + (place ? ' · ' + place : '');
+  }
+  const SOURCE_LABEL = { landwatch: 'LandWatch', land: 'Land.com', landsearch: 'LandSearch', unitedcountry: 'United Country', craigslist: 'Craigslist', fsbo: 'FSBO', zillow: 'Zillow', redfin: 'Redfin', realtor: 'Realtor.com', homes: 'Homes.com', acres: 'Acres', other: 'Link' };
+  const WATCH_LABEL = { watching: 'Watching', interested: 'Interested', passed: 'Passed', sold: 'Sold / gone' };
+
+  async function loadSavedListings() {
+    __savedState = 'loading';
+    if (__areaPanel === 'saved') renderSavedPanel();
+    const r = await apiFetch('/api/listings');
+    if (!r.ok) {
+      __savedState = r.reason === 'no-token' || r.reason === 'unauthorized' ? 'no-token' : 'error';
+      __savedError = r.error || '';
+      __savedListings = [];
+    } else {
+      __savedState = 'ready';
+      __savedListings = r.listings || [];
+    }
+    drawSavedMarkers();
+    updateSavedCount();
+    if (__areaPanel === 'saved') renderSavedPanel();
+    if (__areaPanel === 'listing' && __openListingId) renderListingPanel();
+  }
+
+  function updateSavedCount() {
+    const side = document.getElementById('fc-sc-area');
+    if (side) side.textContent = __savedListings.length ? String(__savedListings.length) : '—';
+    const tab = document.getElementById('fc-area-saved-n');
+    if (tab) tab.textContent = __savedListings.length ? String(__savedListings.length) : '';
+    if (__areaPanel === 'saved') setAreaCount(__savedListings.length ? `${__savedListings.length} saved` : '');
+  }
+
+  function drawSavedMarkers() {
+    if (!__savedLayer) return;
+    __savedLayer.clearLayers();
+    for (const s of __savedListings) {
+      if (s.lat == null || s.lng == null) continue;
+      const m = L.circleMarker([s.lat, s.lng], {
+        radius: 8, color: '#ffffff', weight: 2, fillColor: s.watch_status === 'passed' ? '#8f897a' : '#1f6f8b', fillOpacity: 0.95, bubblingMouseEvents: false,
+      });
+      m.bindTooltip(escapeHtml(listingTitle(s)), { direction: 'top', offset: [0, -6] });
+      m.on('click', () => openListing(s.id));
+      m.addTo(__savedLayer);
+    }
+  }
+
+  function upsertLocalListing(l) {
+    if (!l || !l.id) return;
+    const i = __savedListings.findIndex(x => x.id === l.id);
+    if (i >= 0) __savedListings[i] = l; else __savedListings.unshift(l);
+    drawSavedMarkers();
+    updateSavedCount();
+  }
+
+  function enrichmentBadges(e) {
+    if (!e) return '';
+    const b = [];
+    if (e.easement) b.push('<span class="fc-pill coral">Easement</span>');
+    if (e.sfha) b.push(`<span class="fc-pill coral">Flood ${escapeHtml(e.floodZone || '')}</span>`);
+    if (e.waterFt != null && e.waterFt <= 1000) b.push(`<span class="fc-pill sky">💧 ${Math.round(e.waterFt).toLocaleString()} ft</span>`);
+    if (e.growth) b.push('<span class="fc-pill sage">Growth area</span>');
+    if (e.rezoningNear || e.rezoningOn) b.push('<span class="fc-pill gold">Rezoning nearby</span>');
+    if (e.delinquent) b.push('<span class="fc-pill coral">Taxes due</span>');
+    if (e.acreMismatch) b.push('<span class="fc-pill gold">Check pin</span>');
+    return b.join('');
+  }
+
+  function renderSavedPanel() {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl || __areaPanel !== 'saved') return;
+    if (__savedState === 'no-token') {
+      listEl.innerHTML = `<div class="fc-area-empty">
+        <strong>Connect this device</strong> to save listings and sync them across your phone and computer.
+        <div><button class="fc-btn fc-btn-sm fc-btn-dark" data-act="connect">Open Settings</button></div>
+        <div class="fc-pc-dim">Paste your sync token in Settings → Device sync. Parcel lookups work without it.</div></div>`;
+      listEl.querySelector('[data-act="connect"]').addEventListener('click', () => setView('settings'));
+      setAreaCount('');
+      return;
+    }
+    if (__savedState === 'loading' || __savedState === 'idle') { listEl.innerHTML = `<div class="fc-area-empty">${skel('Loading your saved listings…')}</div>`; return; }
+    if (__savedState === 'error') {
+      listEl.innerHTML = `<div class="fc-area-empty">Could not load saved listings. <div class="fc-pc-dim">${escapeHtml(__savedError)}</div><button class="fc-btn fc-btn-sm" data-act="retry">Try again</button></div>`;
+      listEl.querySelector('[data-act="retry"]').addEventListener('click', loadSavedListings);
+      return;
+    }
+    setAreaCount(__savedListings.length ? `${__savedListings.length} saved` : '');
+    if (!__savedListings.length) {
+      listEl.innerHTML = `<div class="fc-area-empty">
+        <strong>No saved listings yet.</strong>
+        <div>Found land on LandWatch, Zillow, Redfin or anywhere else? Tap <strong>＋ Add listing</strong> and paste the link.</div>
+        <div>Or click anywhere on the map to look up that parcel.</div></div>`;
+      return;
+    }
+    const order = { interested: 0, watching: 1, sold: 2, passed: 3 };
+    const rows = __savedListings.slice().sort((a, b) => (order[a.watch_status] ?? 1) - (order[b.watch_status] ?? 1) || String(b.updated_at).localeCompare(String(a.updated_at)));
+    listEl.innerHTML = rows.map(s => {
+      const ppa = s.price && s.acres ? fmtMoney(s.price / s.acres) + '/ac' : '';
+      const needs = s.status !== 'located';
+      return `<div class="fc-sl-row" data-id="${escapeHtml(s.id)}">
+        <div class="fc-sl-title">${escapeHtml(listingTitle(s))}</div>
+        <div class="fc-sl-sub">${escapeHtml(SOURCE_LABEL[s.source] || s.source)} · ${escapeHtml(WATCH_LABEL[s.watch_status] || 'Watching')}${s.county ? ' · ' + escapeHtml(s.county) : ''}</div>
+        <div class="fc-sl-foot"><strong>${s.price ? fmtMoney(s.price) : 'Price ?'}</strong><span>${s.acres ? fmtAcres(s.acres) : ''}${ppa ? ' · ' + ppa : ''}</span></div>
+        <div class="fc-pc-flags">${needs ? '<span class="fc-pill gold">📍 Needs a pin</span>' : ''}${s.loc_precision === 'approximate' ? '<span class="fc-pill">Approximate spot</span>' : ''}${enrichmentBadges(s.enrichment)}</div>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('[data-id]').forEach(row => row.addEventListener('click', () => openListing(row.getAttribute('data-id'))));
+  }
+
+  function openListing(id) {
+    __openListingId = id;
+    __areaPanel = 'listing';
+    syncTabs();
+    const s = __savedListings.find(x => x.id === id);
+    if (s && s.lat != null && __areaMap) __areaMap.flyTo([s.lat, s.lng], Math.max(__areaMap.getZoom(), 15), { duration: 0.6 });
+    renderListingPanel();
+    revealPanelOnPhone();
+  }
+
+  function renderListingPanel() {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl || __areaPanel !== 'listing') return;
+    const s = __savedListings.find(x => x.id === __openListingId);
+    if (!s) { listEl.innerHTML = panelBack('saved') + '<div class="fc-area-empty">That listing is gone.</div>'; wirePanelBack(listEl); return; }
+    const href = safeHttps(s.url);
+    const precisionNote = s.loc_method === 'pin' ? 'You placed this pin.'
+      : s.loc_method === 'county_addr' ? 'Location from the county address point.'
+      : ({
+        listing: 'Location from the listing page.', parcel: 'Location from the listing\'s parcel ID.', exact: 'Location confirmed.',
+        approximate: 'Approximate location from a street-range geocoder — confirm the pin.', none: '',
+      }[s.loc_precision || 'none'] || '');
+    const missingFacts = s.price == null || s.acres == null || s.status !== 'located';
+    const fetchNote = missingFacts && s.fetch_block && s.fetch_block !== 'via-browser'
+      ? `<div class="fc-pc-note">${escapeHtml(SOURCE_LABEL[s.source] || 'The site')} blocks automatic reading, so details came from the link itself. Use the <strong>Send to Nestscoop</strong> bookmark on the listing page to pull price, acres and location automatically.</div>` : '';
+    listEl.innerHTML = panelBack('saved') + `<div class="fc-pc">
+      <div class="fc-pc-title">${escapeHtml(listingTitle(s))}</div>
+      <div class="fc-pc-sub">${escapeHtml(SOURCE_LABEL[s.source] || s.source)}${s.listing_status && s.listing_status !== 'unknown' ? ' · ' + escapeHtml(s.listing_status) : ''}${s.county ? ' · ' + escapeHtml(s.county) : ''}</div>
+      <div class="fc-pc-flags">${s.status !== 'located' ? '<span class="fc-pill gold">📍 Needs a pin</span>' : ''}${enrichmentBadges(s.enrichment)}</div>
+      <div class="fc-sl-edit">
+        <label>Asking price<input class="fc-area-input" inputmode="numeric" data-field="price" value="${s.price != null ? escapeHtml(String(s.price)) : ''}" placeholder="$"></label>
+        <label>Acres<input class="fc-area-input" inputmode="decimal" data-field="acres" value="${s.acres != null ? escapeHtml(String(s.acres)) : ''}" placeholder="ac"></label>
+      </div>
+      <div class="fc-pc-note" id="fc-listing-ppa">${ppaNoteHtml(s)}</div>
+      <div class="fc-sl-edit">
+        <label>Status<select class="fc-area-input" data-field="watch_status">${Object.entries(WATCH_LABEL).map(([k, v]) => `<option value="${k}"${s.watch_status === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      </div>
+      <label class="fc-sl-notes">Notes<textarea class="fc-area-input" rows="3" data-field="notes" placeholder="Road frontage, views, questions for the agent…">${escapeHtml(s.notes || '')}</textarea></label>
+      <div class="fc-pc-links">
+        ${href ? `<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="${escapeHtml(href)}">Open listing ↗</a>` : ''}
+        <button class="fc-btn fc-btn-sm fc-area-admin" data-act="place">${s.status === 'located' ? 'Move pin' : '📍 Place pin'}</button>
+        <button class="fc-btn fc-btn-sm fc-area-admin" data-act="delete">Delete</button>
+      </div>
+      ${precisionNote ? `<div class="fc-pc-note">${escapeHtml(precisionNote)}</div>` : ''}
+      ${fetchNote}
+      ${s.status === 'located' ? '<h4>Parcel at this spot</h4><div id="fc-listing-parcel"></div>' : ''}
+    </div>`;
+    wirePanelBack(listEl);
+    listEl.querySelectorAll('[data-field]').forEach(inp => {
+      const evName = inp.tagName === 'SELECT' ? 'change' : 'blur';
+      inp.addEventListener(evName, () => saveListingField(s, inp.getAttribute('data-field'), inp.value));
+    });
+    listEl.querySelector('[data-act="place"]').addEventListener('click', () => startPlacing(s));
+    listEl.querySelector('[data-act="delete"]').addEventListener('click', () => deleteListing(s));
+    if (s.status === 'located') {
+      const box = document.getElementById('fc-listing-parcel');
+      const id = s.id;
+      const key = `${id}|${s.lat}|${s.lng}`;
+      // Price/notes edits re-render this panel; reuse the lookup for the same pin.
+      if (__listingParcel && __listingParcel.key === key) {
+        box.innerHTML = renderParcelCard(__listingParcel.pc, { embedded: true, listing: s });
+        wireParcelCard(box, __listingParcel.pc);
+        maybeSaveEnrichment(s, __listingParcel.pc).catch(() => {});
+      } else {
+        inspectParcelAt(s.lat, s.lng, { target: box, listing: s, isLive: () => __areaPanel === 'listing' && __openListingId === id && document.body.contains(box) })
+          .then(pc => {
+            if (!pc.noParcel || pc.noParcel === 'none') __listingParcel = { key, pc };
+            const cur = __savedListings.find(x => x.id === id) || s;
+            return maybeSaveEnrichment(cur, pc);
+          }).catch(() => {});
+      }
+    }
+  }
+
+  function ppaNoteHtml(s) {
+    if (!(s.price && s.acres)) return '';
+    const e = s.enrichment;
+    return `<strong>${fmtMoney(s.price / s.acres)} / acre asking</strong>` +
+      (e && e.assessedPerAcre ? ` · county value ${fmtMoney(e.assessedPerAcre)} / acre` : '');
+  }
+
+  async function saveListingField(s, field, raw) {
+    let value = raw;
+    if (field === 'price') value = raw === '' ? null : Number(String(raw).replace(/[$,\s]/g, ''));
+    if (field === 'acres') value = raw === '' ? null : Number(String(raw).replace(/[,\s]/g, ''));
+    if ((field === 'price' || field === 'acres') && value !== null && !(isFinite(value) && value > 0)) { areaToast('Enter a positive number', 'red'); return; }
+    if (s[field] === value || (s[field] == null && value === null)) return;
+    const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body: { [field]: value } });
+    if (!r.ok) { areaToast('Could not save: ' + (r.error || 'error'), 'red'); return; }
+    upsertLocalListing(r.listing);
+    if (field === 'price' || field === 'acres') renderListingPanel();
+    areaToast('Saved');
+  }
+
+  async function deleteListing(s) {
+    if (!window.confirm(`Delete "${listingTitle(s)}" from your saved listings?`)) return;
+    const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'DELETE' });
+    if (!r.ok) { areaToast('Could not delete: ' + (r.error || 'error'), 'red'); return; }
+    __savedListings = __savedListings.filter(x => x.id !== s.id);
+    drawSavedMarkers();
+    updateSavedCount();
+    showAreaPanel('saved');
+  }
+
+  // Snapshot of parcel facts on the listing row so the saved list can show
+  // badges without re-querying every county server.
+  async function maybeSaveEnrichment(s, pc) {
+    if (!pc || pc.noParcel) return;
+    const ov = pc.overlays || {};
+    const a = pc.assessed || {};
+    const e = {
+      v: 1, jurisdiction: pc.jurisdiction || null, pin: pc.pin || null, parcelAcres: pc.acres ?? null,
+      assessed: a.total ?? null, assessedYear: a.year ?? null,
+      assessedPerAcre: perAcreBasis(pc) ? Math.round(perAcreBasis(pc).value) : null,
+      zoning: pc.zoningCode || null, easement: !!(pc.easement || ov.easementSpatial),
+      floodZone: pc.flood && pc.flood.zone || null, sfha: !!(pc.flood && pc.flood.sfha),
+      waterFt: pc.water ? Math.round(pc.water.distM * FT_PER_M) : null, waterName: pc.water && pc.water.name || null,
+      growth: ov.growth || (ov.transition ? 'Transition policy area' : null),
+      rezoningOn: !!(ov.rezoningOn && ov.rezoningOn.some(r => r.recent)), rezoningNear: ov.rezoningNear || 0,
+      delinquent: !!(pc.delinquent && pc.delinquent.serious),
+      acreMismatch: !!acreMismatch(s, pc),
+      slopePct: pc.elev && pc.elev.slopePct != null ? Math.round(pc.elev.slopePct * 10) / 10 : null,
+    };
+    const prev = s.enrichment ? JSON.stringify(s.enrichment) : '';
+    if (prev === JSON.stringify(e)) return;
+    const body = { enrichment: e };
+    if (pc.pin && pc.jurisdiction) { body.parcel_pin = pc.pin; body.parcel_jurisdiction = pc.jurisdiction; }
+    const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), { method: 'PUT', body });
+    if (r.ok) {
+      const i = __savedListings.findIndex(x => x.id === s.id);
+      if (i >= 0) __savedListings[i] = r.listing;
+      const note = document.getElementById('fc-listing-ppa');
+      if (note && __openListingId === s.id) note.innerHTML = ppaNoteHtml(r.listing);
+    }
+  }
+
+  // ─── Pin placement ─────────────────────────────────────────────────────
+  function startPlacing(s) {
+    __placing = s;
+    const mapEl = document.getElementById('fc-area-map');
+    if (mapEl) mapEl.classList.add('is-placing');
+    const banner = document.getElementById('fc-area-banner');
+    if (banner) {
+      banner.hidden = false;
+      banner.innerHTML = `<span>📍 Tap the map where <strong>${escapeHtml(listingTitle(s))}</strong> is — ideally inside its parcel.</span>
+        <span class="fc-area-banner-find"><input class="fc-area-input" id="fc-area-find" placeholder="…or type its street address" autocomplete="off">
+        <button class="fc-btn fc-btn-sm" data-act="find">Find</button></span>
+        <button class="fc-btn fc-btn-sm fc-btn-ghost" data-act="cancel">Cancel</button>`;
+      banner.querySelector('[data-act="cancel"]').addEventListener('click', stopPlacing);
+      const find = () => findAddressForPlacing(banner.querySelector('#fc-area-find').value);
+      banner.querySelector('[data-act="find"]').addEventListener('click', find);
+      banner.querySelector('#fc-area-find').addEventListener('keydown', ev => { if (ev.key === 'Enter') find(); });
+    }
+    if (__areaMap) {
+      if (s.lat != null) __areaMap.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
+      else if (/fauquier/i.test(s.county || '')) __areaMap.flyTo([38.73, -77.80], 11, { duration: 0.6 });
+      else if (/loudoun/i.test(s.county || '')) __areaMap.flyTo([39.08, -77.70], 11, { duration: 0.6 });
+    }
+    if (isPhone() && mapEl) mapEl.scrollIntoView({ block: 'start' });
+  }
+
+  function stopPlacing() {
+    __placing = null;
+    const mapEl = document.getElementById('fc-area-map');
+    if (mapEl) mapEl.classList.remove('is-placing');
+    const banner = document.getElementById('fc-area-banner');
+    if (banner) { banner.hidden = true; banner.innerHTML = ''; }
+    if (__placeMarker) { __placeMarker.remove(); __placeMarker = null; }
+  }
+
+  async function findAddressForPlacing(text) {
+    const q = String(text || '').trim();
+    if (!q || !__placing) return;
+    const county = __placing.county || '';
+    const r = await apiFetch('/api/geocode?' + new URLSearchParams({ address: q, county }));
+    if (!r.ok) { areaToast('Lookup failed: ' + (r.error || 'error'), 'red'); return; }
+    if (!r.result) { areaToast('Address not found — tap the map instead', 'red'); return; }
+    const g = r.result;
+    if (__placeMarker) __placeMarker.remove();
+    __placeMarker = L.marker([g.lat, g.lng], { interactive: false }).addTo(__areaMap);
+    __areaMap.flyTo([g.lat, g.lng], 17, { duration: 0.6 });
+    await finishPlacing(g.lat, g.lng, g.method, g.precision);
+  }
+
+  async function finishPlacing(lat, lng, method, precision) {
+    const s = __placing;
+    if (!s) return;
+    const r = await apiFetch('/api/listings/' + encodeURIComponent(s.id), {
+      // Clear the old parcel link + snapshot; the listing card re-derives both.
+      method: 'PUT', body: { lat, lng, loc_method: method || 'pin', loc_precision: precision || 'exact', enrichment: null, parcel_pin: null, parcel_jurisdiction: null },
+    });
+    stopPlacing();
+    if (!r.ok) { areaToast('Could not save the pin: ' + (r.error || 'error'), 'red'); return; }
+    upsertLocalListing(r.listing);
+    areaToast('Pin saved');
+    openListing(s.id);
+  }
+
+  // ─── Add listing (paste a link / bookmarklet) ──────────────────────────
+  const BOOKMARKLET_SRC = "(function(){var o={u:location.href},d=document;function n(v){if(v==null)return null;var x=parseFloat(String(v).replace(/[$,\\s]/g,''));return isFinite(x)?x:null}function A(v,u){var r=String(v==null?'':v),U=String(u||'').toUpperCase();if(/sq/i.test(r)||U=='FTK'||U=='SQFT'){var q=n(r.replace(/[^\\d.]/g,''));return q?q/43560:null}if(U=='ACR'||/acre/i.test(r)||/acre/i.test(U)){return n(r.replace(/[^\\d.]/g,''))}return null}var LS=/RealEstateListing|Product|Residence|House|Place|Accommodation|Offer|GeoCoordinates|PostalAddress/i,SI=/LocalBusiness|Organization|Corporation|WebSite|WebPage|FAQPage|BreadcrumbList|Question|Answer|ItemList|Person|RealEstateAgent/i;function w(x,L,k){if(!x||k>12)return;if(Array.isArray(x)){x.forEach(function(y){w(y,L,k+1)});return}if(typeof x!='object')return;var t=String([].concat(x['@type']||'').join(','));if(t&&SI.test(t)&&!/RealEstateListing|Product|Residence/i.test(t))return;var l=L||(t&&LS.test(t));if(l){var a=n(x.latitude),b=n(x.longitude);if(o.lat==null&&a!=null&&b!=null){o.lat=a;o.lng=b}if(x.offers)[].concat(x.offers).forEach(function(f){var p=f&&n(f.price!=null?f.price:f.lowPrice);if(o.price==null&&p>0)o.price=p});if((x.streetAddress||x.addressLocality)&&!o.street&&!o.city){o.street=x.streetAddress||null;o.city=x.addressLocality||null;o.state=x.addressRegion||null;o.zip=x.postalCode?String(x.postalCode):null}if(x.additionalProperty)[].concat(x.additionalProperty).forEach(function(p){if(p&&/acre|lot\\s*size/i.test(p.name||'')&&o.acres==null){var q=A(p.value,p.unitCode||p.unitText);if(q)o.acres=q}});if(!o.title&&typeof x.name=='string'&&/RealEstateListing|Product|Residence|Place|House/i.test(t))o.title=x.name}for(var K in x){if(x[K]&&typeof x[K]=='object')w(x[K],l,k+1)}}d.querySelectorAll('script[type=\"application/ld+json\"]').forEach(function(s){try{w(JSON.parse(s.textContent),false,0)}catch(e){}});try{var S=d.getElementById('__SERVER_STATE__');if(S){var P=JSON.parse(S.textContent).propertyDetailPage.propertyData;if(P){if(P.shouldRedirectLDP)o.listing_status='delisted';if(n(P.latitude)!=null){o.lat=n(P.latitude);o.lng=n(P.longitude)}if(n(P.price)>0)o.price=n(P.price);if(n(P.acres)>0)o.acres=n(P.acres);if(P.parcelId)o.parcelRef=String(P.parcelId)}}}catch(e){}try{var N=d.getElementById('__NEXT_DATA__');if(N&&/zillow/.test(location.host)){var g=JSON.parse(N.textContent).props.pageProps.componentProps.gdpClientCache;if(typeof g=='string')g=JSON.parse(g);var R=g[Object.keys(g)[0]].property;if(R){if(n(R.latitude)!=null){o.lat=n(R.latitude);o.lng=n(R.longitude)}if(R.homeStatus=='FOR_SALE'&&n(R.price)>0)o.price=n(R.price);else if(R.homeStatus){o.price=null;o.listing_status='off-market'}if(R.lotAreaValue&&/acre/i.test(R.lotAreaUnits||''))o.acres=n(R.lotAreaValue);else if(n(R.lotSize)>0)o.acres=n(R.lotSize)/43560}}}catch(e){}if(o.lat==null){var G=d.querySelector('meta[name=\"geo.position\"],meta[name=\"ICBM\"]');if(G){var z=G.content.split(/[;,]/);o.lat=n(z[0]);o.lng=n(z[1])}}var T=d.querySelector('meta[property=\"og:title\"]'),D=d.querySelector('meta[property=\"og:description\"]');if(!o.title)o.title=T?T.content:d.title;if(o.acres==null){var m=((o.title||'')+' '+(D?D.content:'')).match(/(\\d[\\d,]*(?:\\.\\d+)?)\\s*(?:\\u00b1|\\+\\/-)?\\s*acres?\\b/i);if(m)o.acres=parseFloat(m[1].replace(/,/g,''))}var U='https://nestscoop.com/foreclosure-scout.html#area-focus&add='+encodeURIComponent(JSON.stringify(o));if(!window.open(U,'_blank'))location.href=U})();";
+  const BOOKMARKLET_HREF = 'javascript:' + encodeURIComponent(BOOKMARKLET_SRC);
+
+  function renderAddPanel(prefill) {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl) return;
+    const pay = prefill || null;
+    const host = pay && safeHttps(pay.u) ? new URL(pay.u).hostname.replace(/^www\./, '') : '';
+    const facts = pay ? [pay.price ? fmtMoney(Number(pay.price)) : null, pay.acres ? fmtAcres(Number(pay.acres)) : null, (pay.lat != null && pay.lng != null) ? 'location ✓' : null].filter(Boolean).join(' · ') : '';
+    listEl.innerHTML = panelBack('saved') + `<div class="fc-pc">
+      <div class="fc-pc-title">${pay ? 'Save this listing?' : 'Add a listing'}</div>
+      ${pay ? `<div class="fc-pc-sub">From ${escapeHtml(host || 'a listing page')}${facts ? ' · ' + escapeHtml(facts) : ''}</div>
+        <div class="fc-pc-note">${escapeHtml(pay.title || '')}</div>` : `<div class="fc-pc-sub">Paste a link from LandWatch, Land.com, LandSearch, Zillow, Redfin, Realtor.com, Craigslist or anywhere else. You can paste a whole shared message — Nestscoop finds the link.</div>`}
+      <textarea class="fc-area-input" id="fc-area-paste" rows="3" placeholder="https://…" ${pay ? 'hidden' : ''}>${pay ? escapeHtml(pay.u) : ''}</textarea>
+      <div class="fc-pc-links"><button class="fc-btn fc-btn-sm fc-btn-dark" data-act="ingest">${pay ? 'Save listing' : 'Add listing'}</button></div>
+      <div id="fc-area-ingest-msg" class="fc-pc-note" role="status"></div>
+      <h4>Faster: the Send to Nestscoop bookmark</h4>
+      <div class="fc-pc-note">Most listing sites block servers from reading their pages. The bookmark runs in <em>your</em> browser on the listing page and sends price, acres and exact location here.
+        <div style="margin:8px 0"><a class="fc-btn fc-btn-sm" id="fc-bm-link" href="#">📎 Send to Nestscoop</a> ← drag to your bookmarks bar (desktop)</div>
+        On iPhone: bookmark any page, then edit that bookmark and replace its address with the code below.
+        <div style="margin-top:6px"><button class="fc-btn fc-btn-sm" data-act="copy-bm">Copy bookmark code</button></div>
+      </div>
+    </div>`;
+    wirePanelBack(listEl);
+    const bm = listEl.querySelector('#fc-bm-link');
+    bm.setAttribute('href', BOOKMARKLET_HREF);
+    bm.addEventListener('click', ev => { ev.preventDefault(); areaToast('Drag this button to your bookmarks bar'); });
+    listEl.querySelector('[data-act="copy-bm"]').addEventListener('click', () => {
+      if (navigator.clipboard) navigator.clipboard.writeText(BOOKMARKLET_HREF).then(() => areaToast('Bookmark code copied')).catch(() => {});
+    });
+    const go = async () => {
+      const msg = listEl.querySelector('#fc-area-ingest-msg');
+      const btn = listEl.querySelector('[data-act="ingest"]');
+      const text = pay ? pay.u : listEl.querySelector('#fc-area-paste').value;
+      if (!String(text || '').trim()) { msg.textContent = 'Paste a listing link first.'; return; }
+      btn.disabled = true; msg.textContent = 'Reading the listing…';
+      const body = { text };
+      if (pay) body.page = { lat: pay.lat, lng: pay.lng, price: pay.price, acres: pay.acres, title: pay.title, street: pay.street, city: pay.city, state: pay.state, zip: pay.zip, parcelRef: pay.parcelRef, listing_status: pay.listing_status };
+      const r = await apiFetch('/api/listings/ingest', { method: 'POST', body });
+      btn.disabled = false;
+      if (!r.ok) {
+        if (r.reason === 'no-token' || r.reason === 'unauthorized') { msg.innerHTML = 'This device is not connected. <button class="fc-btn fc-btn-sm" data-act="connect">Open Settings</button>'; msg.querySelector('[data-act="connect"]').addEventListener('click', () => setView('settings')); }
+        else msg.textContent = r.error || 'Something went wrong.';
+        return;
+      }
+      __pendingAddPayload = null;
+      upsertLocalListing(r.listing);
+      if (r.existing) areaToast('Already saved — opening it');
+      openListing(r.listing.id);
+      if (r.listing.status !== 'located') startPlacing(r.listing);
+    };
+    listEl.querySelector('[data-act="ingest"]').addEventListener('click', go);
+    if (!pay) listEl.querySelector('#fc-area-paste').focus({ preventScroll: true });
+  }
+
+  // ─── Panel plumbing ────────────────────────────────────────────────────
+  function panelBack(to) {
+    return `<button class="fc-area-back" data-back="${to}">← ${to === 'results' ? 'Results' : 'Saved listings'}</button>`;
+  }
+  function wirePanelBack(el) {
+    el.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => {
+      drawParcelHighlight(null);
+      showAreaPanel(b.getAttribute('data-back'));
+    }));
+  }
+  function setAreaCount(t) {
+    const c = document.getElementById('fc-area-count');
+    if (c) c.textContent = t || '—';
+  }
+  function syncTabs() {
+    document.querySelectorAll('.fc-area-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-panel') === __areaPanel));
+  }
+  function revealPanelOnPhone() {
+    if (!isPhone()) return;
+    const p = document.getElementById('fc-area-panel');
+    // Instant: a smooth scroll gets cancelled as the card grows with each lookup.
+    if (p) setTimeout(() => p.scrollIntoView({ block: 'start' }), 50);
+  }
+  function showAreaPanel(name, arg) {
+    __areaPanel = name;
+    syncTabs();
+    if (name === 'saved') renderSavedPanel();
+    else if (name === 'results') renderAreaListings();
+    else if (name === 'add') { renderAddPanel(arg); revealPanelOnPhone(); }
+    else if (name === 'listing') renderListingPanel();
+  }
+
+  function setAreaMode(mode) {
+    __areaMode = mode === 'radius' ? 'radius' : 'inspect';
+    const card = document.querySelector('.fc-area-card');
+    if (card) card.classList.toggle('is-radius', __areaMode === 'radius');
+    document.querySelectorAll('.fc-area-mode').forEach(b => b.classList.toggle('active', b.getAttribute('data-mode') === __areaMode));
+    if (__areaMode === 'inspect' && __areaPanel === 'results' && !__areaCenter) showAreaPanel('saved');
+  }
+
+  function onAreaMapClick(e) {
+    if (__placing) { finishPlacing(e.latlng.lat, e.latlng.lng, 'pin', 'exact'); return; }
+    if (__areaMode === 'radius') { dropRadiusCenter(e.latlng); return; }
+    inspectParcelAt(e.latlng.lat, e.latlng.lng);
   }
 
   function wireAreaPresets() {
@@ -4164,10 +5216,7 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('.fc-area-preset').forEach(b => b.classList.toggle('active', b === btn));
         if (__areaMap) {
-          const lat = parseFloat(btn.getAttribute('data-lat'));
-          const lng = parseFloat(btn.getAttribute('data-lng'));
-          const zoom = parseInt(btn.getAttribute('data-zoom'), 10) || 10;
-          __areaMap.setView([lat, lng], zoom);
+          __areaMap.setView([parseFloat(btn.getAttribute('data-lat')), parseFloat(btn.getAttribute('data-lng'))], parseInt(btn.getAttribute('data-zoom'), 10) || 10);
         }
       });
     });
@@ -4182,74 +5231,81 @@
       radius.addEventListener('input', () => {
         __areaRadiusMi = Number(radius.value) || 10;
         if (radiusLabel) radiusLabel.textContent = __areaRadiusMi + ' mi';
-        if (__areaRadiusCircle && __areaCenter) {
-          __areaRadiusCircle.setRadius(__areaRadiusMi * 1609.344);
-        }
+        if (__areaRadiusCircle && __areaCenter) __areaRadiusCircle.setRadius(__areaRadiusMi * 1609.344);
         renderAreaListings();
       });
     }
     if (onlyWater && !onlyWater.__fcWired) {
       onlyWater.__fcWired = true;
-      onlyWater.addEventListener('change', () => {
-        __areaOnlyWater = onlyWater.checked;
-        renderAreaListings();
-      });
+      onlyWater.addEventListener('change', () => { __areaOnlyWater = onlyWater.checked; renderAreaListings(); });
+    }
+    document.querySelectorAll('.fc-area-mode').forEach(b => {
+      if (b.__fcWired) return;
+      b.__fcWired = true;
+      b.addEventListener('click', () => setAreaMode(b.getAttribute('data-mode')));
+    });
+    document.querySelectorAll('.fc-area-tab').forEach(t => {
+      if (t.__fcWired) return;
+      t.__fcWired = true;
+      t.addEventListener('click', () => { drawParcelHighlight(null); showAreaPanel(t.getAttribute('data-panel')); });
+    });
+    const add = document.getElementById('fc-area-add-btn');
+    if (add && !add.__fcWired) {
+      add.__fcWired = true;
+      add.addEventListener('click', () => { stopPlacing(); showAreaPanel('add'); });
     }
   }
 
   async function initAreaFocus() {
     if (__areaMap) {
-      // Already initialized — just invalidate size so Leaflet recomputes
-      // (the container was display:none, so it had no dimensions earlier).
+      // Re-entry: the container was display:none, so Leaflet must re-measure.
       setTimeout(() => __areaMap.invalidateSize(), 100);
-      renderAreaListings();
+      // Token may have been pasted in Settings since the last visit.
+      if ((__savedState === 'no-token' || __savedState === 'error') && getZillowSyncToken()) loadSavedListings();
+      if (__pendingAddPayload) showAreaPanel('add', __pendingAddPayload);
+      else showAreaPanel(__areaPanel === 'parcel' ? 'saved' : __areaPanel);
       return;
     }
-    if (typeof L === 'undefined') {
-      console.warn('Area Focus: Leaflet not loaded');
-      return;
-    }
+    if (typeof L === 'undefined') { console.warn('Area Focus: Leaflet not loaded'); return; }
     const mapEl = document.getElementById('fc-area-map');
     if (!mapEl) return;
 
     __areaMap = L.map(mapEl, { preferCanvas: true }).setView([39.004, -77.734], 10);
-    // Expose for debugging / scripted drops: window.fcAreaDrop(lat, lng).
+    // Debug / scripted helpers: window.fcAreaDrop(lat, lng) fires a map click.
     window.__fcAreaMap = __areaMap;
     window.fcAreaDrop = (lat, lng) => __areaMap.fire('click', { latlng: L.latLng(lat, lng) });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(__areaMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(__areaMap);
 
-    await loadAreaHydro();
-    drawHydroLayer();
+    const hint = document.createElement('div');
+    hint.id = 'fc-area-zoomhint';
+    hint.className = 'fc-area-zoomhint';
+    mapEl.appendChild(hint);
 
-    // Phase 2b — overlay growth-signal + exclusion layers from county GIS.
-    // Non-blocking; map stays usable while these load in parallel.
-    await loadAreaGisLayers();
-
+    __parcelLayer = L.geoJSON(null, { style: { color: '#5b4a2f', weight: 0.9, opacity: 0.75, fill: false }, interactive: false }).addTo(__areaMap);
     __areaListingLayer = L.layerGroup().addTo(__areaMap);
+    __savedLayer = L.layerGroup().addTo(__areaMap);
 
-    __areaMap.on('click', (e) => {
-      __areaCenter = { lat: e.latlng.lat, lng: e.latlng.lng };
-      if (__areaCenterMarker) __areaCenterMarker.remove();
-      if (__areaRadiusCircle) __areaRadiusCircle.remove();
-      __areaCenterMarker = L.marker(e.latlng).addTo(__areaMap);
-      __areaRadiusCircle = L.circle(e.latlng, {
-        radius: __areaRadiusMi * 1609.344,
-        color: '#c84b2f',
-        fillColor: '#c84b2f',
-        fillOpacity: 0.07,
-        weight: 2,
-      }).addTo(__areaMap);
-      renderAreaListings();
-    });
+    // Click + move handlers go on BEFORE the big GeoJSON loads so the map is usable immediately.
+    __areaMap.on('click', onAreaMapClick);
+    let moveTimer = null;
+    __areaMap.on('moveend overlayadd overlayremove', () => { clearTimeout(moveTimer); moveTimer = setTimeout(refreshParcelLines, 400); });
+    refreshParcelLines();
 
     wireAreaPresets();
     wireAreaControls();
-
-    // Make sure Leaflet gets correct size now that the container is visible.
+    setAreaMode('inspect');
+    if (__pendingAddPayload) showAreaPanel('add', __pendingAddPayload); else showAreaPanel('saved');
     setTimeout(() => __areaMap.invalidateSize(), 100);
+
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (__areaMap && mapEl.offsetParent) __areaMap.invalidateSize(); }, 200);
+    });
+
+    loadSavedListings();
+    loadAreaHydro().then(drawHydroLayer);
+    await loadAreaGisLayers();
   }
 
   window.fcInitAreaFocus = initAreaFocus;
@@ -6651,44 +7707,53 @@ Return ONLY the 2-sentence analysis.`,
             </div>
           </div>
 
-          <!-- Area Focus — Leaflet map centered on western Loudoun / Fauquier.
-               Click to drop a search center, slider adjusts radius, listings
-               panel on the right shows land within the radius scored by
-               water-adjacency + equity%. Water layer from OpenStreetMap. -->
+          <!-- Area Focus — Leaflet map over western Loudoun / Fauquier.
+               Map click = inspect that parcel (default) or set a search
+               center (radius mode). Side panel: saved listings, radius
+               results, the parcel card, a listing's detail, or Add listing. -->
           <div id="fc-view-area-focus" style="display:none">
-            <div class="fc-card">
-              <div class="fc-card-hd">
+            <div class="fc-card fc-area-card">
+              <div class="fc-card-hd fc-area-hd">
                 <div class="fc-card-title">Area Focus</div>
                 <span class="fc-pill" id="fc-area-count">—</span>
-                <div style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">
+                <div class="fc-area-presets">
                   <button class="fc-btn fc-btn-sm fc-area-preset active" data-lat="39.004" data-lng="-77.734" data-zoom="10">Middleburg</button>
                   <button class="fc-btn fc-btn-sm fc-area-preset" data-lat="38.714" data-lng="-77.797" data-zoom="10">Warrenton</button>
                   <button class="fc-btn fc-btn-sm fc-area-preset" data-lat="38.858" data-lng="-77.800" data-zoom="10">The Plains</button>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);flex-wrap:wrap;font-size:12px;color:var(--muted)">
-                <div><strong>Click the map</strong> to drop a search center.</div>
-                <div style="display:flex;align-items:center;gap:8px">
+              <div class="fc-area-bar">
+                <div class="fc-area-modes" role="group" aria-label="Map click does">
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-area-mode active" data-mode="inspect">🔍 Inspect parcel</button>
+                  <button class="fc-btn fc-btn-sm fc-btn-ghost fc-area-mode" data-mode="radius">📍 Search radius</button>
+                </div>
+                <div class="fc-area-radius-ctl">
                   <label for="fc-area-radius">Radius</label>
-                  <input type="range" id="fc-area-radius" min="1" max="30" value="10" style="width:140px">
-                  <span id="fc-area-radius-label" style="font-family:var(--f-mono);font-size:11px;color:var(--ink)">10 mi</span>
+                  <input type="range" id="fc-area-radius" min="1" max="30" value="10">
+                  <span id="fc-area-radius-label">10 mi</span>
+                  <label class="fc-area-water"><input type="checkbox" id="fc-area-only-water" checked> Water ≤ 1,000 ft</label>
                 </div>
-                <div style="display:flex;align-items:center;gap:6px">
-                  <label><input type="checkbox" id="fc-area-only-water" checked> Only water-adjacent (≤ 1,000 ft)</label>
-                </div>
+                <button class="fc-btn fc-btn-sm fc-btn-dark fc-area-add" id="fc-area-add-btn">＋ Add listing</button>
               </div>
-              <div style="padding:8px 16px;border-bottom:1px solid var(--hair);background:var(--paper-2);font-size:11px;color:var(--muted);line-height:1.5">
-                <strong>Overlays:</strong>
-                <span style="color:#b8860b">🟡 rezoning cases</span> ·
+              <div class="fc-area-legend">
+                <span style="color:#1f6f8b">● my listings</span> ·
+                <span style="color:#b8860b">🟡 rezoning</span> ·
                 <span style="color:#2d6a4f">🟢 growth areas</span> ·
-                <span style="color:#a67b4a">🟤 transition policy</span> ·
-                <span style="color:#c84b2f">🔴 conservation easements (no development)</span>.
-                Toggle individual layers via the control in the map's top-right. Click any polygon for case details.
+                <span style="color:#a67b4a">🟤 transition</span> ·
+                <span style="color:#c84b2f">🔴 easements</span>.
+                Tap any spot for that parcel's owner, value, zoning, flood and soils. Parcel lines appear when zoomed in.
               </div>
-              <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:0;min-height:620px">
-                <div id="fc-area-map" style="height:620px;border-right:1px solid var(--hair);background:#dde6e8"></div>
-                <div id="fc-area-list" style="height:620px;overflow:auto;padding:8px 10px;background:var(--paper-2)">
-                  <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Click the map to begin.</div>
+              <div class="fc-area-banner" id="fc-area-banner" hidden></div>
+              <div class="fc-area-grid">
+                <div id="fc-area-map" class="fc-area-map"></div>
+                <div id="fc-area-panel" class="fc-area-panel">
+                  <div class="fc-area-tabs" role="tablist">
+                    <button class="fc-area-tab active" data-panel="saved" role="tab">Saved <span id="fc-area-saved-n"></span></button>
+                    <button class="fc-area-tab" data-panel="results" role="tab">Radius results</button>
+                  </div>
+                  <div id="fc-area-list" class="fc-area-list">
+                    <div class="fc-area-empty">Loading…</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -6721,12 +7786,12 @@ Return ONLY the 2-sentence analysis.`,
           <div id="fc-view-settings" style="display:none">
             <div class="fc-card" style="max-width:640px">
               <div class="fc-card-hd">
-                <div class="fc-card-title">Zillow Queue sync</div>
+                <div class="fc-card-title">Device sync</div>
                 <span class="fc-pill" id="fc-sync-status">checking…</span>
               </div>
               <div style="padding:16px 18px;font-size:13px;color:var(--ink-2);line-height:1.55">
                 <p style="margin-bottom:12px">
-                  Paste the sync token below to keep Zillow validations in step across devices.
+                  Paste the sync token below to sync saved land listings, Loudoun parcel values and Zillow validations across devices.
                   Stored locally in this browser only — never sent anywhere except your own
                   <code style="font-family:var(--f-mono);font-size:12px">nestscoop-api</code> worker.
                 </p>
@@ -8135,6 +9200,120 @@ Return ONLY the 2-sentence analysis.`,
   body.fc-role-admin  .fc-role-chip { color: var(--gold-ink); border-color: var(--gold-deep); }
   body.fc-role-viewer .fc-role-chip { color: var(--sky); border-color: var(--sky); }
 
+  /* ─── Area Focus ──────────────────────────────────────────────────────── */
+  .fc-area-hd { flex-wrap: wrap; gap: 8px; }
+  .fc-area-presets { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .fc-area-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; border-bottom: 1px solid var(--hair); background: var(--paper-2);
+    font-size: 12px; color: var(--muted);
+  }
+  .fc-area-modes { display: flex; gap: 2px; background: var(--paper); border: 1px solid var(--hair); border-radius: 6px; padding: 2px; }
+  .fc-area-mode.active { background: var(--ink) !important; color: var(--paper) !important; }
+  .fc-area-radius-ctl { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fc-area-card.is-radius .fc-area-radius-ctl { display: flex; }
+  .fc-area-radius-ctl input[type="range"] { width: 120px; }
+  #fc-area-radius-label { font-family: var(--f-mono); font-size: 11px; color: var(--ink); min-width: 38px; }
+  .fc-area-water { display: flex; align-items: center; gap: 4px; }
+  .fc-area-add { margin-left: auto; }
+  .fc-area-legend { padding: 6px 16px; border-bottom: 1px solid var(--hair); background: var(--paper-2); font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .fc-area-banner {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--gold-soft); color: var(--gold-ink);
+    border-bottom: 1px solid var(--hair); font-size: 13px;
+  }
+  .fc-area-banner[hidden] { display: none; }
+  .fc-area-banner-find { display: flex; gap: 6px; flex: 1 1 260px; }
+  .fc-area-banner-find .fc-area-input { flex: 1; }
+  .fc-area-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); }
+  /* position + z-index:0 = own stacking context, so Leaflet's 400–1000
+     z-index panes cannot paint over the drawer or the mobile sidebar. */
+  .fc-area-map { position: relative; z-index: 0; height: 640px; border-right: 1px solid var(--hair); background: #dde6e8; }
+  .fc-area-map.is-placing { cursor: crosshair; box-shadow: inset 0 0 0 3px var(--gold); }
+  .fc-area-map.is-placing .leaflet-container, .fc-area-map.is-placing.leaflet-container { cursor: crosshair; }
+  .fc-area-zoomhint {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 800;
+    background: rgba(14, 23, 40, 0.78); color: #fff; font-size: 11px; padding: 3px 10px;
+    border-radius: 10px; pointer-events: none; white-space: nowrap;
+  }
+  .fc-area-zoomhint:empty { display: none; }
+  .fc-area-panel { display: flex; flex-direction: column; height: 640px; background: var(--paper-2); min-width: 0; }
+  .fc-area-tabs { display: flex; border-bottom: 1px solid var(--hair); background: var(--paper); flex: 0 0 auto; }
+  .fc-area-tab {
+    flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent;
+    padding: 9px 8px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer;
+  }
+  .fc-area-tab.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  #fc-area-saved-n:not(:empty)::before { content: "· "; }
+  .fc-area-list { flex: 1 1 auto; overflow: auto; padding: 8px 10px; min-height: 0; }
+  .fc-area-empty { padding: 18px 12px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .fc-area-empty > div { margin-top: 8px; }
+  .fc-area-back {
+    background: transparent; border: 0; padding: 4px 2px 8px; font: inherit; font-size: 12px;
+    color: var(--sky); cursor: pointer;
+  }
+  .fc-area-input {
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--white);
+    border: 1px solid var(--hair-2); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box;
+  }
+  textarea.fc-area-input { resize: vertical; }
+  .fc-area-input:focus { outline: 2px solid var(--sky-soft); border-color: var(--sky); }
+
+  /* Saved-listing rows */
+  .fc-sl-row {
+    padding: 10px; margin-bottom: 8px; background: var(--white); border: 1px solid var(--hair);
+    border-radius: 6px; cursor: pointer;
+  }
+  .fc-sl-row:hover { border-color: var(--hair-2); }
+  .fc-sl-title { font-weight: 600; font-size: 13px; color: var(--ink); line-height: 1.3; }
+  .fc-sl-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .fc-sl-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .fc-sl-foot strong { color: var(--ink); font-family: var(--f-mono); }
+  .fc-sl-foot a { color: var(--sky); text-decoration: none; }
+  .fc-sl-edit { display: flex; gap: 8px; margin-top: 10px; }
+  .fc-sl-edit label, .fc-sl-notes { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
+  .fc-sl-notes { margin-top: 10px; }
+
+  /* Parcel card */
+  .fc-pc { background: var(--white); border: 1px solid var(--hair); border-radius: 6px; padding: 12px; }
+  #fc-listing-parcel .fc-pc { border: 0; padding: 0; }
+  .fc-pc-title { font-family: var(--f-serif); font-size: 17px; color: var(--ink); line-height: 1.25; }
+  .fc-pc-sub { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .fc-pc-copy { background: transparent; border: 0; padding: 0 2px; cursor: pointer; color: var(--muted); font-size: 12px; }
+  .fc-pc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .fc-pc-flags:empty { display: none; }
+  .fc-pc h4 {
+    margin: 14px 0 4px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted-2); font-weight: 600; font-family: var(--f-mono);
+  }
+  .fc-pc-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--hair); font-size: 12px; }
+  .fc-pc-row > span:first-child { color: var(--muted); flex: 0 0 auto; }
+  .fc-pc-row > span:last-child { color: var(--ink); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  .fc-pc-dim { color: var(--muted); font-size: 11px; }
+  .fc-pc-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .fc-pc-note:empty { display: none; }
+  .fc-pc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .fc-pc-skel { color: var(--muted-2); font-style: italic; }
+  .fc-area-warn { background: var(--gold-soft); color: var(--gold-ink); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.45; margin-bottom: 10px; }
+
+  @media (max-width: 768px) {
+    body.fc-on-area-focus .fc-page-head { display: none; }
+    .fc-area-presets { margin-left: 0; width: 100%; }
+    .fc-area-bar { padding: 8px 12px; }
+    .fc-area-add { margin-left: 0; }
+    .fc-area-legend { padding: 6px 12px; }
+    .fc-area-grid { grid-template-columns: minmax(0, 1fr); }
+    .fc-area-map { height: 55vh; height: 55dvh; min-height: 320px; border-right: 0; border-bottom: 1px solid var(--hair); }
+    /* min-height: tall enough that "scroll the card to the top" works
+       while the card is still a one-line skeleton. */
+    .fc-area-panel { height: auto; min-height: 75vh; min-height: 75dvh; }
+    .fc-area-list { overflow: visible; }
+    /* iOS zooms any focused input under 16px. */
+    .fc-area-input { font-size: 16px; }
+    .fc-pc-row { font-size: 13px; }
+    .fc-area-tab { padding: 11px 8px; font-size: 13px; }
+  }
+
   /* Viewer hides: keep the app clean + enforce read-only at the UI layer.
      (Bypassable in DevTools — client-side gate is intentional, not secure.) */
   body.fc-role-viewer .fc-side-item[data-view="zillow-queue"],
@@ -8143,6 +9322,8 @@ Return ONLY the 2-sentence analysis.`,
   body.fc-role-viewer .fc-203k-watch-btn,
   body.fc-role-viewer .fc-203k-chip[data-status="WATCH"],
   body.fc-role-viewer #fc-zq-watch,
+  body.fc-role-viewer #fc-area-add-btn,
+  body.fc-role-viewer .fc-area-admin,
   body.fc-role-viewer #fc-coach-pin {
     display: none !important;
   }
