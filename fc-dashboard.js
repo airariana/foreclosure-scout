@@ -4516,12 +4516,29 @@
   }
   const SCREEN_WEIGHT = { tax: 4, estate: 4, held: 2, away: 2 };
 
+  // Road access from the nearest public road (VDOT's inventory, then the
+  // county's map of state-numbered and town roads as a fallback where VDOT has
+  // a gap) and the nearest private road: within SCREEN_ROAD_FT of the parcel
+  // line counts as frontage. The tolerance covers the simplified outlines the
+  // screener works with; the parcel card measures exactly.
+  const SCREEN_ROAD_FT = 115;
+  function screenRoadAccess(pub, priv, countyPub) {
+    const near = d => d && d.ft != null && d.ft <= SCREEN_ROAD_FT;
+    if (near(pub)) return { access: 'public', name: pub.name || null, ft: pub.ft };
+    if (near(countyPub)) return { access: 'public', name: countyPub.name || null, ft: countyPub.ft, source: 'county' };
+    const fts = [pub, countyPub].filter(d => d && d.ft != null).map(d => d.ft);
+    const nearestPublicFt = fts.length ? Math.min(...fts) : null;
+    if (near(priv)) return { access: 'private', name: priv.name || null, ft: priv.ft, nearestPublicFt };
+    return { access: 'none', nearestPublicFt };
+  }
+
   // filters: { minAcres, maxAcres, rawOnly, water: 'any'|'1000'|'300'|'on',
-  //   signals: { tax, estate, away, held }, keepEasements, bounds: {s,n,w,e}|null }
-  // Returns null when the record is filtered out, else { score, signals, water }.
-  // water is computed lazily via waterFor(rec) only for records that survive
-  // the cheaper checks.
-  function screenEvaluate(rec, f, heldCutoff, waterFor) {
+  //   road: 'public'|'road'|'any', signals: { tax, estate, away, held },
+  //   keepEasements, bounds: {s,n,w,e}|null }
+  // Returns null when the record is filtered out, else { score, signals, water, road }.
+  // water and road are computed lazily (waterFor / roadFor) only for records
+  // that survive the cheaper checks; road { unavailable } skips the road rules.
+  function screenEvaluate(rec, f, heldCutoff, waterFor, roadFor) {
     if (rec.noSell) return null;
     if (rec.easement && !f.keepEasements) return null;
     if (rec.acres == null || rec.acres < f.minAcres) return null;
@@ -4540,13 +4557,22 @@
       const lim = f.water === 'on' ? 0 : Number(f.water);
       if (water.ft == null || water.ft > lim) return null;
     }
+    const road = roadFor ? roadFor(rec) : { unavailable: true };
+    if (!road.unavailable && f.road && f.road !== 'any') {
+      if (f.road === 'public' && road.access !== 'public') return null;
+      if (f.road === 'road' && road.access === 'none') return null;
+    }
     let score = 0;
     for (const k of hits) score += SCREEN_WEIGHT[k];
     if (water.ft != null) score += water.ft === 0 ? 3 : water.ft <= 300 ? 2 : water.ft <= 1000 ? 1 : 0;
     if (rec.raw === true) score += 1;
-    return { score, signals: all, water };
+    if (!road.unavailable && road.access === 'none') score -= 2; // landlocked: needs an easement to reach
+    return { score, signals: all, water, road };
   }
   function screenCompare(p, q) {
+    // Land the buildability check graded hard to build sorts last.
+    const ps = p.rec._build && p.rec._build.grade === 'skip' ? 1 : 0, qs = q.rec._build && q.rec._build.grade === 'skip' ? 1 : 0;
+    if (ps !== qs) return ps - qs;
     if (q.ev.score !== p.ev.score) return q.ev.score - p.ev.score;
     const pw = p.ev.water.ft == null ? 1e9 : p.ev.water.ft, qw = q.ev.water.ft == null ? 1e9 : q.ev.water.ft;
     if (pw !== qw) return pw - qw;
@@ -4556,6 +4582,10 @@
 
   // ─── County parcel lookups (browser → county ArcGIS; CORS verified) ────
   const GIS = {
+    // Roads: VDOT's public-road inventory and each county's centerlines (private roads).
+    VDOT_ROADS: 'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Route_Responsibility/FeatureServer/0/query',
+    L_ROADS: 'https://logis.loudoun.gov/gis/rest/services/COL/StreetCenterline/MapServer/0/query',
+    F_ROADS: 'https://services.arcgis.com/oAoeYJ1kqmAwcEC2/arcgis/rest/services/Road_Centerlines_DL/FeatureServer/0/query',
     L_PARCELS: 'https://logis.loudoun.gov/gis/rest/services/COL/LandRecords/MapServer/5/query',
     L_OWNER: 'https://services1.arcgis.com/MxjRokvPm7bjslyR/arcgis/rest/services/Stacked_Parcels_Owner/FeatureServer/0/query',
     L_LMIS0: 'https://logis.loudoun.gov/gis/rest/services/COL/LMIS_ParcelsPlatfile/MapServer/0/query',
@@ -5724,19 +5754,22 @@
       outFields: 'PA_MCPI,PA_LEGAL_ACRE,OWNER,HIDENAME,OWNER_ADDRESS1,OWNER_ADDRESS2,OWNER_CITY,OWNER_STATE,OWNER_ZIP1,OWNER_COUNTRY,PRI_PREMISE_ADD',
     },
   };
-  const SCREEN_DEFAULTS = { area: 'map', minAcres: 10, maxAcres: 0, water: 'any', rawOnly: false, keepEasements: false, signals: { tax: true, estate: true, away: true, held: true } };
+  const SCREEN_DEFAULTS = { area: 'map', minAcres: 10, maxAcres: 0, water: 'any', road: 'public', rawOnly: false, keepEasements: false, signals: { tax: true, estate: true, away: true, held: true } };
   const SCREEN_PAGE = 2000;
   const SCREEN_SMALL = 5;          // below this many acres, load only the size band searched
   const SCREEN_BAND_MAX = 15000;   // most parcels one banded or map-view load will take per county
   const SCREEN_LIST_STEP = 200;
   const SCREEN_MAP_MAX = 1000;
+  const SCREEN_BUILD_TOP = 25;     // results that get the buildability check after each search
   const __screen = {
     recs: { fauquier: null, loudoun: null },     // normalized records per county
     minLoaded: { fauquier: Infinity, loudoun: Infinity },
     bandCache: { fauquier: null, loudoun: null },  // last small-lot (banded or map view) load per county
     aux: { delinquent: null, fEase: null, lEase: null }, // filled per layer; a failed layer retries next search
+    roads: {}, roadIdx: {},                       // per county: road features, and their distance indexes
     filters: null, results: null, summary: null, shown: SCREEN_LIST_STEP,
-    running: false, runSeq: 0, status: '', errors: [], restoreIndex: null,
+    running: false, runSeq: 0, status: '', errors: [], restoreRec: null,
+    checking: null, buildNote: null,              // buildability check of the top results
   };
   let __screenLayer = null;
   let __screenWaterIdx = null;
@@ -5759,6 +5792,77 @@
   function screenRecWater(rec) {
     if (!rec._water || rec._water.unavailable) rec._water = screenWaterFor(rec.geom);
     return rec._water;
+  }
+  // Road access for a record from its county's road indexes (built per search).
+  // A parcel reaching past the area the roads were loaded for isn't judged.
+  function screenRecRoad(rec) {
+    if (rec._road && !rec._road.unavailable) return rec._road;
+    const idx = __screen.roadIdx[rec.jurisdiction];
+    if (!idx || !rec.geom) return { unavailable: true };
+    const bb = screenBBox(rec.geom), rb = idx.box, m = 0.002;
+    if (!bb || bb[0] - m < rb.w || bb[2] + m > rb.e || bb[1] - m < rb.s || bb[3] + m > rb.n) return { unavailable: true };
+    rec._road = screenRoadAccess(screenWaterDistance(idx.pub, rec.geom), screenWaterDistance(idx.priv, rec.geom), screenWaterDistance(idx.cpub, rec.geom));
+    return rec._road;
+  }
+  // County centerlines: private roads, and public roads as a fallback for gaps
+  // in VDOT's inventory. Fauquier classes roads in VDOTCLASS or ROADCLASFC
+  // (most private roads only in the latter); Loudoun by owner.
+  const SCREEN_COUNTY_ROADS = {
+    fauquier: {
+      url: GIS.F_ROADS, name: 'FULLNAME', page: 2000, oid: 'FID',
+      priv: "VDOTCLASS='PRIVATE' OR ROADCLASFC='PRIVATE'",
+      pub: "VDOTCLASS IN ('PRIMARY','SECONDARY','FRONTAGE') OR ROADCLASFC IN ('PRIMARY','SECONDARY','FRONTAGE','TOW')",
+    },
+    loudoun: {
+      url: GIS.L_ROADS, name: 'ST_FULLNAME', page: 1000, oid: 'OBJECTID',
+      priv: "CE_OWNER IN ('PRIVATE / HOA','DEVELOPER (FUTURE PRIVATE)')",
+      pub: "CE_OWNER IN ('VDOT','CONTACT TOWN','DEVELOPER (FUTURE VDOT)','DEVELOPER (FUTURE TOWN)')",
+    },
+  };
+  // Interstates, ramps and trails carry no driveway access; frontage roads do.
+  const screenRoadLimited = p => /^Interstate$|Ramp|Shared Use Path/i.test(p.RTE_CATEGORY_NM || '') || !!p.RTE_RAMP_CD || /ramp/i.test(p.RTE_COMMON_NM || '');
+  async function screenPagedLines(url, where, outFields, box, page, oid, simplify) {
+    const base = { where, geometry: `${box.w},${box.s},${box.e},${box.n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' };
+    const cnt = await arcgis(url, Object.assign({}, base, { returnCountOnly: 'true', f: 'json' }), 20000);
+    const offsets = [];
+    for (let off = 0; off < ((cnt && cnt.count) || 0); off += page) offsets.push(off);
+    const pages = await screenPool(offsets, 3, off => arcgis(url, Object.assign({}, base, {
+      outFields, returnGeometry: 'true', outSR: '4326', geometryPrecision: '5', maxAllowableOffset: simplify || '0.00005',
+      orderByFields: oid, resultOffset: String(off), resultRecordCount: String(page), f: 'geojson',
+    }), 45000).then(j => ((j && j.features) || []).filter(f => f.geometry)));
+    return [].concat(...pages);
+  }
+  // Public roads (VDOT, without interstates, ramps and trails), county private
+  // roads and county public roads, loaded once per county per session.
+  async function screenLoadRoads(counties, errors) {
+    await Promise.all(counties.map(async k => {
+      if (!__screen.roads[k]) {
+        const b = SCREEN_SOURCES[k].box, pad = 0.01;
+        const box = { s: b.s - pad, n: b.n + pad, w: b.w - pad, e: b.e + pad };
+        const cr = SCREEN_COUNTY_ROADS[k];
+        try {
+          const [pub, priv, cpub] = await Promise.all([
+            screenPagedLines(GIS.VDOT_ROADS, "RIM_PUBLIC_ROAD_IND='Y'", 'RTE_COMMON_NM,RTE_CATEGORY_NM,RTE_RAMP_CD', box, 2000, 'OBJECTID'),
+            screenPagedLines(cr.url, cr.priv, cr.name, box, cr.page, cr.oid),
+            screenPagedLines(cr.url, cr.pub, cr.name, box, cr.page, cr.oid, '0.0001'),
+          ]);
+          const tag = (fs, kind, name) => fs.map(f => ({ type: 'Feature', geometry: f.geometry, properties: { name: name(f.properties || {}), kind } }));
+          __screen.roads[k] = {
+            box,
+            pub: tag(pub.filter(f => !screenRoadLimited(f.properties || {})), 'public', p => ddRouteName(p.RTE_COMMON_NM).name),
+            priv: tag(priv, 'private', p => titleish(p[cr.name] || '') || null),
+            cpub: tag(cpub, 'public', p => titleish(p[cr.name] || '') || null),
+          };
+        } catch (err) {
+          errors.push(`${SCREEN_SOURCES[k].label} road maps (VDOT / county) did not load, so road access isn't checked there: ${err.message || err}`);
+          return;
+        }
+      }
+      if (!__screen.roadIdx[k]) {
+        const r = __screen.roads[k];
+        __screen.roadIdx[k] = { box: r.box, pub: screenWaterIndex({ features: r.pub }), priv: screenWaterIndex({ features: r.priv }), cpub: screenWaterIndex({ features: r.cpub }) };
+      }
+    }));
   }
   function screenAwayLabel(mail) {
     const a = screenAwayFrom(mail);
@@ -5956,9 +6060,9 @@
         __screen.results = []; __screen.summary = { checked: 0, counties: [], outside: true, filters: f };
         return;
       }
-      stage = 'loading the tax, easement and water layers';
-      progress('Loading tax, easement and water layers…');
-      const [aux] = await Promise.all([screenLoadAux(counties, errors), loadAreaHydro()]);
+      stage = 'loading the tax, easement, water and road layers';
+      progress('Loading tax, easement, water and road layers…');
+      const [aux] = await Promise.all([screenLoadAux(counties, errors), loadAreaHydro(), screenLoadRoads(counties, errors)]);
       if (!screenWaterIdx()) {
         errors.push(f.water !== 'any'
           ? 'The water layer did not load, so the water filter was skipped and water is not scored.'
@@ -5999,14 +6103,15 @@
       for (const rec of recs) {
         if (bounds && (rec.label.lat < bounds.s || rec.label.lat > bounds.n || rec.label.lng < bounds.w || rec.label.lng > bounds.e)) continue;
         checked++;
-        const ev = screenEvaluate(rec, full, cutoff, screenRecWater);
+        const ev = screenEvaluate(rec, full, cutoff, screenRecWater, screenRecRoad);
         if (ev) results.push({ rec, ev });
       }
       results.sort(screenCompare);
       __screen.results = results;
       __screen.summary = { checked, counties, filters: f };
       __screen.shown = SCREEN_LIST_STEP;
-      __screen.restoreIndex = null;
+      __screen.restoreRec = null;
+      __screen.buildNote = null;
     } catch (err) {
       errors.push(`Search failed while ${stage}: ${err.message || err}`);
     } finally {
@@ -6016,6 +6121,8 @@
         __screen.errors = errors;
         drawScreenMarkers();
         if (__areaPanel === 'find') renderFindPanel();
+        // Then grade the top results for buildability and re-rank them.
+        if (__screen.results && __screen.results.length) checkTopResults(SCREEN_BUILD_TOP);
       }
     }
   }
@@ -6028,6 +6135,13 @@
   };
   function screenTitle(rec) {
     return rec.address ? titleish(rec.address) : `${rec.county} parcel ${rec.pin}`;
+  }
+  function screenRoadText(r) {
+    if (!r || r.unavailable) return '';
+    // The list measures simplified outlines; past the card's frontage distance, say so.
+    if (r.access === 'public') return ` · 🛣 ${escapeHtml(r.name || 'public road')}${r.ft > DD_FRONT_FT ? ` (~${Math.round(r.ft)} ft — confirm frontage)` : ''}`;
+    if (r.access === 'private') return ` · private road${r.name ? ` (${escapeHtml(r.name)})` : ''}`;
+    return '';
   }
   function screenWaterText(w) {
     if (!w || w.ft == null) {
@@ -6058,7 +6172,7 @@
   function openScreenResult(i) {
     const x = (__screen.results || [])[i];
     if (!x) return;
-    __screen.restoreIndex = i;
+    __screen.restoreRec = x.rec;
     if (__areaMap) __areaMap.flyTo([x.rec.label.lat, x.rec.label.lng], Math.max(__areaMap.getZoom(), 15), { duration: 0.6 });
     // Open by PIN (not by the map point) so inholdings and stacked units can't
     // swap in a neighbour; reuse the list's water reading so the two agree.
@@ -6073,7 +6187,8 @@
     const sig = { tax: 'taxes due', estate: 'estate/heirs', away: 'owner outside VA', held: '25+ yrs owned' };
     const on = Object.keys(sig).filter(k => f.signals[k]).map(k => sig[k]);
     const water = { any: '', '1000': ' · water ≤ 1,000 ft', '300': ' · water ≤ 300 ft', on: ' · water on parcel' }[f.water] || '';
-    return `${f.area === 'all' ? 'Both counties' : 'Map view'} · ${f.minAcres}${f.maxAcres ? '–' + f.maxAcres : '+'} ac${water}${f.rawOnly ? ' · no house' : ''} · ${on.length ? on.join(', ') : 'all parcels'}`;
+    const road = { public: ' · on a public road', road: ' · on a road' }[f.road] || '';
+    return `${f.area === 'all' ? 'Both counties' : 'Map view'} · ${f.minAcres}${f.maxAcres ? '–' + f.maxAcres : '+'} ac${water}${road}${f.rawOnly ? ' · no house' : ''} · ${on.length ? on.join(', ') : 'all parcels'}`;
   }
 
   function renderFindPanel() {
@@ -6094,34 +6209,45 @@
       } else {
         const rows = res.slice(0, __screen.shown).map((x, i) => {
           const r = x.rec, w = x.ev.water;
-          const chips = x.ev.signals.map(k => SIGNAL_CHIP[k](r)).join('') + (r.raw === true ? `<span class="fc-pill ink">${r.rawBasis === 'address' ? 'No address on record' : 'No building'}</span>` : '') + (r.easement ? '<span class="fc-pill coral">Easement</span>' : '');
+          const rd = x.ev.road;
+          const chips = x.ev.signals.map(k => SIGNAL_CHIP[k](r)).join('') + (r.raw === true ? `<span class="fc-pill ink">${r.rawBasis === 'address' ? 'No address on record' : 'No building'}</span>` : '') + (r.easement ? '<span class="fc-pill coral">Easement</span>' : '')
+            + (rd && rd.access === 'none' ? '<span class="fc-pill coral">No road frontage</span>' : '');
           return `<div class="fc-sl-row" data-sr="${i}">
             <div class="fc-sl-title">${escapeHtml(screenTitle(r))}</div>
-            <div class="fc-sl-sub">${escapeHtml(r.county)} · ${fmtAcres(r.acres)} · ${screenWaterText(w)}</div>
+            <div class="fc-sl-sub">${escapeHtml(r.county)} · ${fmtAcres(r.acres)} · ${screenWaterText(w)}${screenRoadText(rd)}</div>
             <div class="fc-pc-flags"><span class="fc-build-chip">${buildChip(r._build)}</span>${chips}</div>
           </div>`;
         }).join('');
         const more = res.length > __screen.shown ? `<button class="fc-btn fc-btn-sm" data-act="more">Show ${Math.min(SCREEN_LIST_STEP, res.length - __screen.shown)} more of ${(res.length - __screen.shown).toLocaleString()}</button>` : '';
         const mapNote = res.length > SCREEN_MAP_MAX ? ` The map shows the top ${SCREEN_MAP_MAX.toLocaleString()}.` : '';
         const ran = sum.filters ? `<div class="fc-pc-dim">${escapeHtml(screenFilterSummary(sum.filters))}</div>` : '';
-        const topN = Math.min(25, res.length);
-        const checkBtn = res.length ? `<div class="fc-pc-links"><button class="fc-btn fc-btn-sm" data-act="check-top"${__screen.checking ? ' disabled' : ''}>${__screen.checking ? `Checking ${__screen.checking.done} of ${__screen.checking.total}…` : `Check buildability of the top ${topN}`}</button></div>` : '';
-        resultsHtml = `<div class="fc-find-summary"><strong>${res.length.toLocaleString()} parcel${res.length === 1 ? '' : 's'}</strong> match out of ${(sum.checked || 0).toLocaleString()} checked in ${escapeHtml((sum.counties || []).map(k => SCREEN_SOURCES[k].label).join(' + '))}.${mapNote}${ran}${checkBtn}</div>
+        const job = __screen.checking && __screen.checking.seq === __screen.runSeq ? __screen.checking : null;
+        const fresh = res.filter(x => !x.rec._build).length, retry = res.filter(screenRetryable).length;
+        const bn = __screen.buildNote;
+        const label = job ? `Checking buildability ${job.done} of ${job.total}…`
+          : fresh ? `Check buildability of the ${bn ? 'next' : 'top'} ${Math.min(SCREEN_BUILD_TOP, fresh)}${retry ? ` (and retry ${Math.min(retry, Math.max(0, SCREEN_BUILD_TOP - fresh))})` : ''}`
+          : retry ? `Retry ${Math.min(SCREEN_BUILD_TOP, retry)} that didn't fully load` : '';
+        const checkBtn = res.length && label ? `<div class="fc-pc-links"><button class="fc-btn fc-btn-sm" data-act="check-top"${job ? ' disabled' : ''}>${label}</button></div>` : '';
+        const buildLine = bn && !job ? `<div class="fc-pc-dim">Buildability checked for ${bn.checked.toLocaleString()}: ${bn.skip ? `${bn.skip} look hard to build and sit at the bottom of the list` : 'none look hard to build'}${bn.failed ? `; ${bn.failed} couldn't be fully checked — the button retries them` : ''}.</div>` : '';
+        resultsHtml = `<div class="fc-find-summary"><strong>${res.length.toLocaleString()} parcel${res.length === 1 ? '' : 's'}</strong> match out of ${(sum.checked || 0).toLocaleString()} checked in ${escapeHtml((sum.counties || []).map(k => SCREEN_SOURCES[k].label).join(' + '))}.${mapNote}${ran}${buildLine}${checkBtn}</div>
           ${rows || '<div class="fc-area-empty">Nothing matches. Try fewer filters or a bigger area.</div>'}
           ${more}`;
       }
     }
     const errors = __screen.errors.length ? `<div class="fc-area-warn">${__screen.errors.map(escapeHtml).join('<br>')}</div>` : '';
+    // Keep the filters open if AJ opened them (a check finishing re-renders the list).
+    const wasOpen = !!(listEl.querySelector('.fc-find-filters') || {}).open;
     listEl.innerHTML = `<div class="fc-find">
       <div class="fc-pc-title">Find land that might sell</div>
-      <details class="fc-find-filters"${res && !running ? '' : ' open'}>
+      <details class="fc-find-filters"${res && !running && !wasOpen ? '' : ' open'}>
       <summary>${escapeHtml(screenFilterSummary(f))}</summary>
-      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name.</div>
+      <div class="fc-pc-sub">Ranks parcels by signs the owner may sell, then by water and size. The top ${SCREEN_BUILD_TOP} then get a buildability check (floodplain, slope, septic soils), and land that looks hard to build moves to the bottom. Public, HOA, utility and conservation-easement land is left out, as are Loudoun owners who asked the county to hide their name.</div>
       <div class="fc-find-grid">
         <label>Area<select class="fc-area-input" data-f="area"${dis}>${opt('map', f.area, 'Map view')}${opt('all', f.area, 'Both counties')}</select></label>
         <label>Size<select class="fc-area-input" data-f="minAcres"${dis}>${[0.5, 1, 2, 3, 5, 10, 20, 50, 100].map(v => opt(v, f.minAcres, (v === 0.5 ? '½' : v) + (v <= 1 ? '+ acre' : '+ acres'))).join('')}</select></label>
         <label>Up to<select class="fc-area-input" data-f="maxAcres"${dis}>${opt(0, f.maxAcres, 'No limit')}${[2, 3, 5, 10, 25, 50, 100, 250].map(v => opt(v, f.maxAcres, v + ' acres')).join('')}</select></label>
         <label>Water<select class="fc-area-input" data-f="water"${dis}>${opt('any', f.water, 'Any distance')}${opt('1000', f.water, 'Within 1,000 ft')}${opt('300', f.water, 'Within 300 ft')}${opt('on', f.water, 'On the parcel')}</select></label>
+        <label>Road access<select class="fc-area-input" data-f="road"${dis}>${opt('public', f.road, 'On a public road')}${opt('road', f.road, 'Public or private road')}${opt('any', f.road, 'Any (incl. no road)')}</select></label>
       </div>
       <div class="fc-find-sigs">
         <div class="fc-find-h">Seller signals <span class="fc-pc-dim">(show parcels with any checked)</span></div>
@@ -6140,7 +6266,7 @@
       ${errors}
     </div>
     <div class="fc-find-results">${resultsHtml}</div>
-    ${res && !running ? '<div class="fc-pc-note">Signals are leads, not proof anyone will sell. "Owned 25+ years" counts from the last recorded transfer. Water distances use OpenStreetMap; small streams can be missing.</div>' : ''}`;
+    ${res && !running ? '<div class="fc-pc-note">Signals are leads, not proof anyone will sell. "Owned 25+ years" counts from the last recorded transfer. Water distances use OpenStreetMap; small streams can be missing. Road access means a VDOT public road (or a county-mapped private road) within about 115 ft of the parcel line — interstates and ramps don\'t count, and a recorded access easement can\'t be seen here. Buildability is a screening estimate, not a perc test or survey.</div>' : ''}`;
     listEl.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
       const k = el.getAttribute('data-f');
       if (el.type === 'checkbox') f[k] = el.checked;
@@ -6154,17 +6280,17 @@
     const run = listEl.querySelector('[data-act="run"]');
     if (run) run.addEventListener('click', runScreen);
     const clear = listEl.querySelector('[data-act="clear"]');
-    if (clear) clear.addEventListener('click', () => { __screen.results = null; __screen.summary = null; __screen.errors = []; __screen.restoreIndex = null; drawScreenMarkers(); renderFindPanel(); setAreaCount(''); });
+    if (clear) clear.addEventListener('click', () => { __screen.results = null; __screen.summary = null; __screen.errors = []; __screen.restoreRec = null; __screen.buildNote = null; drawScreenMarkers(); renderFindPanel(); setAreaCount(''); });
     const more = listEl.querySelector('[data-act="more"]');
     if (more) more.addEventListener('click', () => { __screen.shown += SCREEN_LIST_STEP; renderFindPanel(); });
     const checkTop = listEl.querySelector('[data-act="check-top"]');
-    if (checkTop) checkTop.addEventListener('click', () => checkTopResults(25));
+    if (checkTop) checkTop.addEventListener('click', () => checkTopResults(SCREEN_BUILD_TOP));
     listEl.querySelectorAll('[data-sr]').forEach(row => row.addEventListener('click', () => openScreenResult(Number(row.getAttribute('data-sr')))));
     if (res) setAreaCount(`${res.length.toLocaleString()} found`);
     // Coming back from a parcel card: return once to the row that was opened.
-    const back = running ? null : __screen.restoreIndex;
-    __screen.restoreIndex = null;
-    if (back != null) {
+    const back = running || !__screen.restoreRec || !res ? null : res.findIndex(x => x.rec === __screen.restoreRec);
+    __screen.restoreRec = null;
+    if (back != null && back >= 0) {
       const row = listEl.querySelector(`[data-sr="${back}"]`);
       if (row) setTimeout(() => row.scrollIntoView({ block: 'center' }), 0);
     }
@@ -7198,23 +7324,61 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     });
   }
 
-  // Find land: run the buildability check over the top results.
+  // Find land: grade results for flood, slope and septic soils, then re-rank
+  // so land graded hard to build sorts last. Runs after every search; the
+  // button continues down the list. Never-checked results go first, then ones
+  // whose check failed (a source didn't answer).
+  const screenNeedsBuild = x => !x.rec._build || x.rec._build.error || (x.rec._build.failed && x.rec._build.failed.length);
+  const screenRetryable = x => !!x.rec._build && !x.rec._build.pending && screenNeedsBuild(x);
+  function screenBuildQueue(n) {
+    const res = __screen.results || [];
+    return res.filter(x => !x.rec._build).concat(res.filter(screenRetryable)).slice(0, n);
+  }
   async function checkTopResults(n) {
-    const res = (__screen.results || []).slice(0, n).filter(x => !x.rec._build || x.rec._build.error);
-    if (!res.length) return;
-    __screen.checking = { done: 0, total: res.length };
-    for (const x of res) x.rec._build = { pending: true };
-    renderFindPanel();
-    await screenPool(res, 2, async x => {
-      try { x.rec._build = await checkBuildability(x.rec.geom, x.rec.jurisdiction, x.rec.acres); }
-      catch (e) { x.rec._build = { error: e.message || String(e) }; }
-      __screen.checking.done++;
-      const row = document.querySelector(`#fc-area-list [data-sr="${(__screen.results || []).indexOf(x)}"] .fc-build-chip`);
-      if (row) row.innerHTML = buildChip(x.rec._build);
-      const st = document.getElementById('fc-find-status');
-      if (st) st.textContent = `Checked ${__screen.checking.done} of ${__screen.checking.total}…`;
-    });
-    __screen.checking = null;
+    const seq = __screen.runSeq;
+    const prev = __screen.checking;
+    if (prev && prev.seq === seq) return;
+    const todo = screenBuildQueue(n);
+    // Records are shared between searches: an older job may still be grading
+    // this list's parcels. Let it report (and re-rank) here instead.
+    if (!todo.length) { if (prev) prev.seq = seq; return; }
+    const job = { seq, done: 0, total: todo.length };
+    __screen.checking = job;
+    for (const x of todo) x.rec._build = { pending: true };
+    if (__areaPanel === 'find') renderFindPanel();
+    const inList = rec => (__screen.results || []).some(y => y.rec === rec);
+    // Three at a time; one parcel's failure doesn't stop the rest.
+    job.finished = Promise.all([0, 1, 2].map(async () => {
+      for (let x = todo.shift(); x; x = todo.shift()) {
+        // Superseded and no longer listed: don't spend the lookups.
+        if (__screen.checking !== job && !inList(x.rec)) { x.rec._build = null; continue; }
+        try { x.rec._build = await checkBuildability(x.rec.geom, x.rec.jurisdiction, x.rec.acres); }
+        catch (e) { x.rec._build = { error: e.message || String(e) }; }
+        const i = (__screen.results || []).findIndex(y => y.rec === x.rec);
+        const chip = i >= 0 && document.querySelector(`#fc-area-list [data-sr="${i}"] .fc-build-chip`);
+        if (chip) chip.innerHTML = buildChip(x.rec._build);
+        if (__screen.checking !== job) continue;
+        job.done++;
+        const btn = document.querySelector('#fc-area-list [data-act="check-top"]');
+        if (btn) btn.textContent = `Checking buildability ${job.done} of ${job.total}…`;
+      }
+    }));
+    await job.finished;
+    if (prev && prev.finished) await prev.finished;
+    if (__screen.checking === job) __screen.checking = null;
+    // The last job to finish re-ranks whatever list is showing now.
+    if (__screen.checking || !__screen.results) return;
+    screenRerankByBuild();
+  }
+  function screenRerankByBuild() {
+    const res = __screen.results;
+    const graded = res.filter(x => x.rec._build && x.rec._build.grade);
+    __screen.buildNote = {
+      checked: graded.length, skip: graded.filter(x => x.rec._build.grade === 'skip').length,
+      failed: res.filter(screenRetryable).length,
+    };
+    res.sort(screenCompare);
+    drawScreenMarkers();
     if (__areaPanel === 'find') renderFindPanel();
   }
 
@@ -7501,7 +7665,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       case '3.3': {
         if (gap) return Object.assign(gap, { links });
         const r = X.roads;
-        return ddF(ddReady(r) ? (r.touches ? 'ok' : 'flag') : 'manual', [
+        return ddF(ddReady(r) ? (r.touches === true ? 'ok' : r.touches === 'maybe' ? 'info' : 'flag') : 'manual', [
           ...(r ? ddExtraLines('roads') : ['Run the checks to look for public road frontage.']),
           'A recorded access easement or a private road can\'t be seen here — the deed and plat show them.',
         ], links);
@@ -7734,9 +7898,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     L_RSCR: 'https://logis.loudoun.gov/gis/rest/services/COL/Environmental/MapServer/12/query',
     DEQ: n => `https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/${n}/query`,
     EPA: n => `https://geopub.epa.gov/arcgis/rest/services/EMEF/efpoints/MapServer/${n}/query`,
-    VDOT: 'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Route_Responsibility/FeatureServer/0/query',
-    L_ROADS: 'https://logis.loudoun.gov/gis/rest/services/COL/StreetCenterline/MapServer/0/query',
-    F_ROADS: 'https://services.arcgis.com/oAoeYJ1kqmAwcEC2/arcgis/rest/services/Road_Centerlines_DL/FeatureServer/0/query',
+    VDOT: GIS.VDOT_ROADS, L_ROADS: GIS.L_ROADS, F_ROADS: GIS.F_ROADS,
     TX_LINES: 'https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/US_Electric_Power_Transmission_Lines/FeatureServer/0/query',
     GAS_PIPES: 'https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Natural_Gas_Interstate_and_Intrastate_Pipelines_1/FeatureServer/0/query',
     L_POWER: 'https://logis.loudoun.gov/gis/rest/services/COL/Utilities/MapServer/1/query',
@@ -7790,12 +7952,14 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   function ddRouteName(common) {
     const t = String(common || '');
     if (/ramp/i.test(t)) return { name: t.replace(/\s*\(.*\)\s*$/, ''), num: null };
-    const m = t.match(/^(SC|SR|VA|US|IS|I|PR)-(\d+)/);
+    const m = t.match(/^(BUS\s+)?(SC|SR|VA|US|IS|I|PR|FR|OT)-(\d+)/i);
     if (m) {
-      const num = Number(m[2]);
-      return { name: m[1] === 'I' || m[1] === 'IS' ? `I-${num}` : m[1] === 'US' ? `US ${num}` : `Route ${num}`, num };
+      const kind = m[2].toUpperCase(), num = Number(m[3]), bus = m[1] ? 'Business ' : '';
+      if (kind === 'FR') return { name: `Frontage Road ${num}`, num: null };
+      if (kind === 'OT') return { name: 'a federal road', num: null };
+      return { name: bus + (kind === 'I' || kind === 'IS' ? `I-${num}` : kind === 'US' ? `US ${num}` : `Route ${num}`), num };
     }
-    return { name: titleish(t.replace(/\s*\((PR|SC|SR)\b[^)]*\)\s*$/i, '')) || 'a public road', num: null };
+    return { name: titleish(t.replace(/\s*\((?:PR|NP|SC|SR|\d+)\b[^)]*\)\s*$/i, '')) || 'a public road', num: null };
   }
   const ddRouteNum = v => { const m = String(v || '').match(/^T?(\d+)$/); return m ? Number(m[1]) : null; };
 
@@ -7854,52 +8018,61 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       const failed = [rel, tanks, vrp, sf, bf].some(r => r.status === 'rejected');
       return { lines, near: open > 0 || cleanup.length > 0, any: !!((releases && releases.length) || (t && t.length)), partial: failed };
     },
-    // 3.3 — public road frontage (VDOT) and private roads (county centerlines).
+    // 3.3 — public road frontage (VDOT, then the county map where VDOT has a
+    // gap) and private roads (county centerlines). Frontage = centerline within
+    // DD_FRONT_FT of the parcel line; up to SCREEN_ROAD_FT is "probably — confirm".
     async roads(pc) {
       const g = pc.geometry;
       const loud = pc.jurisdiction === 'loudoun';
       const [pub, cty] = await Promise.allSettled([
         ddLines(DD_GIS.VDOT, "RIM_PUBLIC_ROAD_IND='Y'", 'RTE_COMMON_NM,RTE_NM,RTE_CATEGORY_NM,RTE_RAMP_CD,RIM_MAINT_RESPONSIBILITY_NM', g, DD_ROAD_PAD_M, p => {
           const r = ddRouteName(p.RTE_COMMON_NM || p.RTE_NM);
-          // Interstates and ramps are limited-access: no driveway onto them.
-          const limited = /interstate/i.test(p.RTE_CATEGORY_NM || '') || !!p.RTE_RAMP_CD || /ramp/i.test(p.RTE_COMMON_NM || '');
+          // Interstates and ramps are limited-access (no driveway); trails aren't roads. Frontage roads count.
+          const kind = /Shared Use Path/i.test(p.RTE_CATEGORY_NM || '') ? 'trail'
+            : /^Interstate$|Ramp/i.test(p.RTE_CATEGORY_NM || '') || !!p.RTE_RAMP_CD || /ramp/i.test(p.RTE_COMMON_NM || '') ? 'limited' : 'public';
           const maint = /^01-/.test(p.RIM_MAINT_RESPONSIBILITY_NM || '') ? 'state-maintained' : /^03-/.test(p.RIM_MAINT_RESPONSIBILITY_NM || '') ? 'town-maintained' : '';
-          return { name: r.name, num: r.num, kind: limited ? 'limited' : 'public', maint };
+          return { name: r.name, num: r.num, kind, maint };
         }),
         loud
           ? ddLines(DD_GIS.L_ROADS, '1=1', 'ST_FULLNAME,CE_OWNER,CE_RTNO', g, DD_ROAD_PAD_M, p => {
             const o = String(p.CE_OWNER || ''), rt = String(p.CE_RTNO || '');
-            const kind = /^(PRIVATE \/ HOA|DEVELOPER \(FUTURE PRIVATE\))$/i.test(o) || /^PAE/i.test(rt) ? 'private'
-              : /^(VDOT|CONTACT TOWN)$/i.test(o) || ddRouteNum(rt) != null ? 'public' : 'unknown';
+            const kind = /^(PRIVATE \/ HOA|DEVELOPER \(FUTURE PRIVATE\))$/i.test(o) ? 'private'
+              : /^(VDOT|CONTACT TOWN|DEVELOPER \(FUTURE (VDOT|TOWN)\))$/i.test(o) || ddRouteNum(rt) != null ? 'public' : 'unknown';
             return { name: titleish(p.ST_FULLNAME || 'road'), num: ddRouteNum(rt), kind };
           })
-          : ddLines(DD_GIS.F_ROADS, '1=1', 'FULLNAME,VDOTCLASS,STROUTE', g, DD_ROAD_PAD_M, p => ({
-            name: titleish(p.FULLNAME || 'road'), num: ddRouteNum(String(p.STROUTE || '').trim()),
-            kind: /PRIMARY|SECONDARY/i.test(p.VDOTCLASS || '') ? 'public' : /PRIVATE/i.test(p.VDOTCLASS || '') ? 'private' : 'unknown',
-          })),
+          : ddLines(DD_GIS.F_ROADS, '1=1', 'FULLNAME,VDOTCLASS,ROADCLASFC,STROUTE', g, DD_ROAD_PAD_M, p => {
+            const c = `${p.VDOTCLASS || ''} ${p.ROADCLASFC || ''}`;
+            const kind = /PRIVATE/i.test(c) ? 'private' : /INTERSTATE|RAMP/i.test(c) ? 'limited' : /PRIMARY|SECONDARY|FRONTAGE|\bTOW\b/i.test(c) ? 'public' : 'unknown';
+            return { name: titleish(p.FULLNAME || 'road'), num: ddRouteNum(String(p.STROUTE || '').trim()), kind };
+          }),
       ]);
       if (pub.status === 'rejected') return { error: 'VDOT road map did not respond' };
       const feats = pub.value;
-      const p = ddNearest(feats.filter(f => f.properties.kind === 'public'), g);
-      const lim = ddNearest(feats.filter(f => f.properties.kind === 'limited'), g);
-      const pf = p.ft != null ? feats.find(f => f.properties.kind === 'public' && f.properties.name === p.name) : null;
       const county = cty.status === 'fulfilled' ? cty.value : [];
+      const v = ddNearest(feats.filter(f => f.properties.kind === 'public'), g);
+      const c = ddNearest(county.filter(f => f.properties.kind === 'public'), g);
+      const lim = ddNearest(feats.filter(f => f.properties.kind === 'limited'), g);
       const priv = ddNearest(county.filter(f => f.properties.kind === 'private'), g);
+      // VDOT's inventory first; the county map covers roads VDOT doesn't list here.
+      const useCounty = c.ft != null && (v.ft == null || (v.ft > DD_FRONT_FT && c.ft < v.ft));
+      const best = useCounty ? c : v;
+      const vf = !useCounty && v.ft != null ? feats.find(f => f.properties.kind === 'public' && f.properties.name === v.name) : null;
       // The county's name for the same road, when its route number matches VDOT's.
-      let pubName = p.name;
-      if (pf && pf.properties.num != null) {
-        const same = county.filter(f => f.properties.kind === 'public' && f.properties.num === pf.properties.num);
-        const named = ddNearest(same, g);
-        if (named.ft != null && Math.abs(named.ft - p.ft) < 60) pubName = `${named.name} (${p.name})`;
+      let name = best.name;
+      if (vf && vf.properties.num != null) {
+        const named = ddNearest(county.filter(f => f.properties.kind === 'public' && f.properties.num === vf.properties.num), g);
+        if (named.ft != null && Math.abs(named.ft - v.ft) < 60) name = `${named.name} (${v.name})`;
       }
-      const touches = p.ft != null && p.ft <= DD_FRONT_FT;
+      const where = useCounty ? ' (on the county road map; VDOT\'s inventory doesn\'t list it here)' : vf && vf.properties.maint ? ` (${vf.properties.maint})` : '';
+      const touches = best.ft != null && best.ft <= DD_FRONT_FT ? true : best.ft != null && best.ft <= SCREEN_ROAD_FT ? 'maybe' : false;
       const lines = [];
-      if (touches) lines.push(`Public road: ${pubName}, ${ddFt(p.ft)}${pf && pf.properties.maint ? ` (${pf.properties.maint})` : ''}.`);
-      else if (p.ft != null && p.ft <= DD_ROAD_REACH_FT) lines.push(`No public road along the parcel; the nearest, ${pubName}, is ${ddFt(p.ft)}.`);
+      if (touches === true) lines.push(`Public road: ${name}, ${ddFt(best.ft)}${where}.`);
+      else if (touches === 'maybe') lines.push(`Public road ${name} is ${ddFt(best.ft)}${where} — probably frontage across a wide right-of-way, but confirm on the plat.`);
+      else if (best.ft != null && best.ft <= DD_ROAD_REACH_FT) lines.push(`No public road along the parcel; the nearest, ${name}, is ${ddFt(best.ft)}.`);
       else lines.push('No public road within about 1,000 ft of the parcel.');
       if (lim.ft != null && lim.ft <= DD_FRONT_FT) lines.push(`${lim.name} runs along the parcel — interstates and ramps are limited-access, so they give no driveway access.`);
       if (priv.ft != null && priv.ft <= DD_FRONT_FT) lines.push(`Private road: ${priv.name}, ${ddFt(priv.ft)} — access over it needs a recorded easement or road agreement.`);
-      if (!touches) lines.push('Without public frontage the land needs a recorded access easement across a neighbor — check the deed and plat.');
+      if (touches === false) lines.push('Without public frontage the land needs a recorded access easement across a neighbor — check the deed and plat.');
       return { lines, touches, partial: cty.status === 'rejected' };
     },
     // 3.4 — transmission lines and county-mapped easements near the parcel (ft-level),
