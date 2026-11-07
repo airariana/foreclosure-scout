@@ -3905,6 +3905,7 @@
   let __placeMarker = null;
   let __listingParcel = null; // {key, pc} — last parcel lookup for an open listing
   let __listingParcelPending = null; // {key, promise} — that lookup while it runs (the checklist shares it)
+  let __parcelView = null; // {pc, back} — the side-panel parcel card, for "Back to parcel"
   let __pendingAddPayload = null; // facts from the "Send to Nestscoop" bookmarklet
 
   // The bookmarklet opens nestscoop.com/...#area-focus&add=<json>. Consume it
@@ -4200,6 +4201,15 @@
     return String(s == null ? '' : s).replace(/&(amp|lt|gt|quot|#39|apos);/g, (m, e) =>
       ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'" })[e]).replace(/\s+/g, ' ').trim();
   }
+  // screenDecode plus numeric entities (Fauquier notes carry "&#x0D;").
+  function screenEntities(s) {
+    return screenDecode(String(s == null ? '' : s).replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCharCode(Number(d))));
+  }
+  // Fauquier's mailing street: "C/O NAME" or "ATTN …" in PSTLADDRES puts the
+  // street in PSTLADDR_1 (669 parcels), so join the two like Loudoun's lines.
+  function screenMailLine(a) {
+    return [screenDecode(a.PSTLADDRES), screenDecode(a.PSTLADDR_1)].filter(Boolean).join(', ');
+  }
   // Fauquier site addresses use "UNASSIGNED" or a bare suffix ("RD") as placeholders.
   function screenAddress(v) {
     const a = screenDecode(v);
@@ -4241,14 +4251,21 @@
   }
   // Where the owner's tax bill goes, if not Virginia: a state code, a country,
   // or 'elsewhere' (address with no state — abroad, APO, territories).
-  function screenAwayFrom(mail) {
+  // home = the parcel's state ('VA' unless given).
+  function screenAwayFrom(mail, home) {
     if (!mail) return null;
-    if (mail.state) return mail.state !== 'VA' ? mail.state : null;
+    const md = home === 'MD';
+    if (mail.state) return mail.state !== (md ? 'MD' : 'VA') ? mail.state : null;
     if (mail.country && !/^(US|USA|UNITED STATES)$/i.test(mail.country)) return mail.country;
     if (!(mail.line1 || mail.city) || /ADDRESS UNKNOWN/i.test(mail.line1 || '')) return null;
     // Blank state: a 5-digit ZIP decides (Virginia = 201xx, 220xx–246xx);
     // without one, look for "VIRGINIA"/"VA" in the city (not "WEST VIRGINIA").
-    const zip = String(mail.zip || '').trim();
+    const zip = String(mail.zip || '').trim().slice(0, 5);
+    if (md) {
+      // Maryland = 206xx–219xx.
+      if (/^\d{5}$/.test(zip)) return /^(20[6-9]\d\d|21\d{3})$/.test(zip) ? null : 'elsewhere';
+      return /(^|[^A-Z])(MARYLAND|MD)\b/i.test(mail.city || '') ? null : 'elsewhere';
+    }
     if (/^\d{5}$/.test(zip)) return /^(201\d\d|2[23]\d{3}|24[0-6]\d\d)$/.test(zip) ? null : 'elsewhere';
     if (/(^|[^A-Z])(VIRGINIA|VA)\b/i.test(mail.city || '') && !/WEST VIRGINIA/i.test(mail.city || '')) return null;
     return 'elsewhere';
@@ -4458,7 +4475,7 @@
       id: 'fauquier:' + pin, jurisdiction: 'fauquier', county: 'Fauquier', pin,
       acres: screenNum(a.ACREAGE), address: screenAddress(a.SITEADDRES) || null,
       owner, ownerHidden: false,
-      mail: { line1: screenDecode(a.PSTLADDRES), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5), country: '' },
+      mail: { line1: screenMailLine(a), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5), country: '' },
       raw: building == null ? null : building === 0, rawBasis: 'building',
       saleIso: screenSaleIso(a.LASTSALEDA),
       tax, easement: !!(easements && easements.has(pin)),
@@ -4600,6 +4617,15 @@
     FEMA: 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query',
     SDA: 'https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest',
     ELEV: 'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples',
+    // Maryland: statewide parcels (SDAT record, no owner names), SDAT open data, SHA roads, Frederick well/septic.
+    MD_PARCELS: 'https://mdgeodata.md.gov/imap/rest/services/PlanningCadastre/MD_ParcelBoundaries/MapServer/0/query',
+    MD_OPENDATA: 'https://opendata.maryland.gov/resource/ed4q-f8tm.json',
+    MD_ROADS: 'https://gisportalapps.sha.maryland.gov/arcgis/rest/services/OMOC/OMOCNetwork_Maryland_MDOTSHA/MapServer/0/query',
+    F_MD_PROPINFO: 'https://fcgis.frederickcountymd.gov/server_pub/rest/services/Basemap/Property_Information_WGS/MapServer/2/query',
+    // Montgomery's July tax billing (residential accounts only): parcel_code = the account without leading zeros.
+    MONT_TAXBILL: 'https://data.montgomerycountymd.gov/resource/ejqm-j7xm.json',
+    F_MD_ZONING: 'https://fcgis.frederickcountymd.gov/server_pub/rest/services/PlanningAndPermitting/Zoning/MapServer/1/query',
+    W_MD_ZONING: 'https://maps.washco-md.net/arcgis/rest/services/Planning/Zoning/MapServer/2/query',
   };
   // Rough county extents — only used to skip a county query for views far away.
   const LOUDOUN_BOX = { s: 38.84, n: 39.33, w: -77.97, e: -77.32 };
@@ -4683,7 +4709,7 @@
 
   async function fauquierParcelAt(lat, lng, byPin) {
     const fields = {
-      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,Primary_Us,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,CURRENTOWN,Legal_Desc,Building_V,Land_Value,Land_Def_V,Final_Valu,Year_Built',
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLADDR_1,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,Primary_Us,Primary__1,District_D,LASTSALEDA,LASTSALEPR,Deed_Type,CURRENTOWN,Legal_Desc,Building_V,Land_Value,Land_Def_V,Final_Valu,Year_Built,NOTE_YEAR,NOTE_TEXT',
       returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
     };
     const j = await arcgis(GIS.F_PARCELS, /^\d{4}-\d{2}-\d{4}-\d{3}$/.test(byPin || '')
@@ -4705,7 +4731,7 @@
       acres: numS(a.ACREAGE), address: screenAddress(a.SITEADDRES) || null,
       // Fauquier text arrives HTML-escaped ("O B &amp; SONS") — decode before display.
       owner: [screenDecode(a.OWNERNME1), screenDecode(a.Co_Owner2)].filter(Boolean).join(' & ') || null,
-      mail: { line1: screenDecode(a.PSTLADDRES), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5) },
+      mail: { line1: screenMailLine(a), city: screenDecode(a.PSTLCITY), state: screenDecode(a.PSTLSTATE).toUpperCase(), zip: screenDecode(a.PSTLZIP5) },
       ownerSinceIso: screenSaleIso(a.LASTSALEDA),
       landUse: trimS(a.Primary__1) || null, district: trimS(a.District_D) || null,
       // Use code suffix: V = vacant, R = has a residence (e.g. 500V / 500R).
@@ -4721,6 +4747,9 @@
       },
       sale: { date: isoDate(a.LASTSALEDA), price: salePrice, nonMarket: salePrice === 0, deedType: trimS(a.Deed_Type) || null, deedBookPage: trimS(a.CURRENTOWN) || null },
       legalDesc: screenDecode(a.Legal_Desc) || null,
+      // The assessor's free-text note (title history, name changes). The field
+      // holds 254 characters, so a full one was probably cut off.
+      assessorNote: trimS(a.NOTE_TEXT) ? { year: trimS(a.NOTE_YEAR) || null, text: screenEntities(a.NOTE_TEXT), cut: String(a.NOTE_TEXT).length >= 254 } : null,
       geometry: f.geometry,
     };
   }
@@ -4809,6 +4838,174 @@
     pc.failed = (pc.failed || 0) + [zon, ease, del].filter(r => r.status === 'rejected').length;
   }
 
+  // ─── Maryland parcels (Frederick, Washington, Montgomery) ──────────────
+  // MD iMAP's statewide parcel outlines carry SDAT's assessment record —
+  // account, acres, mailing address, deed book/page, last transfer, zoning —
+  // but not the owner's name: SDAT keeps names out of its free data, forbids
+  // scripted searches, and its direct links need a login. Montgomery's
+  // water/sewer category map does name owners; the Worker relays it (no CORS).
+  // pin = the SDAT account id (ACCTID): county code (11 Frederick, 22
+  // Washington, 16 Montgomery) + 2-digit district + account (6 or 8 digits).
+  const MD_JURIS = { FRED: { key: 'frederick', name: 'Frederick' }, WASH: { key: 'washington', name: 'Washington' }, MONT: { key: 'montgomery', name: 'Montgomery' } };
+  const MD_PIN = /^(11|22)\d{8}$|^16\d{10}$/;
+  const isMd = j => j === 'frederick' || j === 'washington' || j === 'montgomery';
+  const MD_BOX = { s: 38.93, n: 39.73, w: -78.37, e: -76.88 };
+  // CONVEY1, as SDAT's open data decodes it.
+  const MD_CONVEY = { 1: 'arm\'s-length sale', 2: 'arm\'s-length sale, vacant at the time', 3: 'arm\'s-length sale of several parcels together', 4: 'non-arm\'s-length transfer (foreclosure, gift or auction)' };
+  // Strip leading zeros from a liber/folio ("06533" → "6533"); "00000" → "".
+  const mdNum = v => trimS(v).replace(/^0+/, '');
+  function mdAcct(pin) {
+    const p = String(pin || '');
+    return { district: p.slice(2, 4), account: p.slice(4), acct8: p.slice(-8) };
+  }
+
+  async function marylandParcelAt(lat, lng, byPin) {
+    const fields = {
+      outFields: 'JURSCODE,ACCTID,ACRES,POLYACRES,ADDRESS,CITY,OWNADD1,OWNADD2,OWNCITY,OWNSTATE,OWNERZIP,DR1LIBER,DR1FOLIO,GR1LIBR1,GR1FOLO1,CONVEY1,TRADATE,CONSIDR1,ZONING,DESCLU,NFMLNDVL,NFMIMPVL,NFMTTLVL,YEARBLT,SQFTSTRC,LEGAL1,LEGAL2,LEGAL3,SDATDATE',
+      returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', f: 'geojson',
+    };
+    const j = await arcgis(GIS.MD_PARCELS, MD_PIN.test(byPin || '')
+      ? Object.assign({ where: `ACCTID='${byPin}'` }, fields)
+      : pointParams(lat, lng, fields), 12000);
+    const f = j && j.features && j.features[0];
+    if (!f) return null;
+    const a = f.properties || {};
+    const juris = MD_JURIS[trimS(a.JURSCODE)];
+    const pin = trimS(a.ACCTID);
+    if (!juris || !MD_PIN.test(pin)) return null;
+    const tra = String(a.TRADATE || '').match(/^(\d{4})(\d{2})(\d{2})$/);
+    const traIso = tra && Number(tra[1]) > 1900 ? `${tra[1]}-${tra[2]}-${tra[3]}` : null;
+    const price = numS(a.CONSIDR1);
+    const convey = numS(a.CONVEY1);
+    // A blank improvement value isn't "no building": the record may still list one.
+    const land = numS(a.NFMLNDVL), bld = numS(a.NFMIMPVL), total = numS(a.NFMTTLVL);
+    const book = (l, f2) => mdNum(l) && mdNum(f2) ? `${mdNum(l)}/${mdNum(f2)}` : null;
+    const yb = numS(a.YEARBLT);
+    const hasStruct = numS(a.SQFTSTRC) > 0 || (yb > 1700);
+    return {
+      jurisdiction: juris.key, state: 'MD', county: juris.name, pin,
+      acres: numS(a.ACRES) || numS(a.POLYACRES),
+      address: screenDecode(a.ADDRESS) ? [screenDecode(a.ADDRESS), titleish(screenDecode(a.CITY))].filter(Boolean).join(', ') : null,
+      owner: null, ownerUnknown: true,
+      mail: { line1: [screenDecode(a.OWNADD1), screenDecode(a.OWNADD2)].filter(Boolean).join(', '), city: screenDecode(a.OWNCITY), state: screenDecode(a.OWNSTATE).toUpperCase(), zip: screenDecode(a.OWNERZIP) },
+      ownerSinceIso: traIso ? screenSaleIso(traIso) : null,
+      sale: { date: traIso ? isoDate(traIso) : null, price, nonMarket: price === 0, convey, deedBookPage: book(a.DR1LIBER, a.DR1FOLIO), priorBookPage: book(a.GR1LIBR1, a.GR1FOLO1) },
+      landUse: trimS(a.DESCLU) || null, zoningCode: trimS(a.ZONING) || null, vacant: bld > 0 ? false : !hasStruct, hasStruct,
+      yearBuilt: yb && yb > 1700 ? yb : null,
+      assessed: { year: null, land, building: bld, total, none: land == null && bld == null && total == null },
+      legalDesc: [a.LEGAL1, a.LEGAL2, a.LEGAL3].map(screenDecode).filter(Boolean).join(' ') || null,
+      sdatDate: trimS(a.SDATDATE) || null,
+      geometry: f.geometry,
+    };
+  }
+
+  // Prior transfers with the seller's name (SDAT open data, public domain;
+  // current owner names are hidden there too).
+  async function mdSalesHistory(pin) {
+    const t = withTimeout(12000);
+    try {
+      const res = await fetch(GIS.MD_OPENDATA + '?' + new URLSearchParams({ account_id_mdp_field_acctid: pin }), { signal: t.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const r = ((await res.json()) || [])[0];
+      if (!r) return { sales: [] };
+      const seg = [
+        ['sales_segment_1_grantor_name_mdp_field_grntnam1_sdat_field_80', 'sales_segment_1_transfer_date_yyyy_mm_dd_mdp_field_tradate_sdat_field_89', 'sales_segment_1_consideration_mdp_field_considr1_sdat_field_90', 'sales_segment_1_how_conveyed_ind_mdp_field_convey1_sdat_field_87'],
+        ['sales_segment_2_grantor_name_sdat_field_100', 'sales_segment_2_transfer_date_yyyy_mm_dd_sdat_field_109', 'sales_segment_2_consideration_sdat_field_110', 'sales_segment_2_how_conveyed_ind_sdat_field_107'],
+        ['sales_segment_3_grantor_name_sdat_field_120', 'sales_segment_3_transfer_date_yyyy_mm_dd_sdat_field_129', 'sales_segment_3_consideration_sdat_field_130', 'sales_segment_3_how_conveyed_ind_sdat_field_127'],
+      ];
+      const sales = seg.map(([n, d, c, h]) => {
+        const m = String(r[d] || '').match(/^(\d{4})\.(\d{2})\.(\d{2})$/);
+        if (!m || m[1] === '0000') return null;
+        return { seller: screenDecode(r[n]) || null, date: `${m[1]}-${m[2]}-${m[3]}`, price: numS(r[c]), how: trimS(r[h]).replace(/\s*\(\d\)$/, '') || null };
+      }).filter(Boolean);
+      return { sales };
+    } finally { t.done(); }
+  }
+
+  async function marylandDetails(pc) {
+    const { acct8 } = mdAcct(pc.pin);
+    const token = r => r.reason === 'no-token' || r.reason === 'unauthorized' ? 'no-token' : (r.error || 'error');
+    const jobs = [
+      mdSalesHistory(pc.pin).then(x => { pc.mdSales = x; }, e => { pc.mdSales = { error: e.message || String(e) }; throw e; }),
+      apiFetch(`/api/md/taxsale?county=${pc.jurisdiction}&acct=${acct8}`).then(r => {
+        pc.mdTax = r.ok ? { rows: r.rows || [], loaded: r.loaded || null } : { error: token(r) };
+        if (!r.ok && token(r) !== 'no-token') throw new Error(r.error || 'tax-sale lookup failed'); // counts toward "Retry"
+      }),
+    ];
+    let dep = null;
+    if (pc.jurisdiction === 'montgomery') {
+      jobs.push(apiFetch(`/api/md/montgomery?acct=${acct8}`).then(r => {
+        if (!r.ok) { pc.mdDep = { error: token(r) }; if (token(r) !== 'no-token') throw new Error(r.error || 'owner lookup failed'); return; }
+        pc.mdDep = r.dep || { none: true };
+        dep = r.dep || null;
+      }));
+      jobs.push(fetch(GIS.MONT_TAXBILL + '?' + new URLSearchParams({ parcel_code: String(Number(acct8)), $select: 'tax_class,bill_total,wssc_front_foot_benefit_chg,wssc_connection_fee_chg' }), { signal: AbortSignal.timeout(12000) })
+        .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(rows => { const b = rows && rows[0]; pc.mdBill = b ? { total: numS(b.bill_total), ffbc: numS(b.wssc_front_foot_benefit_chg), connect: numS(b.wssc_connection_fee_chg) } : { none: true }; },
+          e => { pc.mdBill = { error: e.message || String(e) }; throw e; }));
+    }
+    // County zoning maps (Montgomery's sends no CORS header, so it keeps SDAT's code).
+    if (pc.jurisdiction === 'frederick' || pc.jurisdiction === 'washington') {
+      const fred = pc.jurisdiction === 'frederick';
+      jobs.push(arcgis(fred ? GIS.F_MD_ZONING : GIS.W_MD_ZONING, pointParams(pc.lat, pc.lng, { outFields: fred ? 'TYPE' : 'Zone,Zone_Full' }), 9000).then(j => {
+        const z = firstAttrs(j);
+        const code = z && trimS(fred ? z.TYPE : z.Zone);
+        if (code) { pc.zoningCode = code; pc.zoningName = fred ? ({ A: 'Agricultural', RC: 'Resource Conservation', MUN: 'inside a town — the town sets the zoning' }[code] || null) : (trimS(z.Zone_Full) || null); pc.zoningSource = 'county'; }
+      }));
+    }
+    if (pc.jurisdiction === 'frederick') {
+      jobs.push(arcgis(GIS.F_MD_PROPINFO, { where: `TAX_ACCT='${pc.pin}'`, outFields: 'WATERT,SEWT,SUBDIVDESC', returnGeometry: 'false', f: 'json' }, 9000).then(j => {
+        const x = firstAttrs(j);
+        pc.mdWater = x ? { water: trimS(x.WATERT) || null, sewer: trimS(x.SEWT) || null } : { none: true };
+      }, e => { pc.mdWater = { error: e.message || String(e) }; throw e; }));
+    }
+    const res = await Promise.allSettled(jobs);
+    pc.failed = (pc.failed || 0) + res.filter(r => r.status === 'rejected').length;
+    if (dep && dep.owner) {
+      const v = mdDepOwnerCheck(dep, pc);
+      if (v.ok) { pc.owner = dep.owner; pc.ownerUnknown = false; pc.ownerSource = 'Montgomery DEP water/sewer map'; }
+      else pc.ownerStale = { transferred: pc.sale && pc.sale.date, why: v.why };
+    }
+  }
+  // Montgomery's water/sewer map was last refreshed around early 2025, so its
+  // owner can be the seller of a later sale. Use it only when the last transfer
+  // predates the record's edit (or 2025-01-01 when unknown) and the name isn't
+  // the latest seller's.
+  function mdDepOwnerCheck(dep, pc) {
+    // Row edits run into 2025 but 2025 sales already show the seller: use the earlier date.
+    const asOf = dep.edited && dep.edited < '2025-01-01' ? dep.edited : '2025-01-01';
+    if (pc.ownerSinceIso && pc.ownerSinceIso >= asOf) return { ok: false, why: 'transfer' };
+    const toks = v => new Set(String(v || '').toUpperCase().replace(/[^A-Z ]/g, ' ').split(/\s+/).filter(t => t.length >= 3 && !/^(AND|THE|LLC|INC|TRUST|TRUSTEE|ETAL)$/.test(t)));
+    const seller = pc.mdSales && pc.mdSales.sales && pc.mdSales.sales[0] && pc.mdSales.sales[0].seller;
+    if (seller) {
+      const a = toks(dep.owner), b = toks(seller);
+      if ([...a].some(t => b.has(t))) return { ok: false, why: 'seller' };
+    }
+    return { ok: true };
+  }
+
+  // The latest tax-sale row for a Maryland parcel, read for the card and Stage 1.
+  function mdTaxState(pc) {
+    const t = pc.mdTax;
+    if (!t) return { state: 'pending' };
+    if (t.error) return { state: t.error === 'no-token' ? 'no-token' : 'error', error: t.error };
+    if (!t.loaded) return { state: 'none-loaded' };
+    const row = (t.rows || []).find(r => r.year === t.loaded.year) || null;
+    if (!row) return { state: 'clear', year: t.loaded.year };
+    if (row.sold) return { state: 'sold', year: row.year, row };
+    // On the advertised list but not in the results once the sale is over: paid or withdrawn first.
+    const saleDay = MD_SALE_DATES[row.year] && MD_SALE_DATES[row.year][pc.jurisdiction];
+    return { state: saleDay && todayIso() > saleDay ? 'paid' : 'listed', year: row.year, row };
+  }
+  // Tax-sale dates (the redemption clock starts here) and redemption interest a year.
+  const MD_SALE_DATES = { 2026: { frederick: '2026-05-11', washington: '2026-06-02', montgomery: '2026-06-08' } };
+  const MD_REDEEM_RATE = { frederick: 0.08, washington: 0.06, montgomery: 0.20 };
+  const MD_TAX_LINKS = {
+    frederick: { lookup: 'https://frederickcountymd.munisselfservice.com/citizens/RealEstate/Default.aspx?mode=new', sale: 'https://www.frederickcountymd.gov/2005/Tax-Sale', results: 'https://www.frederickcountymd.gov/Archive.aspx?AMID=152', phone: '301-600-1111', certificate: 'https://www.frederickcountymd.gov/8158/Lien-CertificateTax-Status-Report-Reques' },
+    washington: { lookup: 'https://washingtoncountymd.munisselfservice.com/css/citizens/RealEstate/Default.aspx?mode=new', sale: 'https://www.washco-md.net/treasurers-office/tax-sale-information/', results: 'https://www.washco-md.net/treasurers-office/tax-sale-information/', phone: '240-313-2110' },
+    montgomery: { lookup: 'https://apps.montgomerycountymd.gov/realpropertytax/default.aspx', sale: 'https://www.montgomerycountymd.gov/department-finance/tax-sale/tax-sale-information-procedures', results: 'https://www.montgomerycountymd.gov/tax-sale-results', phone: '240-777-0311' },
+  };
+
   async function floodAt(lat, lng) {
     const j = await arcgis(GIS.FEMA, pointParams(lat, lng, { outFields: 'FLD_ZONE,ZONE_SUBTY,SFHA_TF' }), 9000);
     const a = firstAttrs(j);
@@ -4870,21 +5067,22 @@
     const target = opts.target || null;
     const isLive = () => target ? (opts.isLive ? opts.isLive() : true) : (seq === __inspectSeq && __areaPanel === 'parcel');
     const render = () => {
+      if (__areaPanel === 'stage1' && __s1.pc === pc) renderStage1Panel();
       if (!isLive()) return;
       const el = target || document.getElementById('fc-area-list');
       if (!el) return;
       el.innerHTML = (target ? '' : panelBack(opts.back || 'saved')) + renderParcelCard(pc, { embedded: !!target, listing: opts.listing || null });
       wireParcelCard(el, pc);
     };
-    if (!target) { __areaPanel = 'parcel'; syncTabs(); revealPanelOnPhone(); }
+    if (!target) { __areaPanel = 'parcel'; syncTabs(); revealPanelOnPhone(); __parcelView = { pc, back: opts.back || 'saved' }; }
     render();
 
     // Find land results come with a PIN: look that parcel up directly, so an
     // inholding or a stacked unit at the same point can't take its place.
     let base = null, pinFailed = false;
-    if (opts.pin && (opts.jurisdiction === 'loudoun' || opts.jurisdiction === 'fauquier')) {
+    if (opts.pin && (opts.jurisdiction === 'loudoun' || opts.jurisdiction === 'fauquier' || isMd(opts.jurisdiction))) {
       try {
-        base = await (opts.jurisdiction === 'loudoun' ? loudounParcelAt(lat, lng, opts.pin) : fauquierParcelAt(lat, lng, opts.pin));
+        base = await (opts.jurisdiction === 'loudoun' ? loudounParcelAt(lat, lng, opts.pin) : isMd(opts.jurisdiction) ? marylandParcelAt(lat, lng, opts.pin) : fauquierParcelAt(lat, lng, opts.pin));
         if (!base) {
           pc.pinNote = `The county no longer lists PIN ${opts.pin}; showing the parcel at this spot instead.`;
           opts.water = null; opts.address = null; // they described the retired parcel
@@ -4901,9 +5099,11 @@
       }
     }
     if (!base && !pinFailed) {
-      const [lo, fq] = await Promise.allSettled([loudounParcelAt(lat, lng), fauquierParcelAt(lat, lng)]);
-      base = (lo.status === 'fulfilled' && lo.value) || (fq.status === 'fulfilled' && fq.value) || null;
-      if (!base) pc.noParcel = (lo.status === 'rejected' && fq.status === 'rejected') ? 'error' : 'none';
+      const inMd = lat >= MD_BOX.s && lat <= MD_BOX.n && lng >= MD_BOX.w && lng <= MD_BOX.e;
+      const [lo, fq, md] = await Promise.allSettled([loudounParcelAt(lat, lng), fauquierParcelAt(lat, lng), inMd ? marylandParcelAt(lat, lng) : Promise.resolve(null)]);
+      base = (lo.status === 'fulfilled' && lo.value) || (fq.status === 'fulfilled' && fq.value) || (md.status === 'fulfilled' && md.value) || null;
+      // North of the Potomac a failed Maryland lookup can't be read as "no parcel".
+      if (!base) pc.noParcel = (lo.status === 'rejected' && fq.status === 'rejected') || (inMd && md.status === 'rejected') ? 'error' : 'none';
     }
     pc.loadingParcel = false;
     if (base) Object.assign(pc, base);
@@ -4928,6 +5128,8 @@
       jobs.push(loudounAssessmentFor(pc).then(render));
     } else if (pc.jurisdiction === 'fauquier') {
       jobs.push(fauquierDetails(pc, lat, lng).then(render));
+    } else if (isMd(pc.jurisdiction)) {
+      jobs.push(marylandDetails(pc).then(render));
     }
     await Promise.allSettled(jobs);
     pc.loadingDetails = false;
@@ -4968,6 +5170,8 @@
   function perAcreBasis(pc) {
     const a = pc.assessed;
     if (!a || !(pc.acres > 0) || a.noMarket) return null;
+    // Maryland assesses farmland at its farm-use value, not market value.
+    if (isMd(pc.jurisdiction) && /agricult/i.test(pc.landUse || '') && a.land != null) return { label: 'Assessed land per acre (farm-use value)', value: a.land / pc.acres };
     if (a.landUseProgram && a.marketTotal != null) return { label: 'Market value per acre', value: a.marketTotal / pc.acres };
     if (a.building > 0 && a.land != null) return { label: 'Land value per acre', value: a.land / pc.acres };
     if (a.total != null) return { label: 'Assessed per acre', value: a.total / pc.acres };
@@ -4992,6 +5196,9 @@
       links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://loudounvapa.tylerhost.net/Datalets/Datalet.aspx?UseSearch=no&amp;mode=profileall&amp;jur=107&amp;pin=${pc.pin}">County record ↗</a>`);
     } else if (pc.jurisdiction === 'fauquier') {
       links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://www.actdatascout.com/RealProperty/Virginia/Fauquier" title="Search Tax Map # = ${escapeHtml(pc.pin || '')}">County record ↗</a>`);
+    } else if (isMd(pc.jurisdiction)) {
+      const a = mdAcct(pc.pin);
+      links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx" title="${escapeHtml(pc.county || '')} County · district ${escapeHtml(a.district)} · account ${escapeHtml(a.account)}">SDAT record ↗</a>`);
     }
     if (isFinite(pc.lat) && isFinite(pc.lng)) {
       links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/@${pc.lat.toFixed(6)},${pc.lng.toFixed(6)},400m/data=!3m1!1e3">Satellite ↗</a>`);
@@ -5011,7 +5218,7 @@
     else if (pc.water && pc.water.ft != null && pc.water.ft <= 1000) flags.push(`<span class="fc-pill sky">💧 ${pc.water.ft.toLocaleString()} ft to water</span>`);
     // Seller signals — same rules as Find land.
     if (!pc.ownerHidden && screenIsEstate(pc.owner)) flags.push('<span class="fc-pill coral">Estate / heirs owner</span>');
-    const away = !pc.ownerHidden && screenAwayLabel(pc.mail);
+    const away = !pc.ownerHidden && screenAwayLabel(pc.mail, pc.state);
     if (away) flags.push(`<span class="fc-pill sky">${escapeHtml(away)}</span>`);
     if (pc.ownerSinceIso && pc.ownerSinceIso < screenHeldCutoff()) flags.push(`<span class="fc-pill gold">Owned since ${escapeHtml(pc.ownerSinceIso.slice(0, 4))}</span>`);
     if (ov.growth) flags.push(`<span class="fc-pill sage">🟢 Growth area: ${escapeHtml(ov.growth)}</span>`);
@@ -5019,12 +5226,18 @@
     if (ov.rezoningOn && ov.rezoningOn.some(r => r.recent)) flags.push('<span class="fc-pill gold">🟡 Recent rezoning case on this spot</span>');
     else if (ov.rezoningNear) flags.push(`<span class="fc-pill gold">🟡 ${ov.rezoningNear} rezoning case${ov.rezoningNear === 1 ? '' : 's'} within 1 mi</span>`);
     if (pc.delinquent) flags.push(`<span class="fc-pill ${pc.delinquent.serious ? 'coral' : ''}">⚠️ Taxes past due${pc.delinquent.days != null ? ` · ${fmtOverdue(pc.delinquent.days)}` : ''}</span>`);
-    if (pc.vacant && !(pc.assessed && pc.assessed.building > 0)) flags.push('<span class="fc-pill ink">Vacant land</span>');
+    if (isMd(pc.jurisdiction)) {
+      const t = mdTaxState(pc);
+      if (t.state === 'sold') flags.push(`<span class="fc-pill coral">⚠️ Tax lien sold ${t.year}</span>`);
+      else if (t.state === 'listed') flags.push(`<span class="fc-pill coral">⚠️ On the ${t.year} tax-sale list</span>`);
+      else if (t.state === 'paid') flags.push(`<span class="fc-pill gold">Was on the ${t.year} tax-sale list</span>`);
+    }
+    if (pc.vacant && !pc.hasStruct && !(pc.assessed && pc.assessed.building > 0)) flags.push('<span class="fc-pill ink">Vacant land</span>');
 
     if (pc.noParcel) {
       return `<div class="fc-pc">
         <div class="fc-pc-title">${pc.noParcel === 'error' ? 'County parcel servers did not respond' : 'No county parcel here'}</div>
-        <div class="fc-pc-sub">${pc.noParcel === 'error' ? 'Try again in a moment.' : 'This spot is outside Loudoun and Fauquier parcel coverage.'}</div>
+        <div class="fc-pc-sub">${pc.noParcel === 'error' ? 'Try again in a moment.' : 'This spot is outside the parcel coverage (Loudoun and Fauquier, VA; Frederick, Washington and Montgomery, MD).'}</div>
         ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}</div>` : ''}
         ${renderSiteSection(pc)}
         <div class="fc-pc-links">${parcelLinks(pc)}</div>
@@ -5036,14 +5249,18 @@
     const mismatch = acreMismatch(o.listing, pc);
     // Loudoun's address comes with the detail lookups; hold Save until then so
     // the saved title isn't "Loudoun parcel <PIN>" forever.
-    const saveWaits = !pc.savedId && !pc.address && !!pc.addressPending;
+    const saveWaits = !pc.savedId && ((!pc.address && !!pc.addressPending) || (pc.jurisdiction === 'montgomery' && !!pc.loadingDetails && pc.mdDep === undefined));
     const mismatchHtml = mismatch ? `<div class="fc-area-warn">This parcel is ${fmtAcres(pc.acres)} but the listing says ${fmtAcres(o.listing.acres)}. ${mismatch === 'bigger'
       ? 'The listing may cover several parcels, or its map pin may be off.'
       : 'The listing\'s map pin may be on a neighboring parcel.'} If so, use <strong>Move pin</strong> to put it on the right one.</div>` : '';
     // Ownership + value
     let ownerHtml;
     if (pc.ownerHidden) ownerHtml = '<span title="The county withholds this owner\'s name from its online records">Withheld by the county</span>';
-    else if (pc.owner) ownerHtml = escapeHtml(pc.owner);
+    else if (pc.owner) ownerHtml = escapeHtml(pc.owner) + (pc.ownerSource ? `<div class="fc-pc-dim">From ${escapeHtml(pc.ownerSource)}</div>` : '');
+    else if (pc.ownerUnknown && !loading) {
+      const a = mdAcct(pc.pin);
+      ownerHtml = `${pc.ownerStale ? `Not current in Montgomery's map (it predates the ${escapeHtml(pc.ownerStale.transferred || 'last')} transfer)` : 'Not in Maryland\'s free data'}<div class="fc-pc-dim">Look it up on <a target="_blank" rel="noopener" href="https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx">SDAT</a>: ${escapeHtml(pc.county)} County · account identifier · district ${escapeHtml(a.district)} · account ${escapeHtml(a.account)}</div>`;
+    }
     else ownerHtml = loading ? skel() : '—';
 
     let assessedHtml;
@@ -5097,7 +5314,9 @@
         saleHtml += '<div class="fc-pc-dim">Well above this parcel\'s assessed value. The price may cover several parcels sold together.</div>';
       }
       if (pc.sale.deedType === 'CM/D') saleHtml += '<div class="fc-pc-dim">Commissioner\'s deed — often a tax or court sale</div>';
+      if (MD_CONVEY[pc.sale.convey]) saleHtml += `<div class="fc-pc-dim">${escapeHtml(ddCap(MD_CONVEY[pc.sale.convey]))}</div>`;
     }
+    if (isMd(pc.jurisdiction) && pc.sale && pc.sale.deedBookPage) saleHtml += `<div class="fc-pc-dim">Deed book/page ${escapeHtml(pc.sale.deedBookPage)}</div>`;
 
     let zoningHtml = loading && !pc.zoningCode ? skel() : '—';
     if (pc.zoningCode) zoningHtml = `<strong>${escapeHtml(pc.zoningCode)}</strong>${pc.zoningName ? ' · ' + escapeHtml(pc.zoningName) : ''}`;
@@ -5145,7 +5364,7 @@
       ${rezoningHtml}${easementHtml}
       ${renderSiteSection(pc)}
       ${buildValueSectionHtml(pc)}
-      <div class="fc-pc-links">${o.embedded ? '' : `<button class="fc-btn fc-btn-sm fc-btn-dark fc-area-admin" data-act="${pc.savedId ? 'open-saved' : 'save-parcel'}"${saveWaits ? ' disabled' : ''}>${pc.savedId ? 'Open in Saved' : saveWaits ? 'Loading address…' : '★ Save parcel'}</button>`}${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
+      <div class="fc-pc-links">${o.embedded ? '' : `<button class="fc-btn fc-btn-sm fc-btn-dark fc-area-admin" data-act="${pc.savedId ? 'open-saved' : 'save-parcel'}"${saveWaits ? ' disabled' : ''}>${pc.savedId ? 'Open in Saved' : saveWaits ? 'Loading address…' : '★ Save parcel'}</button>`}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="stage1">🔎 Stage 1</button>'}${parcelLinks(pc)}${o.embedded ? '' : '<button class="fc-btn fc-btn-sm" data-act="search-here">Search around here</button>'}</div>
       ${pc.failed ? `<div class="fc-pc-note">${pc.failed} county lookup${pc.failed === 1 ? '' : 's'} did not respond; some fields may be missing.</div>` : ''}
     </div>`;
   }
@@ -5201,6 +5420,7 @@
       dropRadiusCenter(L.latLng(pc.lat, pc.lng));
     }));
     el.querySelectorAll('[data-act="connect"]').forEach(b => b.addEventListener('click', () => { setView('settings'); }));
+    el.querySelectorAll('[data-act="stage1"]').forEach(b => b.addEventListener('click', () => openStage1(pc, 'parcel')));
     wireBuildValue(el, pc);
     el.querySelectorAll('[data-act="save-parcel"], [data-act="open-saved"]').forEach(b => b.addEventListener('click', () => {
       if (b.getAttribute('data-act') === 'open-saved' && pc.savedId) { drawParcelHighlight(null); openListing(pc.savedId); return; }
@@ -5233,6 +5453,7 @@
     const reqs = [];
     if (boxIntersects(b, LOUDOUN_BOX)) reqs.push(arcgis(GIS.L_PARCELS, Object.assign({}, common, { where: "PA_TYPE<>'W'", outFields: 'PA_MCPI', resultRecordCount: '3000' }), 15000).catch(() => null));
     if (boxIntersects(b, FAUQUIER_BOX)) reqs.push(arcgis(GIS.F_PARCELS, Object.assign({}, common, { outFields: 'PARCELID', maxAllowableOffset: '0.00001', resultRecordCount: '2000' }), 15000).catch(() => null));
+    if (boxIntersects(b, MD_BOX) && (b.getNorth() > 39.05 || b.getEast() > -77.25)) reqs.push(arcgis(GIS.MD_PARCELS, Object.assign({}, common, { outFields: 'ACCTID', maxAllowableOffset: '0.00001', resultRecordCount: '1000' }), 15000).catch(() => null));
     if (hint) hint.textContent = reqs.length ? 'Loading parcel lines…' : '';
     const results = await Promise.all(reqs);
     if (seq !== __parcelReqSeq) return; // a newer pan/zoom superseded this one
@@ -5349,6 +5570,7 @@
     if (__areaPanel === 'saved') renderSavedPanel();
     if (__areaPanel === 'listing' && __openListingId) renderListingPanel();
     if (__areaPanel === 'diligence' && __dd.listingId) renderDiligencePanel();
+    if (__areaPanel === 'stage1') renderStage1Panel();
   }
 
   function updateSavedCount() {
@@ -5487,6 +5709,7 @@
       <div class="fc-pc-links">
         ${href ? `<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="${escapeHtml(href)}">${s.source === 'parcel' ? 'County record ↗' : 'Open listing ↗'}</a>` : ''}
         <button class="fc-btn fc-btn-sm" data-act="diligence">📋 Due diligence</button>
+        <button class="fc-btn fc-btn-sm" data-act="stage1"${s.status === 'located' ? '' : ' disabled'}>🔎 Stage 1</button>
         <button class="fc-btn fc-btn-sm fc-area-admin" data-act="place">${s.status === 'located' ? 'Move pin' : '📍 Place pin'}</button>
         <button class="fc-btn fc-btn-sm fc-area-admin" data-act="delete">Delete</button>
       </div>
@@ -5502,6 +5725,7 @@
       inp.addEventListener(evName, () => saveListingField(s, inp.getAttribute('data-field'), inp.value));
     });
     listEl.querySelector('[data-act="diligence"]').addEventListener('click', () => openDiligence(s.id));
+    listEl.querySelector('[data-act="stage1"]').addEventListener('click', () => openStage1ForListing(s, 'listing'));
     listEl.querySelector('[data-act="place"]').addEventListener('click', () => startPlacing(s));
     listEl.querySelector('[data-act="delete"]').addEventListener('click', () => deleteListing(s));
     if (s.status === 'located') {
@@ -5602,8 +5826,8 @@
       ownerSinceIso: pc.ownerSinceIso || null,
     };
     // Parcels saved before outreach existed lack the owner fields letters need.
-    const backfill = s.source === 'parcel' && !pc.ownerHidden && !s.owner_name && !(s.owner_mail && s.owner_mail.line1) && pc.owner
-      ? { owner_name: pc.owner, owner_mail: pc.mail || null } : null;
+    const backfill = s.source === 'parcel' && !pc.ownerHidden && !s.owner_name && pc.owner
+      ? Object.assign({ owner_name: pc.owner }, !(s.owner_mail && s.owner_mail.line1) ? { owner_mail: pc.mail || null } : {}) : null;
     const prev = s.enrichment ? JSON.stringify(s.enrichment) : '';
     if (prev === JSON.stringify(e) && !backfill) return;
     const body = Object.assign({ enrichment: e }, backfill || {});
@@ -5745,7 +5969,7 @@
     fauquier: {
       label: 'Fauquier', url: GIS.F_PARCELS, oid: 'FID', box: FAUQUIER_BOX,
       acres: 'CAST(ACREAGE AS FLOAT)',
-      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,LASTSALEDA,Building_V,Primary__1',
+      outFields: 'PARCELID,OWNERNME1,Co_Owner2,PSTLADDRES,PSTLADDR_1,PSTLCITY,PSTLSTATE,PSTLZIP5,SITEADDRES,ACREAGE,LASTSALEDA,Building_V,Primary__1',
     },
     loudoun: {
       label: 'western Loudoun', url: GIS.L_OWNER, oid: 'OBJECTID', box: LOUDOUN_WEST_BOX,
@@ -5864,10 +6088,10 @@
       }
     }));
   }
-  function screenAwayLabel(mail) {
-    const a = screenAwayFrom(mail);
+  function screenAwayLabel(mail, home) {
+    const a = screenAwayFrom(mail, home);
     if (!a) return null;
-    if (a === 'elsewhere') return 'Owner outside VA';
+    if (a === 'elsewhere') return `Owner outside ${home === 'MD' ? 'MD' : 'VA'}`;
     return mail && mail.state ? `Owner in ${a}` : `Owner abroad (${a})`;
   }
 
@@ -6407,12 +6631,12 @@
     const county = (s.county || '').replace(/ County$/, '') + ' County';
     if (s.street && /\d/.test(s.street)) return `your property at ${titleish(s.street)}`;
     if (s.street) return `your land on ${titleish(s.street)} in ${county}`;
-    return `your land in ${county}${pin ? ` (tax map parcel ${pin})` : ''}`;
+    return `your land in ${county}${pin ? (s.state === 'MD' || isMd(s.parcel_jurisdiction) ? ` (SDAT account ${pin})` : ` (tax map parcel ${pin})`) : ''}`;
   }
   function letterVariant(s) {
     const owner = ownerSummary(s.owner_name);
     if (owner.kind === 'estate') return 'estate';
-    if (screenAwayFrom(s.owner_mail)) return 'away';
+    if (screenAwayFrom(s.owner_mail, s.state)) return 'away';
     const since = s.enrichment && s.enrichment.ownerSinceIso;
     if (since && since < screenHeldCutoff()) return 'held';
     return 'general';
@@ -6428,7 +6652,7 @@
     const intro = {
       general: `My name is ${name}. I'm looking for land in ${county} to build a home, and I'm writing about ${place}.`,
       estate: `My name is ${name}, and I'm writing about ${place}. County records list the land under an estate or the family's heirs, so I'm sorry if this letter reaches you at a difficult time.`,
-      away: `My name is ${name}, and I'm writing about ${place}. I understand from county records that you live outside Virginia.`,
+      away: `My name is ${name}, and I'm writing about ${place}. I understand from county records that you live outside ${s.state === 'MD' ? 'Maryland' : 'Virginia'}.`,
       held: `My name is ${name}, and I'm writing about ${place}, which I understand you've owned for many years.`,
     };
     const middle = {
@@ -7295,7 +7519,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     return `<h4>Buildability &amp; value</h4>
       <div data-bv="${escapeHtml(pc.jurisdiction + ':' + pc.pin)}">
       <div id="fc-pc-build">${pc.build ? buildDetailHtml(pc.build) : '<button class="fc-btn fc-btn-sm" data-act="check-build">Check buildability</button>'}</div>
-      <div id="fc-pc-comps" style="margin-top:8px">${pc.comps ? compsHtml(pc.comps, pc) : '<button class="fc-btn fc-btn-sm" data-act="check-comps">Nearby land sales</button>'}</div>
+      ${isMd(pc.jurisdiction) ? '' : `<div id="fc-pc-comps" style="margin-top:8px">${pc.comps ? compsHtml(pc.comps, pc) : '<button class="fc-btn fc-btn-sm" data-act="check-comps">Nearby land sales</button>'}</div>`}
       </div>`;
   }
   function wireBuildValue(el, pc) {
@@ -7428,8 +7652,13 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   // Fauquier's deed-type codes have no published legend (the GIS field has no
   // domain), so only near-certain readings get a gloss, marked "likely".
   // 73% of parcels carry the generic DEED, which says nothing about the type.
-  const DD_DEED_CODES = { WD: 'a warranty deed', QC: 'a quitclaim deed', WILL: 'a transfer by will', DEXC: 'an estate-related transfer', ADMN: 'an estate-related transfer' };
-  const DD_DEED_ESTATE = /^(WILL|DEXC|ADMN)$/;
+  // Read from how each code is used (2026-11-06): every D/G, L/HR, TDD and DNTR
+  // transfer is $0, about half of L/HR owners read as heirs, 198 of 200 sampled
+  // DNTR owners are trusts; ADMN rows are cemeteries and airport leaseholds with
+  // no instrument, and DEXC rows include land exchanges with VDOT.
+  const DD_DEED_CODES = { WD: 'a warranty deed', QC: 'a quitclaim deed', WILL: 'a transfer by will', ADMN: 'a county administrative record (often a cemetery or leasehold)',
+    'CM/D': 'a commissioner\'s deed (court sale)', 'D/G': 'a deed of gift', 'L/HR': 'a recorded list of heirs', TDD: 'a transfer-on-death deed', DNTR: 'a deed into a trust' };
+  const DD_DEED_ESTATE = /^(WILL|L\/HR)$/;
   const DD_NOTE_MAX = 2000;   // the Worker refuses longer notes
   const DD_BK_MAX = 5;        // owner names searched per tap (CourtListener allows 5 a minute with a token)
 
@@ -7463,6 +7692,11 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   // never graded "Looks fine".
   const ddReady = x => !!(x && !x.pending && !x.error);
   const ddFull = x => ddReady(x) && !x.partial;
+  function ddBookKind(code, ref) {
+    if (/^(WILL|L\/HR|HAFD)$/.test(String(code || '').trim())) return 'will';
+    if (/^[A-Z]/i.test(ref || '') || String(code || '').trim() === 'ADMN') return 'other'; // ADMN: cemeteries, leaseholds
+    return 'deed';
+  }
   // Estate-related deed codes describe how the CURRENT owner got the land; they
   // matter for probate only when that transfer is recent.
   function ddRecentEstateDeed(pc) {
@@ -7474,10 +7708,14 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   }
 
   // What Nestscoop can say about one item. Plain text only — rendered escaped.
+  // Items whose automatic check works outside Virginia (FEMA, NWI, USGS/NRCS, outreach).
+  const DD_ANY_STATE = new Set(['2.1', '2.2', '2.3', '3.2', '5.1', '5.3']);
+  const ddIsMd = (s, pc) => isMd(pc && pc.jurisdiction) || (s && (s.state === 'MD' || isMd(s.parcel_jurisdiction) || /^parcel:(frederick|washington|montgomery):/.test(s.id || '')));
   function ddFinding(id, s, pc) {
+    if (ddIsMd(s, pc) && !DD_ANY_STATE.has(id)) return ddF('manual', ['This checklist\'s automatic findings are written for Virginia. For this Maryland parcel, the 🔎 Stage 1 report covers items 1.1–1.8 and 3.1; check the rest by hand.'], []);
     const gap = ddParcelGap(s, pc);
     const owner = pc && !pc.ownerHidden ? (pc.owner || s.owner_name || '') : (s.owner_name || '');
-    const kind = ownerSummary(owner).kind;
+    const kind = ownerKind(owner);
     const links = DD_LINKS[id] ? DD_LINKS[id](pc || {}, s) : [];
     const X = __dd.extra;
     switch (id) {
@@ -7485,12 +7723,14 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         if (gap) return Object.assign(gap, { links });
         const sale = pc.sale || {};
         const code = (sale.deedType || '').trim();
-        const bookPage = sale.deedBookPage && !/^[\s\-–—.]*$/.test(sale.deedBookPage) ? sale.deedBookPage : null;
+        const bookPage = sale.deedBookPage && !/^[\s0\/\-–—.]*$/.test(sale.deedBookPage) ? sale.deedBookPage : null;
+        // WILL / list-of-heirs transfers point into the will book, ADMN ("A1/…") the fiduciary book.
+        const bookKind = ddBookKind(code, bookPage);
         const outline = pc.geometry ? polyAcres(pc.geometry) : 0;
         const acreOff = pc.acres > 0 && outline > 0 && Math.abs(outline - pc.acres) > 0.5 && Math.abs(outline - pc.acres) / pc.acres > 0.15;
         return ddF(code === 'QC' || DD_DEED_ESTATE.test(code) || acreOff ? 'flag' : 'manual', [
           code && (code === 'DEED' ? 'The county records the last deed only as "DEED" — its type isn\'t in the county data.' : `Last deed: county code ${code}${DD_DEED_CODES[code] ? ` (likely ${DD_DEED_CODES[code]})` : ''}.`),
-          bookPage && `Deed book/page ${bookPage}${sale.recorded ? `, recorded ${sale.recorded}` : sale.date ? `, ${sale.date}` : ''}.`,
+          bookPage && `${bookKind === 'deed' ? 'Deed' : bookKind === 'will' ? 'Will' : 'County administrative'} book/page ${bookPage}${sale.recorded ? `, recorded ${sale.recorded}` : sale.date ? `, ${sale.date}` : ''}.`,
           !bookPage && sale.date && `Last transfer ${sale.recorded || sale.date}.`,
           sale.instrument && `Instrument ${sale.instrument}.`,
           pc.legalDesc && `County legal description: ${pc.legalDesc}.`,
@@ -7513,14 +7753,14 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       case '1.3': {
         if (gap) return Object.assign(gap, { links });
         if (pc.ownerHidden) return ddF('manual', ['The county withholds this owner\'s name; the deed names every owner.'], links);
-        const people = ownerParts(owner).map(personName).filter(Boolean);
+        const people = ownerParts(owner).filter(p => !S1_TRUSTNAME.test(p)).map(personName).filter(Boolean);
         const uniq = people.filter((p, i) => people.findIndex(q => q.full === p.full) === i);
-        const away = screenAwayLabel(pc.mail);
+        const away = screenAwayLabel(pc.mail, pc.state);
         const m = pc.mail || {};
         const multi = uniq.length > 1 || /\bET\s?AL\b/i.test(owner) || kind === 'estate';
         return ddF(multi || away ? 'flag' : 'ok', [
           uniq.length ? `Named on the record: ${uniq.map(p => p.full).join('; ')}.` : owner && `Owner of record: ${owner}.`,
-          m.line1 && `Tax bill goes to: ${[m.line1, m.city, m.state, m.zip].filter(Boolean).join(', ')}${away ? ` (${away.toLowerCase()})` : ''}.`,
+          m.line1 && `Tax bill goes to: ${[m.line1, m.city, m.state, m.zip].filter(Boolean).join(', ')}${away ? ` (${away.replace(/^Owner\b/, 'owner')})` : ''}.`,
           multi && 'The county keeps one mailing address per parcel. Find the other owners\' addresses yourself and add them to the notes.',
         ], links);
       }
@@ -7583,7 +7823,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       }
       case '1.8':
         return ddF('manual', [
-          'No public lien index to query. Unpaid water/sewer charges bind a buyer once recorded with the circuit court clerk. Grass- or trash-cutting charges, where a county ordinance applies, are collected like taxes — ask the Treasurer.',
+          'No public lien index to query. Unpaid water/sewer charges are a lien that binds a buyer once recorded with the circuit court clerk, or once the buyer knows of them. Grass- or trash-cutting charges, where a county ordinance applies, are collected like taxes — ask the Treasurer.',
           'A title company\'s search covers recorded liens.',
         ], links);
       case '1.9': {
@@ -7622,8 +7862,10 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         const eased = pc.easement || ov.easementSpatial;
         const w = X.wetlands;
         const fq = pc.jurisdiction === 'fauquier';
+        const md = isMd(pc.jurisdiction);
         const hit = w && (w.on || w.corridorOn);
-        return ddF(eased || hit ? 'flag' : ddFull(w) && !fq ? 'ok' : 'manual', [
+        return ddF(eased || hit ? 'flag' : ddFull(w) && !fq && !md ? 'ok' : 'manual', [
+          md && 'Maryland conservation easements (MALPF, MET, county programs) and stream buffers aren\'t checked here — look at the county\'s easement map and stream-buffer rules.',
           eased && `Conservation easement on the parcel${pc.easement && pc.easement.holder ? ` (${pc.easement.holder})` : ''} — it limits building and subdividing.`,
           pc.legalDesc && /ESMT|EASEMENT/i.test(pc.legalDesc) && `The county legal description mentions an easement: "${pc.legalDesc}".`,
           ...(w ? ddExtraLines('wetlands') : ['Run the checks to map wetlands and stream buffers on the parcel.']),
@@ -7658,7 +7900,8 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         const open = b && b.hits ? b.hits.filter(h => !h.closed).length : 0;
         return ddF(ddReady(b) ? (open ? 'flag' : 'info') : 'manual', [
           ...ddExtraLines('bankruptcy'),
-          'Loudoun and Fauquier cases are in the Eastern District of Virginia (Alexandria); an owner living elsewhere files where they live. A name match isn\'t proof — compare the debtor\'s address on the PACER docket.',
+          ddIsMd(s, pc) ? 'Owners in Maryland file in the District of Maryland (Baltimore or Greenbelt); an owner living elsewhere files where they live. A name match isn\'t proof — compare the debtor\'s address on the PACER docket.'
+            : 'Loudoun and Fauquier cases are in the Eastern District of Virginia (Alexandria); an owner living elsewhere files where they live. A name match isn\'t proof — compare the debtor\'s address on the PACER docket.',
           'In an open Chapter 7 the trustee controls the land: make a written offer to the trustee, and the court approves the sale. Don\'t sign a deal with the debtor directly.',
         ], links);
       }
@@ -7772,7 +8015,8 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     courts: 'https://www.vacourts.gov/caseinfo/home',
   };
   const ddCode = (sec, label) => ({ label: label || `Va. Code § ${sec}`, url: `https://law.lis.virginia.gov/vacode/${sec}/` });
-  const ddLand = pc => pc.jurisdiction === 'fauquier'
+  const ddLand = pc => isMd(pc.jurisdiction) ? { label: 'MD Land Records (free account)', url: 'https://landrec.msa.maryland.gov/' }
+    : pc.jurisdiction === 'fauquier'
     ? { label: 'Fauquier land records (clerk)', url: DD_URL.fClerk }
     : { label: 'Loudoun land-records index (free account)', url: DD_URL.lIndex };
   const DD_LINKS = {
@@ -7827,8 +8071,12 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     __dd.loadError = null;
   }
 
-  function openDiligence(id) {
+  // back: the panel the checklist returns to ('listing' unless opened from Stage 1).
+  function openDiligence(id, back) {
     __areaPanel = 'diligence';
+    __openListingId = id;
+    __dd.back = back === 'stage1' ? 'stage1' : 'listing';
+    if (back !== 'stage1' && back !== 'listing' && back) __dd.back = 'listing';
     syncTabs();
     const s = __savedListings.find(x => x.id === id);
     if (!s) { showAreaPanel('saved'); return; }
@@ -7867,19 +8115,24 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     const k = ddSyncExtra(s);
     __dd.running = id;
     const mine = () => __dd.listingId === id && __dd.extraFor === k;
-    const redraw = () => { if (__areaPanel === 'diligence' && __dd.listingId === id) renderDiligencePanel(); };
+    const redraw = () => {
+      if (__areaPanel === 'diligence' && __dd.listingId === id) renderDiligencePanel();
+      else if (__areaPanel === 'stage1' && __s1.pc === pc) renderStage1Panel();
+    };
     const jobs = [];
     if (!pc.build || pc.build.error || (pc.build.failed && pc.build.failed.length)) {
       pc.build = { pending: true };
       ddPaintCard(pc);
       jobs.push(checkBuildability(pc.geometry, pc.jurisdiction, pc.acres).catch(e => ({ error: e.message || String(e) })).then(b => { pc.build = b; ddPaintCard(pc); redraw(); }));
     }
-    if (!pc.comps || pc.comps.error) {
+    const md = isMd(pc.jurisdiction);
+    if (!md && (!pc.comps || pc.comps.error)) {
       pc.comps = { pending: true };
       ddPaintCard(pc);
       jobs.push(valueReference(pc).catch(e => ({ error: e.message || String(e) })).then(c => { pc.comps = c; ddPaintCard(pc); redraw(); }));
     }
     for (const [key, fn] of Object.entries(DD_LOOKUPS)) {
+      if (md && key !== 'wetlands') continue; // the rest read Virginia sources
       const cur = __dd.extra[key];
       if (cur && (cur.pending || ddFull(cur))) continue;
       __dd.extra[key] = { pending: true };
@@ -7889,7 +8142,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     redraw();
     await Promise.allSettled(jobs);
     if (__dd.running === id) __dd.running = null;
-    if (__areaPanel === 'diligence') renderDiligencePanel();
+    redraw();
   }
   // Extra public-data lookups for the checklist: key → async (pc) → { lines, partial?, ... }.
   // Every service below answers the browser directly (CORS checked 2026-10-26).
@@ -8128,14 +8381,20 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
           .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
       ]);
       const lines = [];
+      let inArea = null;
       if (water.status === 'fulfilled') {
         const w = firstAttrs(water.value);
         if (pc.jurisdiction === 'loudoun') {
-          if (!w || w.CommunitySystem === -1 || /not served/i.test(w.AreaName || '')) lines.push('Outside Loudoun Water\'s service area — plan on a private well and septic (a town utility may serve some areas).');
+          inArea = !(!w || w.CommunitySystem === -1 || /not served/i.test(w.AreaName || ''));
+          if (!inArea) lines.push('Outside Loudoun Water\'s service area — plan on a private well and septic (a town utility may serve some areas).');
           else lines.push(`In Loudoun Water's ${w.AreaName || 'service area'} (${{ W: 'water', WW: 'sewer', Both: 'water and sewer' }[w.ServiceType] || 'service type not listed'}${w.CommunitySystem === 1 ? ', a community system' : ''}) — ask Loudoun Water whether a main reaches the parcel.`);
         } else {
           const ov = pc.overlays || {};
-          if (w && w.DISTRICTNAME) {
+          inArea = !!(w && w.DISTRICTNAME);
+          // The towns are cut out of the service districts and run their own systems.
+          const town = /-(WARRENTON|REMINGTON|THE PLAINS)$/.test(String(pc.district || '').toUpperCase()) ? titleish(String(pc.district).split('-').pop()) : null;
+          if (!inArea && town) { inArea = 'town'; lines.push(`Inside the Town of ${town} — its own utility (or FCWSA where it serves the town) provides any public water/sewer; ask the town.`); }
+          else if (inArea) {
             lines.push(`Inside Fauquier's ${titleish(w.DISTRICTNAME)} service district (FCWSA's service area) — ask FCWSA whether water/sewer can serve this parcel, and at what capacity and cost.`);
             if (/NO SEWER OR WATER/i.test(ov.plannedUse || '')) lines.push('The county plan shows no public water or sewer for this part of the district.');
           } else lines.push('Outside Fauquier\'s water/sewer service districts — plan on a private well and septic.');
@@ -8155,7 +8414,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
           lines.push(`Internet at ${of} within about ¼ mile: ${n('any_100_20') || 'none'} can get 100/20 Mbps${n('fiber_100_20') ? `, ${n('fiber_100_20')} by fiber` : ''}${n('fixedwireless_100_20') ? `, ${n('fixedwireless_100_20')} by fixed wireless` : ''} (Commonwealth Connection map).`);
         } else lines.push('No mapped addresses within about ¼ mile to show internet service.');
       } else lines.push('Broadband map didn\'t load.');
-      return { lines, partial: [water, elec, bb].some(r => r.status === 'rejected') };
+      return { lines, water: inArea == null ? null : inArea === 'town' ? 'town' : inArea ? 'in' : 'out', partial: [water, elec, bb].some(r => r.status === 'rejected') };
     },
   };
 
@@ -8295,7 +8554,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         ${items.map(it => ddItemHtml(it, s, pc)).join('')}
       </details>`;
     }).join('');
-    listEl.innerHTML = panelBack('listing') + `<div class="fc-pc fc-dd">
+    listEl.innerHTML = panelBack(__dd.back || 'listing') + `<div class="fc-pc fc-dd">
       <div class="fc-pc-title">Due diligence</div>
       <div class="fc-pc-sub">${escapeHtml(listingTitle(s))}${pc && pc.pin ? ` · ${escapeHtml(pc.county || '')} PIN ${escapeHtml(pc.pin)}` : ''}</div>
       <div class="fc-dd-sum"><strong>${n.done + n.flag + n.na} of ${DD_ITEMS.length}</strong> checked${n.flag ? ` · <span class="fc-dd-flagcount">${n.flag} problem${n.flag === 1 ? '' : 's'}</span>` : ''}</div>
@@ -8304,6 +8563,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
         ${lookupFailed ? '<button class="fc-btn fc-btn-sm" data-dd-act="retry">Retry parcel lookup</button>'
           : `<button class="fc-btn fc-btn-sm" data-dd-act="run"${canRun && !running ? '' : ' disabled'}>${running ? 'Checking…' : 'Run automatic checks'}</button>`}
         <button class="fc-btn fc-btn-sm" data-dd-act="print">🖨 Report</button>
+        <button class="fc-btn fc-btn-sm" data-dd-act="stage1"${s.status === 'located' ? '' : ' disabled'}>🔎 Stage 1</button>
       </div>
       <div class="fc-pc-note">Automatic findings come from county, state and federal public data and are a starting point, not a title search, survey or legal advice. Mark each item once you've confirmed it.</div>
       ${stageHtml}
@@ -8322,6 +8582,8 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     if (run) run.addEventListener('click', () => ddRunChecks(s, ddParcel(s)));
     const retry = root.querySelector('[data-dd-act="retry"]');
     if (retry) retry.addEventListener('click', () => { __dd.parcelErr = null; renderDiligencePanel(); ddEnsureParcel(s); });
+    // Back from Stage 1 returns here — unless this checklist was opened from Stage 1 (then reuse Stage 1's own back).
+    root.querySelector('[data-dd-act="stage1"]').addEventListener('click', () => openStage1ForListing(s, __dd.back === 'stage1' && __s1.back && __s1.back !== 'diligence' ? __s1.back : 'diligence'));
     root.querySelector('[data-dd-act="print"]').addEventListener('click', () => printPages(ddReportHtml(s, ddParcel(s)), 'size: letter; margin: 0.5in 0.55in;'));
     root.querySelectorAll('[data-dd-run]').forEach(b => b.addEventListener('click', async () => {
       const act = DD_ACTIONS[b.getAttribute('data-dd-run')];
@@ -8397,7 +8659,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   // what was on screen when the item was marked if that differs.
   function ddReportHtml(s, pc) {
     const n = ddCounts();
-    const juris = pc && pc.jurisdiction ? (pc.jurisdiction === 'loudoun' ? 'VA — Loudoun' : 'VA — Fauquier') : 'VA';
+    const juris = pc && pc.jurisdiction ? `${pc.state || 'VA'} — ${pc.county || ''}` : (s.state || 'VA');
     const zoning = pc && pc.zoningCode ? pc.zoningCode : '—';
     const mark = st => ({ done: '✓', flag: '⚑', na: 'N/A' }[st] || '☐');
     const rows = DD_STAGES.map(st => `<div class="fc-ddr-stage">Stage ${st.n}: ${escapeHtml(st.title)}</div>` + DD_ITEMS.filter(it => it.id.startsWith(st.n + '.')).map(it => {
@@ -8429,9 +8691,773 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     </div>`;
   }
 
+  // ─── Stage 1 report ────────────────────────────────────────────────────
+  // AJ's mind map "Stage 1 Pre-Screening Modules & Public Record Lookups" run
+  // for one parcel in one tap: its 7 modules, each with what public data shows
+  // and every leaf of the map marked ✓ found, ✋ yours to check (with the link
+  // and the exact search) or — not applicable here. Virginia builds on the
+  // due-diligence findings. Works for parcels that aren't saved. Court, clerk,
+  // SCC and Register of Wills systems forbid automated searches: links only.
+  const S1_MODULES = [
+    { n: 1, title: 'Deed types' },
+    { n: 2, title: 'Multi-owner (ET AL) decomposition' },
+    { n: 3, title: 'Estate & probate checks' },
+    { n: 4, title: 'LLC & corporate entity status' },
+    { n: 5, title: 'Tax delinquency breakdown' },
+    { n: 6, title: 'Tax sale & redemption check' },
+    { n: 7, title: 'Municipal & utility liens' },
+  ];
+  // Checklist items each module draws on; AJ's marks on them show in the report.
+  const S1_ITEMS = { 1: ['1.1'], 2: ['1.2', '1.3'], 3: ['1.4'], 4: ['1.5'], 5: ['1.6'], 6: ['1.7'], 7: ['1.8', '3.1'] };
+  const S1_MARK = { found: '✓', you: '✋', na: '—', pending: '…' };
+  const S1_LOOKUPS = ['roads', 'utilities'];
+  const S1_CODE_URL = {
+    loudoun: 'https://www.loudoun.gov/2140/Zoning-Enforcement',
+    fauquier: 'https://www.fauquiercounty.gov/government/departments-a-g/community-development/complaints-enforcement',
+  };
+  // s/pc = the parcel; back = the panel to return to; extra = this parcel's lookups.
+  const __s1 = { s: null, pc: null, back: 'parcel', extra: {}, extraFor: null, running: null, waitingFor: null, lookupErr: false };
+  const s1Leaf = (label, st, text, links) => ({ label, st, text: text || '', links: (links || []).filter(Boolean) });
+  const s1Key = pc => `${pc.jurisdiction}:${pc.pin}`;
+  const s1Redraw = () => { if (__areaPanel === 'stage1') renderStage1Panel(); };
+
+  // The listing the findings read: the saved one when this parcel is saved,
+  // else a stand-in carrying the county's owner facts.
+  function s1Listing(pc) {
+    const saved = pc.savedId && __savedListings.find(x => x.id === pc.savedId);
+    if (saved) return saved;
+    return { id: `s1:${s1Key(pc)}`, status: 'located', lat: pc.lat, lng: pc.lng, source: 'parcel', unsaved: true,
+      owner_name: pc.ownerHidden ? null : pc.owner || null, owner_mail: pc.ownerHidden ? null : pc.mail || null };
+  }
+
+  function openStage1(pc, back, s) {
+    if (!pc || pc.noParcel || pc.loadingParcel) return;
+    const k = s1Key(pc);
+    if (__s1.extraFor !== k) { __s1.extra = {}; __s1.extraFor = k; }
+    Object.assign(__s1, { pc, s: s || s1Listing(pc), back: back || 'parcel', waitingFor: null, lookupErr: false });
+    __areaPanel = 'stage1';
+    syncTabs();
+    const sid = __s1.s.unsaved ? null : __s1.s.id;
+    if (sid) {
+      if (__dd.listingId !== sid) ddReset(sid);
+      ddLoad(sid).then(s1Redraw);
+    }
+    renderStage1Panel();
+    revealPanelOnPhone();
+    s1RunChecks();
+  }
+  // From a saved listing (or its checklist): reuse or start its parcel lookup.
+  function openStage1ForListing(s, back) {
+    if (s.status !== 'located') { areaToast('Place the pin on the parcel first', 'red'); return; }
+    const pc = ddParcel(s);
+    if (pc && !pc.noParcel) { openStage1(pc, back, s); return; }
+    // Only the newest tap proceeds, with its own back target.
+    const tok = {};
+    Object.assign(__s1, { s, pc: null, back, waitingFor: tok, lookupErr: false });
+    __areaPanel = 'stage1';
+    syncTabs();
+    renderStage1Panel();
+    revealPanelOnPhone();
+    ddLookupParcel(s).then(p => {
+      if (__areaPanel !== 'stage1' || __s1.waitingFor !== tok) return;
+      if (!p || p.noParcel) { __s1.lookupErr = !p || p.noParcel === 'error' ? 'error' : 'none'; renderStage1Panel(); return; }
+      openStage1(p, back, s);
+    });
+  }
+
+  async function s1RunChecks() {
+    const pc = __s1.pc;
+    if (!pc || !pc.geometry) return;
+    const k = s1Key(pc);
+    if (__s1.running === k) return;
+    __s1.running = k;
+    const jobs = [];
+    const L = isMd(pc.jurisdiction) ? S1_MD_LOOKUPS : DD_LOOKUPS;
+    for (const key of isMd(pc.jurisdiction) ? Object.keys(S1_MD_LOOKUPS) : S1_LOOKUPS) {
+      const cur = __s1.extra[key];
+      if (cur && (cur.pending || ddFull(cur))) continue;
+      __s1.extra[key] = { pending: true };
+      jobs.push(Promise.resolve().then(() => L[key](pc)).catch(e => ({ error: e.message || String(e) }))
+        .then(x => { if (__s1.extraFor === k) __s1.extra[key] = x || { error: 'no answer' }; s1Redraw(); }));
+    }
+    s1Redraw();
+    await Promise.allSettled(jobs);
+    if (__s1.running === k) __s1.running = null;
+    s1Redraw();
+  }
+  const s1Lines = key => {
+    const x = __s1.extra[key];
+    if (!x) return [];
+    if (x.pending) return ['Checking…'];
+    if (x.error) return [`Didn't load: ${x.error}.`];
+    return x.lines || [];
+  };
+
+  // Who an owner string names, part by part: decedents ("… HEIRS", "ESTATE
+  // OF …"), named fiduciaries ("… ADMINISTRATOR"), trustees and trust names,
+  // and everyone else. People carry { full, search } (search = "Last, First"
+  // for the clerk's index).
+  const S1_DEAD = /\b(HEIRS?|HRS|ESTATE|EST|DECEASED|DEC'?D|DESCENDANTS)\b/;
+  const S1_ROLE = /\b(EXECUT(OR|RIX)S?|EXRS?|ADMINISTRAT(OR|RIX)S?|ADMRX?S?|PERSONAL REP\w*)\b/;
+  const S1_TRUSTEE = /\b(TRUSTEES?|TR|TRS|TEES?)\b/;
+  const S1_TRUSTNAME = /\bTRUST\b|\bU\/[AW]\b/;
+  function s1Person(part) {
+    const p = personName(part.replace(/^(ESTATE|EST) OF\s+/, '').replace(new RegExp(S1_ROLE.source + '.*$'), '').replace(/\b(DESCENDANTS|TEES?)\b.*$/, '').trim());
+    return p ? { full: p.full, search: `${p.last}, ${p.first}` } : null;
+  }
+  function s1Owners(owner) {
+    const o = { decedents: [], fiduciaries: [], trustees: [], trusts: [], people: [] };
+    const add = (list, p) => { if (p && !list.some(q => q.full === p.full)) list.push(p); };
+    for (const part of ownerParts(owner)) {
+      if (S1_TRUSTNAME.test(part)) { if (!o.trusts.includes(titleCase(part))) o.trusts.push(titleCase(part)); continue; }
+      const p = s1Person(part);
+      const role = part.match(S1_ROLE);
+      if (role) add(o.fiduciaries, p && Object.assign({ role: /EXEC|EXR/i.test(role[0]) ? 'executor' : /ADM/i.test(role[0]) ? 'administrator' : 'personal representative' }, p));
+      else if (S1_DEAD.test(part) || /^(ESTATE|EST) OF\b/.test(part)) add(o.decedents, p);
+      else if (S1_TRUSTEE.test(part)) add(o.trustees, p);
+      else add(o.people, p);
+    }
+    o.people = o.people.filter(p => ![...o.decedents, ...o.fiduciaries, ...o.trustees].some(q => q.full === p.full));
+    return o;
+  }
+  // The owner's kind with trusts recognised: "SMITH, JOHN TR" or
+  // "BALL, THERESA TRUSTEE & BALL, THERESA LIVING TRUST" is a trust, not people.
+  function ownerKind(owner) {
+    const k = ownerSummary(owner).kind;
+    if (k === 'estate' || k === 'entity') return k;
+    const o = s1Owners(owner);
+    return o.trusts.length || o.trustees.length ? 'trust' : k;
+  }
+  // The first deceased owner, for the clerk's or Register of Wills' index.
+  function s1Decedent(owner) {
+    return s1Owners(owner).decedents[0] || null;
+  }
+  const s1Names = list => list.map(p => p.full).join('; ');
+  // What the county record says about the last deed's type (Fauquier's code,
+  // or the seller's name in Loudoun's sales record).
+  function s1DeedKind(pc) {
+    const sale = pc.sale || {};
+    const code = (sale.deedType || '').trim();
+    if (code === 'WD') return { leaf: 'warranty', text: 'Likely a warranty deed (county code WD) — the deed says whether general or special warranty.' };
+    if (code === 'QC') return { leaf: 'quitclaim', text: 'Likely a quitclaim deed (county code QC).' };
+    if (code === 'WILL') return { leaf: 'will', text: 'Passed by will (county code WILL), not by a deed.' };
+    const seller = String(sale.seller || '');
+    if (/\b(EXECUT(OR|RIX)S?|EXRS?|ADMINISTRAT(OR|RIX)S?|ADMRS?|PERSONAL REPRESENTATIVES?)\b/i.test(seller)) return { leaf: 'pr', text: `Probably a PR or executor's deed — the county lists the seller as "${titleish(seller)}".` };
+    if (code && code !== 'DEED' && DD_DEED_CODES[code]) return { leaf: 'other', text: `County code ${code}, likely ${DD_DEED_CODES[code]}.` };
+    return null;
+  }
+
+  // The 7 modules for a Virginia parcel. Each: { n, title, tone, headline,
+  // lines, leaves, links, skip } — skip = mind-map sources for other places.
+  function s1ModulesVA(s, pc) {
+    const owner = pc.ownerHidden ? (s.owner_name || '') : (pc.owner || s.owner_name || '');
+    const kind = ownerKind(owner);
+    const own = s1Owners(owner);
+    const county = pc.county || titleish(pc.jurisdiction);
+    const fq = pc.jurisdiction === 'fauquier';
+    // County details still on their way: show "checking", not "didn't load" or n/a.
+    const ownerPending = !fq && !!pc.loadingDetails && pc.owner === undefined && !pc.ownerHidden;
+    const taxPending = fq && !!pc.loadingDetails && pc.delinquentState == null;
+    const pend = leaves => leaves.map((l, i) => s1Leaf(l.label, 'pending', i ? '' : 'Loading the owner of record…'));
+    const names = ddOwnerNames(owner).map(n => n.label);
+    const f = id => ddFinding(id, s, pc);
+    const mods = [];
+    const mod = (n, tone, headline, lines, leaves, links, skip) => mods.push(Object.assign({}, S1_MODULES[n - 1], { tone, headline, lines, leaves, links, skip }));
+
+    // 1 — Deed types
+    {
+      const b = f('1.1');
+      const dk = s1DeedKind(pc);
+      const sale = pc.sale || {};
+      const bookPage = sale.deedBookPage && !/^[\s0\/\-–—.]*$/.test(sale.deedBookPage) ? sale.deedBookPage : null;
+      const bookKind = ddBookKind(sale.deedType, bookPage);
+      const note = pc.assessorNote;
+      const lines = b.lines.slice();
+      if (note) lines.splice(Math.min(2, lines.length), 0, `County assessor's note (${note.year || 'undated'}): "${note.text}${note.cut ? '…' : ''}"${note.cut ? ' (the county\'s GIS copy holds only 254 characters — the Commissioner of the Revenue has the full note)' : ''}`);
+      mod(1, b.tone, dk && /quitclaim|pr|will/.test(dk.leaf) ? dk.text : null, lines, [
+        bookPage && bookKind !== 'deed'
+          ? s1Leaf('Last recorded deed (Virginia land records)', 'you', bookKind === 'will' ? `The county's reference ${bookPage} is a will-book entry, not a deed — the land passed through an estate. The clerk's will and estate index has it; find the last deed by owner name.` : `The county's reference ${bookPage} is an administrative entry with no recorded deed instrument — find the last deed by owner name.`)
+          : s1Leaf('Last recorded deed (Virginia land records)', bookPage || sale.instrument ? 'found' : 'you',
+            bookPage ? `Deed book/page ${bookPage}${sale.recorded ? `, recorded ${sale.recorded}` : sale.date ? `, ${sale.date}` : ''}.` : sale.instrument ? `Instrument ${sale.instrument}.` : 'Find it in the land records by owner name or PIN.'),
+        s1Leaf('Deed type — grant (general warranty), special warranty, quitclaim, or PR / executor deed', dk ? 'found' : 'you',
+          dk ? dk.text : 'The county data doesn\'t give the type — the deed\'s heading and warranty clause do.'),
+      ], b.links, ['MD LandRecords (Maryland parcels)', 'DC Recorder of Deeds (DC isn\'t covered)']);
+    }
+
+    // 2 — Multi-owner (ET AL)
+    {
+      const b2 = f('1.2'), b3 = f('1.3');
+      const uniq = own.people;
+      const etal = /\bET\s?AL\b/i.test(owner);
+      const estate = own.decedents.length > 0 || kind === 'estate';
+      const trust = !estate && kind === 'trust';
+      const several = uniq.length > 1 || etal || estate || (trust && uniq.length > 0);
+      const m = pc.mail || {};
+      const away = screenAwayLabel(pc.mail, pc.state);
+      const decs = own.decedents.length ? `the heirs of ${s1Names(own.decedents)}` : 'an estate or heirs';
+      const OL = 'Owners of record (Commissioner of the Revenue)';
+      const ownersLeaf = pc.ownerHidden
+        ? s1Leaf(OL, 'you', 'The county withholds this owner\'s name; the deed names every owner.')
+        : estate ? s1Leaf(OL, 'you', `${uniq.length ? `Named on the record: ${s1Names(uniq)}, plus ${decs}` : `The record names only ${decs}`} — who the heirs are comes from a recorded list of heirs or the family tree.${own.fiduciaries.length ? ` It also names ${own.fiduciaries.map(p => `${p.full} (${p.role})`).join('; ')}.` : ''}`)
+          : trust ? s1Leaf(OL, 'found', `Held in trust${own.trustees.length ? ` — trustee${own.trustees.length > 1 ? 's' : ''}: ${s1Names(own.trustees)}` : ''}${own.trusts.length ? `; trust: ${own.trusts.join('; ')}` : ''}${uniq.length ? `; also ${s1Names(uniq)}` : ''}.`)
+            : s1Leaf(OL, owner ? 'found' : 'you', owner ? `${uniq.length > 1 ? `${uniq.length} people: ` : ''}${uniq.length ? s1Names(uniq) : owner}${etal ? ' — plus others the record calls "ET AL"; the deed names them' : ''}.` : 'No owner name on the county record.');
+      const headline = estate ? (uniq.length ? `Heirs of ${s1Names(own.decedents) || 'a deceased owner'} own part of it — every named owner and heir signs unless a personal representative has a power of sale` : 'Heirs own it, and the record doesn\'t name them — every heir signs unless a personal representative has a power of sale')
+        : trust ? (uniq.length ? 'Held partly in trust — the trustee and every other owner sign' : 'Held in trust — the trustee signs')
+          : several ? 'Several owners — every one signs' : null;
+      const leaves = [
+        ownersLeaf,
+        s1Leaf('Mailing addresses', pc.ownerHidden ? 'you' : m.line1 ? 'found' : 'you',
+          pc.ownerHidden ? '' : m.line1 ? `Tax bill: ${[m.line1, m.city, m.state, m.zip].filter(Boolean).join(', ')}${away ? ` (${away.replace(/^Owner\b/, 'owner')})` : ''}.${several ? ' The county keeps one address per parcel — find the other owners\' yourself.' : ''}` : 'No mailing address on the county record.'),
+        estate && !uniq.length ? s1Leaf('Grantee clause analysis', 'you', 'Heirs take by inheritance, with no grantee clause; if there was a will, read its devise clause instead.')
+          : several || trust ? s1Leaf('Grantee clause analysis', 'you', 'Read how the last deed names the buyers — e.g. "as tenants in common", "as joint tenants with the right of survivorship", or to a trustee.')
+            : s1Leaf('Grantee clause analysis', 'na', 'One owner of record.'),
+        estate && !uniq.length ? s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'you', 'Heirs or devisees usually hold undivided shares as tenants in common; a share passes under that person\'s will, or to their heirs if there\'s none. A will can say otherwise — read it.')
+          : several ? s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'you', `No survivorship unless the deed says "with survivorship" or equivalent words (§§ 55.1-134, 55.1-135); spouses named "tenants by the entirety" have it, so the survivor owns it all (§ 55.1-136).${estate ? ' Heirs each inherit an undivided share.' : ''}`)
+            : trust ? s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'na', 'Held in trust — the trust document governs.')
+              : s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'na', 'One owner of record.'),
+      ];
+      mod(2, ownerPending ? 'pending' : several || trust || away ? 'flag' : b2.tone, ownerPending ? null : headline,
+        // The mailing address is its own leaf below.
+        [...b2.lines, ...b3.lines.filter(l => !b2.lines.includes(l) && !/^(Tax bill goes to|The county keeps one mailing address)/.test(l))],
+        ownerPending ? pend(leaves) : leaves, [...b3.links, ddCode('55.1-135', 'Joint ownership (§ 55.1-135)'), ddCode('55.1-136', 'Tenancy by the entirety (§ 55.1-136)')], ['MD SDAT (Maryland parcels)', 'DC MyTax (DC isn\'t covered)']);
+    }
+
+    // 3 — Estate & probate
+    {
+      const b = f('1.4');
+      const estate = own.decedents.length > 0 || own.fiduciaries.length > 0 || kind === 'estate';
+      const deed = ddRecentEstateDeed(pc);
+      const active = estate || !!(deed && deed.recent);
+      const clerk = `${county} circuit court clerk`;
+      // The assessor's note may spell a surname differently (Tines / Tynes): search both.
+      const noteText = (pc.assessorNote && pc.assessorNote.text) || '';
+      const variants = d => {
+        const [last, first] = d.search.split(', ');
+        const re = new RegExp(`\\b${last.replace(/[aeiouy]/gi, '[aeiouy]')}\\b`, 'gi');
+        return [...new Set((noteText.match(re) || []).map(titleCase))].filter(v => v.toLowerCase() !== last.toLowerCase()).map(v => `${v}, ${first}`);
+      };
+      const terms = own.decedents.flatMap(d => [d.search, ...variants(d)]);
+      const searches = terms.length ? ` Search the clerk's probate index for ${terms.map(t => `"${t}"`).join(', ')}.` : '';
+      const named = own.fiduciaries.length ? `The record names ${own.fiduciaries.map(p => `${p.full} as ${p.role}`).join('; ')} — confirm the certificate of qualification with the ${clerk}.` : '';
+      const leaves = active ? [
+        s1Leaf('Personal representative (PR)', 'you', named ? `${named}${searches}` : `Ask the ${clerk} whether anyone qualified as personal representative${own.decedents.length ? ` for ${s1Names(own.decedents)}` : ''}.${searches}`),
+        s1Leaf('Executor designation', 'you', 'Only a will names an executor — ask the clerk whether a will was probated.'),
+        s1Leaf('Letters of administration', 'you', 'The clerk usually issues a certificate of qualification, which has the same effect as letters of administration; formal letters can be requested (§ 64.2-506).', [ddCode('64.2-506', 'Qualification (§ 64.2-506)')]),
+        s1Leaf('Power of sale', 'you', 'It comes from the will or a court order. Without one, every heir signs the deed (module 2).'),
+      ] : [
+        s1Leaf('Personal representative (PR)', 'na', 'No estate or heirs on the county record.'),
+        s1Leaf('Executor designation', 'na'), s1Leaf('Letters of administration', 'na'), s1Leaf('Power of sale', 'na'),
+      ];
+      mod(3, ownerPending ? 'pending' : b.tone, ownerPending || !active ? null : 'Ask the clerk for a will, a list of heirs or a qualified personal representative before an offer', b.lines, ownerPending ? pend(leaves) : leaves, b.links, ['MD Register of Wills (Maryland parcels)', 'DC Probate Division (DC isn\'t covered)']);
+    }
+
+    // 4 — LLC & corporate entity
+    {
+      const b = f('1.5');
+      const corp = /\b(INC|CORP|CORPORATION|INCORPORATED)\b/i.test(owner);
+      const scc = { label: 'Virginia SCC business search', url: DD_URL.scc };
+      const leaves = kind === 'entity' ? [
+        s1Leaf('Good standing verification', 'you', `Search SCC CIS for "${owner}": status (active, pending inactive or inactive) and registered agent.`, [scc]),
+        s1Leaf('Managing member identification', 'you', 'Virginia doesn\'t publish an LLC\'s members or managers — ask for the operating agreement or a certificate naming who can sign.'),
+        corp ? s1Leaf('Officer listings', 'you', 'A corporation\'s directors and principal officers are in its SCC annual report (§ 13.1-775).', [scc])
+          : s1Leaf('Officer listings', 'na', 'Officer lists are filed by corporations (§ 13.1-775).'),
+      ] : kind === 'trust' ? [
+        s1Leaf('Good standing verification', 'na', 'Trusts aren\'t registered with the state.'),
+        s1Leaf('Managing member identification', 'na'),
+        s1Leaf('Officer listings', 'you', `The trustee signs${own.trustees.length ? ` (the record names ${s1Names(own.trustees)})` : ''} — ask for a certification of trust naming the current trustee (§ 64.2-804).`, [ddCode('64.2-804', 'Certification of trust (§ 64.2-804)')]),
+      ] : [
+        s1Leaf('Good standing verification', 'na', 'The owner isn\'t a company or trust.'),
+        s1Leaf('Managing member identification', 'na'), s1Leaf('Officer listings', 'na'),
+      ];
+      mod(4, ownerPending ? 'pending' : b.tone, ownerPending ? null : kind === 'entity' ? 'Owned by a company — check it\'s active and who can sign' : kind === 'trust' ? 'Held in trust — the trustee signs' : null, kind === 'entity' || kind === 'trust' ? b.lines : [], ownerPending ? pend(leaves) : leaves, b.links, ['MD SDAT Business Express (Maryland parcels)', 'DC CorpOnline (DC isn\'t covered)']);
+    }
+
+    // 5 — Tax delinquency
+    {
+      const b = f('1.6');
+      const d = fq ? pc.delinquent : null;
+      const clear = fq && !d && pc.delinquentState === 'ok';
+      const fees = 'Once the account goes to a collection attorney or a tax-sale suit, the county can add attorney or collection fees of up to 20% plus administrative costs of up to $30 ($35 after a judgment) (§ 58.1-3958).';
+      const leaves = taxPending ? [
+        s1Leaf('Principal tax', 'pending', 'Checking Fauquier\'s delinquent-tax list…'), s1Leaf('Accrued interest and penalties', 'pending'), s1Leaf('Legal fees', 'pending'),
+      ] : clear ? [
+        s1Leaf('Principal tax', 'na', 'Not on Fauquier\'s delinquent-tax list.'), s1Leaf('Accrued interest and penalties', 'na'), s1Leaf('Legal fees', 'na'),
+      ] : d ? [
+        s1Leaf('Principal tax', 'you', `Fauquier's list gives only the total${d.balance != null ? ` (${fmtMoney(d.balance)})` : ''}; the Treasurer's payoff splits out the tax.`),
+        s1Leaf('Accrued interest and penalties', 'you', 'Included in that total; the payoff itemizes them by year.'),
+        s1Leaf('Legal fees', 'you', fees),
+      ] : fq ? [
+        s1Leaf('Principal tax', 'you', 'Fauquier\'s delinquent-tax list didn\'t load — ask the Treasurer.'), s1Leaf('Accrued interest and penalties', 'you'), s1Leaf('Legal fees', 'you', fees),
+      ] : [
+        s1Leaf('Principal tax', 'you', 'Each unpaid bill is on the parcel\'s tax payment history (link below).'),
+        s1Leaf('Accrued interest and penalties', 'you', 'Shown per bill on the same page.'),
+        s1Leaf('Legal fees', 'you', fees),
+      ];
+      mod(5, taxPending ? 'pending' : b.tone, d ? `${d.balance != null ? fmtMoney(d.balance) + ' in back taxes' : 'Taxes past due'}${d.days != null ? `, ${fmtOverdue(d.days)} overdue` : ''}` : null,
+        b.lines, leaves, [...b.links, ddCode('58.1-3958', 'Collection fees (§ 58.1-3958)')], ['Maryland county finance offices (Maryland parcels)', 'DC Office of Tax and Revenue (DC isn\'t covered)']);
+    }
+
+    // 6 — Tax sale & redemption
+    {
+      const b = f('1.7');
+      const d = fq ? pc.delinquent : null;
+      const sale = b.links[0];
+      // Assessed at $15,000 or less and 3+ years delinquent: the Treasurer can auction it without a court.
+      const a = pc.assessed || {};
+      // § 58.1-3975 A: delinquent on Dec 31 after the 3rd anniversary of the due date.
+      const due = d && d.days != null ? new Date(Date.now() - d.days * 864e5) : null;
+      const nonjud = !!(due && a.total > 0 && a.total <= 15000 && new Date() > new Date(due.getFullYear() + 3, 11, 31, 23, 59, 59));
+      mod(6, b.tone === 'flag' || nonjud ? 'flag' : b.tone, nonjud ? 'The Treasurer can auction it without a court on 30 days\' notice (assessed $15,000 or less, taxes unpaid past the 3-year mark)' : b.tone === 'flag' ? 'The county can already ask the court to sell it for taxes' : null, [
+        ...b.lines, nonjud && `Assessed at ${fmtMoney(a.total)}, and taxes were still unpaid on Dec 31 after their third anniversary, so the Treasurer can sell it at public auction without a court, after 30 days' notice by certified mail (§ 58.1-3975).`].filter(Boolean), [
+        s1Leaf('County tax auction catalog', 'you', `Look for PIN ${pc.pin} on ${county}'s tax-sale page.`, [sale]),
+        s1Leaf('Tax lien sale portals', 'na', 'Virginia doesn\'t sell tax liens.'),
+        s1Leaf('Tax certificate sales', 'na', 'None in Virginia — the county sells the land itself.'),
+        nonjud ? s1Leaf('Redemption expiration date', 'you', 'The owner (or heirs) can redeem only before the Treasurer\'s auction date (§ 58.1-3975), or the court sale date if the county sues instead (§ 58.1-3974); watch for the 30-day notice.')
+          : s1Leaf('Redemption expiration date', 'found', 'The owner (or heirs) can pay off until the date set for the court sale (§ 58.1-3974); a sold parcel can\'t be redeemed.'),
+        taxPending ? s1Leaf('Payoff threshold', 'pending', 'Checking Fauquier\'s delinquent-tax list…')
+          : d && d.balance != null ? s1Leaf('Payoff threshold', 'found', nonjud ? `At least ${fmtMoney(d.balance)} — plus all costs, including notice and a reasonable attorney fee; a partial payment doesn't stop the auction (§ 58.1-3975).` : `At least ${fmtMoney(d.balance)} — plus court costs, publication and a court-set attorney fee once a sale suit is filed (§ 58.1-3974).`)
+          : fq && pc.delinquentState === 'ok' && !d ? s1Leaf('Payoff threshold', 'na', 'Nothing past due on the county list.')
+            : s1Leaf('Payoff threshold', 'you', 'The Treasurer gives the payoff for a date.'),
+      ], [...b.links, ddCode('58.1-3974', 'Redemption (§ 58.1-3974)'), nonjud && ddCode('58.1-3975', 'Treasurer\'s auction (§ 58.1-3975)')].filter(Boolean), []);
+    }
+
+    // 7 — Municipal & utility liens
+    {
+      const b8 = f('1.8'), b31 = f('3.1');
+      const u = __s1.extra.utilities;
+      const util = !u || u.pending ? s1Leaf('Utility liens', 'pending', 'Checking the water/sewer service area…')
+        : u.water === 'out' ? s1Leaf('Utility liens', 'found', fq ? 'Outside Fauquier\'s water/sewer service districts, so a public water/sewer lien is unlikely.' : 'Outside Loudoun Water\'s service area, so a water/sewer lien is unlikely unless a town utility serves the parcel.')
+          : u.water === 'town' ? s1Leaf('Utility liens', 'you', `Inside the Town of ${titleish(String(pc.district || '').split('-').pop())} — the town's utility (or FCWSA where it serves the town) bills water/sewer; ask it for any unpaid balance. Unpaid charges are a lien on a par with taxes, binding a buyer once recorded or once the buyer knows of them (§ 15.2-2119).`)
+          : u.water === 'in' ? s1Leaf('Utility liens', 'you', `Inside ${fq ? 'FCWSA\'s' : 'Loudoun Water\'s'} service area — ask it for any unpaid balance on this parcel. Unpaid charges are a lien on a par with taxes, binding a buyer once recorded or once the buyer knows of them, so have any balance paid at closing (§ 15.2-2119).`)
+            : s1Leaf('Utility liens', 'you', 'The water/sewer service map didn\'t load — ask the local utility.');
+      // 1.8's guidance is spelled out in the leaves; keep the court-search detail.
+      mod(7, 'manual', null, [...b31.lines, ...s1Lines('utilities').slice(0, 1)], [
+        s1Leaf('County code enforcement', 'you', `Ask ${county} zoning enforcement about open violations on PIN ${pc.pin}.`, [{ label: `${county} zoning enforcement`, url: S1_CODE_URL[pc.jurisdiction] }]),
+        s1Leaf('Circuit court judgments', 'you', `Search ${names.length ? names.map(n => `"${n}"`).join(', ') : 'each owner'} in ${county}'s circuit and general district courts, and the judgment index in the land records.`, [{ label: 'Virginia court case information', url: DD_URL.courts }]),
+        s1Leaf('Municipal lien search', 'you', 'No public lien index — a title company\'s lien search covers recorded liens.'),
+        s1Leaf('Weed and abatement liens', 'you', 'Grass- or trash-cutting charges, where a county ordinance applies, are collected like taxes — ask the Treasurer.'),
+        util,
+        s1Leaf('WSSC Water, DC Water, Fairfax Water', 'na', 'Maryland, DC and Fairfax utilities — they don\'t serve properties here.'),
+      ], [...b8.links, ...b31.links.filter(l => !b8.links.some(x => x.url === l.url))], []);
+    }
+    return mods;
+  }
+
+  // Facts outside the 7 modules that decide a land deal early.
+  function s1Extras(s, pc) {
+    const out = [];
+    if (isMd(pc.jurisdiction)) {
+      out.push({ title: 'Zoning & use', lines: [
+        pc.landUse && `County use: ${pc.landUse}.`,
+        pc.assessed && pc.assessed.none ? 'No assessment values on the SDAT record.'
+          : pc.assessed && pc.assessed.building > 0 ? `Has improvements (assessed ${fmtMoney(pc.assessed.building)}).`
+            : pc.hasStruct ? 'A building is listed but not valued on the assessment.' : 'No buildings on the assessment.',
+        pc.zoningCode ? `Zoning ${pc.zoningCode}${pc.zoningName ? ` — ${pc.zoningName}` : ''} (${pc.zoningSource === 'county' ? 'county zoning map' : 'SDAT\'s code'}); the zoning ordinance gives the uses and lot size.` : 'Zoning isn\'t on the SDAT record.',
+      ].filter(Boolean) });
+    } else {
+      const z = ddFinding('1.9', s, pc);
+      out.push({ title: 'Zoning & use', lines: z.lines.filter(l => !/^Read the district/.test(l)) });
+    }
+    const r = __s1.extra.roads;
+    out.push({ title: 'Road access', lines: s1Lines('roads'), flag: ddReady(r) && r.touches === false });
+    const b = pc.build;
+    if (b && !b.pending && !b.error) out.push({ title: 'Buildability', lines: ddFinding('2.3', s, pc).lines.slice(0, 3) });
+    if (pc.flood && pc.flood.zone) out.push({ title: 'Flood', lines: [`FEMA zone ${pc.flood.zone} at the pin${pc.flood.sfha ? ' — in the 1%-annual-chance floodplain' : ''}${pc.build && pc.build.flood != null ? `; ${pc.build.flood > 0 ? `about ${Math.max(1, Math.round(pc.build.flood * 100))}% of the parcel is in the 100-year floodplain` : 'none of the parcel is in the 100-year floodplain'}` : ''}.`] });
+    return out;
+  }
+
+  // Maryland statute text on mgaleg (article codes: grp Real Property, get
+  // Estates & Trusts, gtp Tax-Property, gca Corporations & Associations, gpu Public Utilities).
+  const mdCode = (article, sec, label) => ({ label, url: `https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=${article}&section=${sec}&enactments=false` });
+  const S1_MD_URL = {
+    sdat: 'https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx',
+    landrec: 'https://landrec.msa.maryland.gov/',
+    wills: 'https://registers.maryland.gov/main/search.html',
+    entity: 'https://egov.maryland.gov/BusinessExpress/EntitySearch',
+    judgments: 'https://jportal.mdcourts.gov/judgment/judgementSearch.jsf',
+    wssc: 'https://my.wsscwater.com/FFBenefitCharges/benefits/charges/ffbenefitsCharges.faces',
+  };
+  // Months after a tax sale, as an ISO date.
+  const mdAddMonths = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setMonth(d.getMonth() + n); return localIso(d); };
+
+  // The 7 modules for a Maryland parcel. Without the owner's name (SDAT only,
+  // by hand) modules 3, 4 and 7 say what to check once AJ has it.
+  function s1ModulesMD(s, pc) {
+    const county = pc.county;
+    const owner = pc.owner || (s.unsaved ? '' : s.owner_name || '');
+    const fromListing = !pc.owner && !!owner;
+    const known = !!owner;
+    const kind = known ? ownerKind(owner) : 'unknown';
+    // Montgomery's owner arrives with the county details.
+    const ownerPending = pc.jurisdiction === 'montgomery' && !!pc.loadingDetails && pc.mdDep === undefined && !known;
+    const pend = leaves => leaves.map((l, i) => s1Leaf(l.label, 'pending', i ? '' : 'Loading the owner of record…'));
+    const { district, account, acct8 } = mdAcct(pc.pin);
+    const sdat = { label: 'SDAT Real Property search', url: S1_MD_URL.sdat };
+    const sdatHow = `On SDAT pick ${county} County, search by Property Account Identifier: district ${district}, account ${account}.`;
+    const names = ddOwnerNames(owner).map(n => n.label);
+    const sale = pc.sale || {};
+    const mods = [];
+    const mod = (n, tone, headline, lines, leaves, links, skip) => mods.push(Object.assign({}, S1_MODULES[n - 1], { tone, headline, lines: lines.filter(Boolean), leaves, links: links.filter(Boolean), skip }));
+
+    // 1 — Deed types
+    {
+      const hist = pc.mdSales && pc.mdSales.sales ? pc.mdSales.sales : [];
+      const odd = sale.convey === 4 || sale.price === 0;
+      mod(1, odd ? 'flag' : 'manual', sale.convey === 4 ? 'The last transfer wasn\'t an arm\'s-length sale — read the deed (gift, estate, foreclosure or confirmatory)' : null, [
+        sale.date && `Last transfer ${sale.date}${sale.price != null ? ` for ${sale.price === 0 ? '$0' : fmtMoney(sale.price)}` : ''}${MD_CONVEY[sale.convey] ? ` — ${MD_CONVEY[sale.convey]}` : ''}.`,
+        sale.priorBookPage && `The deed before it: book/page ${sale.priorBookPage}.`,
+        ...hist.filter(h => h.seller).map(h => `Sold ${fmtDay(h.date)} by ${h.seller}${h.price ? ` for ${fmtMoney(h.price)}` : ''}${h.how ? ` (${h.how.toLowerCase()})` : ''}.`),
+        pc.mdSales && pc.mdSales.error && 'Sales history (SDAT open data) didn\'t load.',
+        pc.legalDesc && `County legal description: ${pc.legalDesc}.`,
+        'Maryland Land Records needs a free account (with an emailed one-time code) and has no direct links — search by the book and page.',
+      ], [
+        s1Leaf('Last recorded deed (MD Land Records)', sale.deedBookPage ? 'found' : 'you', sale.deedBookPage ? `Book/page ${sale.deedBookPage}${sale.date ? `, transferred ${sale.date}` : ''}.` : 'Not in the county record — search the land records by owner name.'),
+        s1Leaf('Deed type — grant (general warranty), special warranty, quitclaim, or PR / executor deed', 'you',
+          `Read the deed's covenant: "warrant specially" is a special warranty (Real Property § 2-106), "warrant generally" a general warranty (§ 2-105); also look for a quitclaim, a personal representative's deed or a confirmatory deed.${sale.convey === 4 ? ' The last transfer wasn\'t arm\'s length (SDAT: foreclosure, gift or auction) — expect a trustee\'s, gift, PR or confirmatory deed and read which.' : ''}`),
+      ], [{ label: 'MD Land Records (free account)', url: S1_MD_URL.landrec }, mdCode('grp', '2-106', 'Special warranty (RP § 2-106)')], ['VA land records (Virginia parcels)', 'DC Recorder of Deeds (DC isn\'t covered)']);
+    }
+
+    // 2 — Multi-owner (ET AL)
+    {
+      const people = ownerParts(owner).map(personName).filter(Boolean);
+      const uniq = people.filter((p, i) => people.findIndex(q => q.full === p.full) === i);
+      const etal = /\bET\s?AL\b/i.test(owner);
+      const estate = kind === 'estate';
+      const several = uniq.length > 1 || etal || estate;
+      const m = pc.mail || {};
+      const away = screenAwayLabel(pc.mail, 'MD');
+      const src = pc.owner ? ` (${pc.ownerSource || 'county map'})` : fromListing ? ' (as typed on your saved listing)' : '';
+      const leaves2 = [
+        !known && pc.ownerStale ? s1Leaf('Owners of record (MD SDAT)', 'you', `Montgomery's water/sewer map still lists the owner from before the ${pc.ownerStale.transferred || 'last'} transfer, so it isn't used. ${sdatHow}`, [sdat])
+        : known ? s1Leaf('Owners of record (MD SDAT)', 'found', `${uniq.length > 1 ? `${uniq.length} people: ${uniq.map(p => p.full).join('; ')}` : owner}${etal ? ' — plus others the record calls "ET AL"' : ''}${src}.`)
+          : s1Leaf('Owners of record (MD SDAT)', 'you', sdatHow, [sdat]),
+        s1Leaf('Mailing addresses', m.line1 ? 'found' : 'you', m.line1 ? `Tax bill: ${[m.line1, m.city, m.state, m.zip].filter(Boolean).join(', ')}${away ? ` (${away.replace(/^Owner\b/, 'owner')})` : ''}.` : 'No mailing address on the county record.'),
+        estate ? s1Leaf('Grantee clause analysis', 'na', 'Heirs and legatees take through the estate, not by a grantee clause.')
+          : known && !several ? s1Leaf('Grantee clause analysis', 'na', 'One owner of record.')
+            : s1Leaf('Grantee clause analysis', 'you', `Read how the deed${sale.deedBookPage ? ` at book/page ${sale.deedBookPage}` : ''} names the buyers.`),
+        known && !several ? s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'na', 'One owner of record.')
+          : s1Leaf('Tenants in common or joint tenants with survivorship (JTWROS)', 'you', 'Maryland treats co-owners as tenants in common unless the deed expressly creates a joint tenancy (Real Property § 2-117); a married couple can hold as tenants by the entirety.'),
+      ];
+      mod(2, ownerPending ? 'pending' : several ? 'flag' : known ? 'info' : 'manual', ownerPending ? null : several ? (estate ? 'An estate or heirs own it — the personal representative signs once letters issue' : kind === 'trust' ? 'Held in trust — the trustee signs' : 'Several owners — every one signs') : null, [
+        !known && !ownerPending && 'Maryland\'s free parcel data has no owner names, SDAT can\'t be searched by name, and its terms forbid automated searches — so the owner is a one-minute look-up by account number.',
+      ], ownerPending ? pend(leaves2) : leaves2, [sdat, mdCode('grp', '2-117', 'Joint tenancy (RP § 2-117)')], ['VA Commissioner of the Revenue (Virginia parcels)', 'DC MyTax (DC isn\'t covered)']);
+    }
+
+    // 3 — Estate & probate
+    {
+      const estate = kind === 'estate';
+      const dec = estate ? s1Decedent(owner) : null;
+      const wills = { label: 'Register of Wills estate search', url: S1_MD_URL.wills };
+      const leaves = !known ? [
+        s1Leaf('Personal representative (PR)', 'you', `Get the owner's name first (module 2). If they've died, search the Register of Wills by that name in ${county} County: it shows the estate number, type, status and PR.`, [wills]),
+        s1Leaf('Executor designation', 'you', 'A will names one; the estate\'s docket shows who was appointed.'),
+        s1Leaf('Letters of administration', 'you', 'A PR\'s powers start when the Register issues letters (Estates & Trusts § 6-105). A "limited order" (LO) estate gets no letters and can\'t transfer land.'),
+        s1Leaf('Power of sale', 'you', 'In Maryland the PR holds title and can sell without court approval unless the will or a court order limits it (Estates & Trusts §§ 1-301, 7-401).'),
+      ] : estate ? [
+        s1Leaf('Personal representative (PR)', 'you', `Search the Register of Wills for ${dec ? `"${dec.search}"` : 'the decedent'} in ${county} County: estate number, type, status and the PR.`, [wills]),
+        s1Leaf('Executor designation', 'you', 'A will names one; the estate\'s docket shows who was appointed.'),
+        s1Leaf('Letters of administration', 'you', 'A PR\'s powers start when the Register issues letters (Estates & Trusts § 6-105). A "limited order" (LO) estate gets no letters and can\'t transfer land; a closed estate\'s PR has probably finished.'),
+        s1Leaf('Power of sale', 'found', 'In Maryland the PR holds title and can sell without court approval unless the will or a court order limits it (Estates & Trusts §§ 1-301, 7-401) — deal with the PR, not each heir.'),
+      ] : [
+        s1Leaf('Personal representative (PR)', 'na', 'No estate on the owner\'s name.'),
+        s1Leaf('Executor designation', 'na'), s1Leaf('Letters of administration', 'na'), s1Leaf('Power of sale', 'na'),
+      ];
+      mod(3, ownerPending ? 'pending' : estate ? 'flag' : known ? 'ok' : 'manual', !ownerPending && estate ? 'Estate owner — find the personal representative on the Register of Wills' : null, [
+        'The Register of Wills search is a form with no direct links, and its terms bar commercial use without permission — so it\'s a manual step. Coverage starts in 1998.',
+      ], ownerPending ? pend(leaves) : leaves, [wills, mdCode('get', '7-401', 'PR power to sell (E&T § 7-401)')], ['VA circuit court probate (Virginia parcels)', 'DC Probate Division (DC isn\'t covered)']);
+    }
+
+    // 4 — LLC & corporate entity
+    {
+      const corp = /\b(INC|CORP|CORPORATION|INCORPORATED)\b/i.test(owner);
+      const be = { label: 'Maryland Business Express search', url: S1_MD_URL.entity };
+      const leaves = kind === 'entity' ? [
+        s1Leaf('Good standing verification', 'you', `Search Business Express for "${owner}": status (Active, Not in Good Standing or Forfeited) and resident agent. It sits behind a captcha, so it's manual.`, [be]),
+        s1Leaf('Managing member identification', 'you', 'Maryland doesn\'t collect an LLC\'s members or managers (Corps. & Ass\'ns § 4A-204) — ask the LLC, or see who signed its recorded deeds.'),
+        corp ? s1Leaf('Officer listings', 'you', 'SDAT mails a corporation\'s latest annual report (officers and directors) for $1.')
+          : s1Leaf('Officer listings', 'na', 'Only corporations file officer lists.'),
+      ] : kind === 'trust' ? [
+        s1Leaf('Good standing verification', 'na', 'Trusts aren\'t registered with the state.'),
+        s1Leaf('Managing member identification', 'na'),
+        s1Leaf('Officer listings', 'you', 'The trustee signs — ask for the trust document or a certification naming the current trustee.'),
+      ] : known ? [
+        s1Leaf('Good standing verification', 'na', 'The owner isn\'t a company or trust.'),
+        s1Leaf('Managing member identification', 'na'), s1Leaf('Officer listings', 'na'),
+      ] : [
+        s1Leaf('Good standing verification', 'you', 'Once you have the owner\'s name (module 2): if it\'s a company, check its status on Business Express.', [be]),
+        s1Leaf('Managing member identification', 'you', 'Maryland doesn\'t collect an LLC\'s members or managers (Corps. & Ass\'ns § 4A-204).'),
+        s1Leaf('Officer listings', 'you', 'For a corporation, SDAT mails the latest annual report for $1.'),
+      ];
+      mod(4, ownerPending ? 'pending' : kind === 'entity' || kind === 'trust' ? 'manual' : known ? 'ok' : 'manual', ownerPending ? null : kind === 'entity' ? 'Owned by a company — check it\'s active and who can sign' : kind === 'trust' ? 'Owned by a trust — the trustee signs' : null, [
+        kind === 'entity' && 'A forfeited LLC\'s contracts and acts stay valid (Corps. & Ass\'ns § 4A-920), and it can apply to be reinstated; a forfeited corporation\'s directors manage and can sell its assets to wind it up (§ 3-515).',
+      ], ownerPending ? pend(leaves) : leaves, [be, mdCode('gca', '4A-920', 'Forfeited LLC (§ 4A-920)')], ['VA SCC (Virginia parcels)', 'DC CorpOnline (DC isn\'t covered)']);
+    }
+
+    // 5 — Tax delinquency
+    const ts = mdTaxState(pc);
+    const L = MD_TAX_LINKS[pc.jurisdiction] || {};
+    const acctText = pc.jurisdiction === 'montgomery' ? acct8 : `${district}${account}`;
+    const lookup = { label: `${county} tax bill lookup`, url: L.lookup };
+    {
+      const amt = ts.row && (ts.row.list_amount != null ? ts.row.list_amount : ts.row.sale_amount);
+      const rate = { frederick: '1% a month, plus a $10 delinquent fee and a $50 advertising fee once advertised', washington: '1% a month', montgomery: '1⅔% a month (8% interest plus 12% penalty a year)' }[pc.jurisdiction];
+      const owes = ts.state === 'listed' || ts.state === 'sold';
+      const paid = ts.state === 'paid';
+      const saleDay = ts.row && MD_SALE_DATES[ts.row.year] && MD_SALE_DATES[ts.row.year][pc.jurisdiction];
+      // Montgomery's file lists only liens sold one by one, so "no row" proves little there.
+      const montClear = ts.state === 'clear' && pc.jurisdiction === 'montgomery';
+      const unknown = ts.state === 'pending' || ts.state === 'error' || ts.state === 'no-token' || ts.state === 'none-loaded' || montClear;
+      mod(5, owes ? 'flag' : paid ? 'manual' : unknown ? (ts.state === 'pending' ? 'pending' : 'manual') : 'ok', ts.state === 'listed' ? `On ${county}'s ${ts.year} tax-sale list${amt != null ? ` for ${fmtMoney(amt)}` : ''}` : null, [
+        ts.state === 'no-token' && 'Connect this device (Settings) to check the county tax-sale lists.',
+        ts.state === 'error' && `The tax-sale lookup didn't load (${ts.error}).`,
+        ts.state === 'none-loaded' && `No ${county} tax-sale list is loaded yet.`,
+        `County tax bill lookup: enter account ${acctText}. It's a form with no direct links.`,
+        pc.jurisdiction === 'frederick' && 'The official payoff is Frederick\'s lien certificate / tax status report ($20, about 3 business days) — it leaves out town taxes and charges, so for a parcel inside a town ask the town too.',
+        pc.mdBill && pc.mdBill.total != null && `Montgomery's July billing for this account: ${fmtMoney(pc.mdBill.total)} for the year (what was billed, not whether it's paid).`,
+      ], [
+        owes ? s1Leaf('Principal tax', 'you', `${ts.state === 'sold' ? 'The lien sold' : 'Listed'} for ${amt != null ? fmtMoney(amt) : 'an amount the file doesn\'t give'} — tax, interest and fees together; the county lookup splits them.`, [lookup])
+          : paid ? s1Leaf('Principal tax', 'you', `Was on the ${ts.year} advertised list${amt != null ? ` for ${fmtMoney(amt)}` : ''} but not sold at the ${saleDay ? fmtDay(saleDay) + ' ' : ''}sale — paid or withdrawn before it, a sign of past tax trouble. Look up account ${acctText} for any current balance.`, [lookup])
+          : montClear ? s1Leaf('Principal tax', 'you', `Not among Montgomery's ${ts.year} liens sold one by one (its advertised list isn't kept online). Look up account ${acctText} on the county tax bill page.`, [lookup])
+          : ts.state === 'clear' ? s1Leaf('Principal tax', 'found', `Not on ${county}'s ${ts.year} tax-sale list. This year's bill isn't checked here.`)
+            : s1Leaf('Principal tax', ts.state === 'pending' ? 'pending' : 'you', ts.state === 'pending' ? 'Checking the tax-sale lists…' : `Look up account ${acctText} on the county tax bill page.`, [lookup]),
+        owes || unknown || paid ? s1Leaf('Accrued interest and penalties', 'you', `Late ${county} taxes accrue ${rate} (county tax-sale notice).`)
+          : s1Leaf('Accrued interest and penalties', 'na'),
+        ts.state === 'sold' ? s1Leaf('Legal fees', 'you', 'After the sale the lien buyer can add a title search (up to $250) and attorney fees (up to $500) once 4 months pass (7 if owner-occupied), and more after filing to foreclose (Tax-Property § 14-843).')
+          : owes || unknown ? s1Leaf('Legal fees', 'you', 'None until a lien sells; then the buyer\'s allowed costs are added (Tax-Property § 14-843).')
+            : s1Leaf('Legal fees', 'na'),
+      ], [lookup, L.certificate && { label: 'Frederick lien certificate ($20)', url: L.certificate }], ['VA county treasurers (Virginia parcels)', 'DC Office of Tax and Revenue (DC isn\'t covered)']);
+    }
+
+    // 6 — Tax sale & redemption
+    {
+      const r = ts.row;
+      // No bidder: the county itself holds the certificate ("struck off").
+      const toCounty = !!(r && /COUNTY COMMISSIONER|^(MONTGOMERY|FREDERICK|WASHINGTON) COUNTY\b/i.test(r.bidder || ''));
+      const buyer = toCounty ? 'the county (no bidder)' : (r && r.bidder) || 'a bidder';
+      const saleIso = r && MD_SALE_DATES[r.year] && MD_SALE_DATES[r.year][pc.jurisdiction];
+      const rate = MD_REDEEM_RATE[pc.jurisdiction];
+      const mont = pc.jurisdiction === 'montgomery';
+      let payoff = null;
+      if (ts.state === 'sold' && saleIso && r.sale_amount != null) {
+        const days = Math.max(0, Math.round((new Date(todayIso() + 'T12:00:00') - new Date(saleIso + 'T12:00:00')) / 864e5));
+        payoff = r.sale_amount * (1 + rate * days / 365);
+      }
+      const catalog = { label: `${county} tax sale`, url: L.sale };
+      const results = { label: `${county} tax-sale results`, url: L.results };
+      const leaves = [
+        s1Leaf('County tax auction catalog', ts.state === 'listed' || ts.state === 'paid' || ts.state === 'sold' || (ts.state === 'clear' && !mont) ? 'found' : 'you',
+          ts.state === 'listed' || ts.state === 'paid' || (ts.state === 'sold' && r.listed) ? `On the ${ts.year} list${r.list_amount != null ? ` for ${fmtMoney(r.list_amount)}` : ''}.`
+            : ts.state === 'clear' && !mont ? `Not on the ${ts.year} list.`
+              : mont ? 'Montgomery\'s advertised list runs in the newspaper and isn\'t kept online after the sale.' : 'Check the county\'s tax-sale page.', [catalog]),
+        s1Leaf('Tax lien sale portals', 'you', pc.jurisdiction === 'frederick' ? 'Frederick runs its sale on frederick.marylandtaxsale.com (bidding needs registration).' : 'The county\'s tax-sale page has the sale rules and dates.', [catalog]),
+        ts.state === 'sold' ? s1Leaf('Tax certificate sales', 'found', toCounty ? `No one bid at the ${r.year} tax sale${saleIso ? ` (${fmtDay(saleIso)})` : ''}, so the county holds the lien${r.sale_amount != null ? ` (${fmtMoney(r.sale_amount)})` : ''}.` : `The lien sold at the ${r.year} tax sale${saleIso ? ` (${fmtDay(saleIso)})` : ''} to ${buyer}${r.sale_amount != null ? ` for ${fmtMoney(r.sale_amount)}` : ''}.`, [results])
+          : ts.state === 'paid' ? s1Leaf('Tax certificate sales', 'found', 'Listed but not in the sale results — paid or withdrawn before the sale.', [results])
+          : ts.state === 'listed' ? s1Leaf('Tax certificate sales', 'found', `On the list for the ${saleIso ? fmtDay(saleIso) + ' ' : 'coming '}sale.`, [results])
+            : ts.state === 'clear' && !mont ? s1Leaf('Tax certificate sales', 'found', `No lien sold at the ${ts.year} sale.`)
+              : ts.state === 'clear' ? s1Leaf('Tax certificate sales', 'you', `Not among Montgomery's ${ts.year} liens sold one by one; liens sold in whole groups aren't itemized — call ${L.phone} to be sure.`, [results])
+                : s1Leaf('Tax certificate sales', ts.state === 'pending' ? 'pending' : 'you', ts.state === 'pending' ? 'Checking…' : 'Check the county\'s tax-sale results.', [results]),
+        ts.state === 'sold' && toCounty ? s1Leaf('Redemption expiration date', 'you', `The county holds the certificate and can sell it or sue to foreclose; the owner can redeem until a court's final judgment. Ask the Treasurer (${L.phone}) where it stands.`)
+          : ts.state === 'sold' && saleIso ? s1Leaf('Redemption expiration date', 'found', `The buyer can sue to foreclose from ${fmtDay(mdAddMonths(saleIso, 6))} (9 months after the sale if owner-occupied) and must file by ${fmtDay(mdAddMonths(saleIso, 24))} or the certificate is void (Tax-Property § 14-833). The owner can redeem until the court's final judgment.`)
+          : s1Leaf('Redemption expiration date', ts.state === 'clear' || ts.state === 'listed' || ts.state === 'paid' ? 'na' : 'you', ts.state === 'clear' || ts.state === 'listed' || ts.state === 'paid' ? 'No lien sold.' : 'Applies only if a lien sold.'),
+        payoff != null ? s1Leaf('Payoff threshold', 'found', `About ${fmtMoney(payoff)} today: the ${fmtMoney(r.sale_amount)} lien plus ${Math.round(rate * 100)}% a year since the sale${mont ? ' (6% if owner-occupied)' : ''}, plus any taxes since and the buyer's allowed costs (Tax-Property § 14-828). The Treasurer (${L.phone}) gives the exact figure.`)
+          : ts.state === 'sold' ? s1Leaf('Payoff threshold', 'you', `The lien plus ${Math.round(rate * 100)}% a year since the sale${mont ? ' (6% if owner-occupied)' : ''}, later taxes and the buyer's costs (Tax-Property § 14-828) — call ${L.phone}.`)
+            : s1Leaf('Payoff threshold', ts.state === 'clear' || ts.state === 'listed' || ts.state === 'paid' ? 'na' : 'you', ts.state === 'clear' || ts.state === 'listed' || ts.state === 'paid' ? 'No lien sold.' : 'Applies only if a lien sold.'),
+      ];
+      mod(6, ts.state === 'sold' ? 'flag' : ts.state === 'clear' && !mont ? 'ok' : ts.state === 'pending' ? 'pending' : 'manual',
+        ts.state === 'sold' ? (toCounty ? `No bidder at the ${r.year} tax sale — the county holds the lien` : `Tax lien sold in ${r.year} to ${buyer}${saleIso ? ` — foreclosure can be filed from ${fmtDay(mdAddMonths(saleIso, 6))}` : ''}`) : null, [
+          'Maryland sells tax liens (certificates), not the land; the buyer gets the land only by a court foreclosure if no one redeems.',
+        ].filter(Boolean), leaves, [catalog, mdCode('gtp', '14-833', 'Foreclosure timing (TP § 14-833)'), mdCode('gtp', '14-828', 'Redemption amount (TP § 14-828)')], []);
+      if (toCounty && pc.jurisdiction === 'frederick') mods[mods.length - 1].lines.push(`Frederick sells certificates nobody bid on at lien value — first at an assignment sale for registered bidders, then over the counter (Treasury, ${L.phone}).`);
+    }
+
+    // 7 — Municipal & utility liens
+    {
+      const dep = pc.mdDep, w = pc.mdWater;
+      const cat = dep && !dep.error && !dep.none ? [...(dep.water || []), ...(dep.sewer || [])] : [];
+      const noPublic = cat.length && cat.every(c => /-6$/.test(c));
+      const bill = pc.mdBill && !pc.mdBill.error && !pc.mdBill.none ? pc.mdBill : null;
+      const wssc = pc.jurisdiction !== 'montgomery' ? s1Leaf('WSSC Water', 'na', 'WSSC serves Montgomery and Prince George\'s, not this county.')
+        : bill && !(bill.ffbc > 0) && !(bill.connect > 0) ? s1Leaf('WSSC Water', 'found', 'No WSSC front-foot or connection charge on the July tax bill.')
+        : bill && (bill.ffbc > 0 || bill.connect > 0) ? s1Leaf('WSSC Water', 'found', `The July tax bill carries WSSC charges: ${[bill.ffbc > 0 && `front-foot benefit ${fmtMoney(bill.ffbc)}`, bill.connect > 0 && `connection ${fmtMoney(bill.connect)}`].filter(Boolean).join(', ')} a year — a lien until paid off (Public Utilities § 25-204).`, [{ label: 'WSSC front-foot charges', url: S1_MD_URL.wssc }])
+        : noPublic ? s1Leaf('WSSC Water', 'found', `Water/sewer category ${cat.join(', ')} — no public service planned, so a WSSC front-foot benefit charge is unlikely.`)
+          : s1Leaf('WSSC Water', dep ? 'you' : 'pending', dep ? `Check WSSC's front-foot benefit charges for district ${district}, account ${acct8}${cat.length ? ` (category ${cat.join(', ')})` : ''}: they're a lien and sell at tax sale (Public Utilities §§ 25-204, 25-214). Farmed agricultural land can be charged for at most 300 front feet, and the full charge applies once it connects (§ 25-205).` : 'Checking Montgomery\'s water/sewer map…', [{ label: 'WSSC front-foot charges', url: S1_MD_URL.wssc }]);
+      const util = pc.jurisdiction === 'montgomery' ? s1Leaf('Utility liens', 'found', 'Unpaid WSSC water bills aren\'t a lien on the land (Public Utilities § 25-504); its front-foot charges are (above).')
+        : pc.jurisdiction === 'frederick' ? (w && !w.error && !w.none && /WELL|SEPTIC/.test(`${w.water} ${w.sewer}`) && !/PUBLIC|TOWN/.test(`${w.water} ${w.sewer}`)
+          ? s1Leaf('Utility liens', 'found', `County record: water ${titleish(w.water || 'not listed')}, sewer ${titleish(w.sewer || 'not listed')} — no public water/sewer charges to lien.`)
+          : s1Leaf('Utility liens', w ? 'you' : 'pending', w ? `${w.water || w.sewer ? `County record: water ${titleish(w.water || 'not listed')}, sewer ${titleish(w.sewer || 'not listed')}. ` : ''}County water/sewer charges are liens that can go to tax sale (Frederick County Code § 2-13-24). If a town serves the parcel, its charges follow the town's code — ask the town utility for any balance.` : 'Checking the county\'s well/septic record…'))
+          : s1Leaf('Utility liens', 'you', 'Unpaid county water/sewer charges are a lien kept only at the county office, not in the land records (Public Local Laws § 6-309) — call the county if the parcel is on public service.');
+      mod(7, 'manual', null, [
+        'Abatement costs can be put on the county tax bill as a lien (then the tax lookup shows them) or billed to the owner as a debt; fines on open cases don\'t appear there — ask code enforcement.',
+        'A circuit court judgment liens the owner\'s land in that county once indexed; a District Court judgment does only after a Notice of Lien is recorded in circuit court (Courts & Judicial Proceedings § 11-402). Judgment liens aren\'t in MD Land Records.',
+      ], [
+        s1Leaf('County code enforcement', 'you', `Call ${county} County's code enforcement about open cases on account ${acctText}.`),
+        wssc,
+        s1Leaf('DC Water, Fairfax Water', 'na', 'DC and Virginia utilities — not here.'),
+        s1Leaf('Circuit court judgments', 'you', known ? `Search ${names.length ? names.map(n => `"${n}"`).join(', ') : 'each owner'} in the Judgment and Liens Search, ${county} County.` : `Once you have the owner's name (module 2), search it in the Judgment and Liens Search, ${county} County.`, [{ label: 'MD Judgment and Liens Search', url: S1_MD_URL.judgments }]),
+        s1Leaf('Municipal lien search', 'you', 'No public lien index; a title company\'s search covers recorded liens.'),
+        s1Leaf('Weed and abatement liens', 'you', 'May be added to the county tax bill (then the module 5 lookup shows them) or billed directly — ask code enforcement.'),
+        util,
+      ], [mdCode('gcj', '11-402', 'Judgment liens (CJP § 11-402)')], []);
+    }
+    return mods;
+  }
+
+  // Maryland road access: MDOT SHA's road network marks public, private and
+  // limited-access roads statewide (it has route numbers, not street names).
+  const S1_MD_ROAD_LABEL = { IS: n => n ? `I-${n}` : 'an interstate', US: n => n ? `US ${n}` : 'a US route', MD: n => n ? `MD ${n}` : 'a state route', SR: () => 'a state road', CO: () => 'a county road', MU: () => 'a town street', GV: () => 'a government road', OP: () => 'a public road', LL: () => 'a local road', SP: () => 'a spur road', XO: () => 'a crossover', RP: () => 'a ramp', PV: () => 'a private road' };
+  const S1_MD_LOOKUPS = {
+    async roads(pc) {
+      const g = pc.geometry;
+      const feats = await ddLines(GIS.MD_ROADS, "LRS_RETIRE_DATE IS NULL AND PREFIX NOT IN ('RR','BK','XO','DE','PA','DC','VA','WV')", 'PREFIX,RTE_NO', g, DD_ROAD_PAD_M, p => {
+        const pre = trimS(p.PREFIX), n = Number(p.RTE_NO) || null;
+        // MD 200 (the ICC) is a toll freeway; government roads (parks, bases) aren't open frontage.
+        const kind = pre === 'PV' ? 'private' : pre === 'IS' || pre === 'RP' || (pre === 'MD' && n === 200) ? 'limited' : pre === 'GV' ? 'gov' : 'public';
+        return { name: (S1_MD_ROAD_LABEL[pre] || (() => 'a road'))(n), kind, state: pre === 'US' || pre === 'MD' };
+      });
+      const pub = ddNearest(feats.filter(f => f.properties.kind === 'public'), g);
+      const lim = ddNearest(feats.filter(f => f.properties.kind === 'limited'), g);
+      const priv = ddNearest(feats.filter(f => f.properties.kind === 'private'), g);
+      const gov = ddNearest(feats.filter(f => f.properties.kind === 'gov'), g);
+      const touches = pub.ft != null && pub.ft <= DD_FRONT_FT ? true : pub.ft != null && pub.ft <= SCREEN_ROAD_FT ? 'maybe' : false;
+      const stateHwy = touches && /^(US|MD) \d/.test(pub.name || '');
+      const lines = [];
+      if (touches === true) lines.push(`Public road: ${pub.name}, ${ddFt(pub.ft)} (MDOT SHA road network).`);
+      else if (touches === 'maybe') lines.push(`Public road ${pub.name} is ${ddFt(pub.ft)} — probably frontage across a wide right-of-way, but confirm on the plat.`);
+      else if (pub.ft != null && pub.ft <= DD_ROAD_REACH_FT) lines.push(`No public road along the parcel; the nearest, ${pub.name}, is ${ddFt(pub.ft)}.`);
+      else lines.push('No public road within about 1,000 ft of the parcel.');
+      if (lim.ft != null && lim.ft <= DD_FRONT_FT) lines.push(`${ddCap(lim.name)} runs along the parcel — interstates and ramps give no driveway access.`);
+      if (stateHwy) lines.push(`${pub.name} is a state highway — some stretches are limited-access, and a new entrance needs an SHA access permit.`);
+      if (priv.ft != null && priv.ft <= DD_FRONT_FT) lines.push(`Private road ${ddFt(priv.ft)} — access over it needs a recorded easement or road agreement.`);
+      if (gov.ft != null && gov.ft <= DD_FRONT_FT) lines.push(`A government road (park or facility) is ${ddFt(gov.ft)} — it isn't public frontage; ask the agency about access.`);
+      if (touches === false) lines.push('Without public frontage the land needs a recorded access easement across a neighbor — check the deed and plat.');
+      return { lines, touches };
+    },
+  };
+
+  function s1Modules(s, pc) { return isMd(pc.jurisdiction) ? s1ModulesMD(s, pc) : s1ModulesVA(s, pc); }
+
+  function s1Counts(mods) {
+    const c = { found: 0, you: 0, na: 0, pending: 0 };
+    for (const m of mods) for (const l of m.leaves) c[l.st] = (c[l.st] || 0) + 1;
+    return c;
+  }
+  // AJ's checklist marks on the items a module draws on (saved parcels).
+  function s1Marks(s, n) {
+    if (!s || s.unsaved || __dd.listingId !== s.id || !__dd.loaded) return [];
+    return (S1_ITEMS[n] || []).map(id => ({ id, r: ddRow(id) })).filter(x => x.r && (x.r.status !== 'todo' || x.r.note))
+      .map(x => `${x.id} ${x.r.status === 'todo' ? 'note' : DD_STATUS[x.r.status]}${x.r.note ? ` — ${x.r.note}` : ''}`);
+  }
+
+  function s1LeafHtml(l) {
+    return `<div class="fc-s1-leaf is-${l.st}"><span class="fc-s1-mk" title="${{ found: 'Found in public data', you: 'Yours to check', na: 'Not applicable here', pending: 'Checking' }[l.st]}">${S1_MARK[l.st]}</span>
+      <div><span class="fc-s1-lt">${escapeHtml(l.label)}</span>${l.text ? ` <span class="fc-s1-tx">${escapeHtml(l.text)}</span>` : ''}${l.links.length ? ` ${l.links.map(x => `<a target="_blank" rel="noopener" href="${escapeHtml(x.url)}">${escapeHtml(x.label)} ↗</a>`).join(' ')}` : ''}</div></div>`;
+  }
+
+  function renderStage1Panel() {
+    const listEl = document.getElementById('fc-area-list');
+    if (!listEl || __areaPanel !== 'stage1') return;
+    const back = panelBack(__s1.back);
+    if (!__s1.pc) {
+      const msg = __s1.lookupErr === 'error' ? 'County parcel servers did not respond — go back and try again.' : __s1.lookupErr === 'none' ? 'No county parcel at this listing\'s pin.' : null;
+      listEl.innerHTML = back + `<div class="fc-pc">${msg ? `<div class="fc-area-empty">${escapeHtml(msg)}</div>` : skel('Looking up the parcel…')}</div>`;
+      wirePanelBack(listEl);
+      return;
+    }
+    const pc = __s1.pc;
+    const s = __s1.s.unsaved ? __s1.s : (__savedListings.find(x => x.id === __s1.s.id) || __s1.s);
+    const mods = s1Modules(s, pc);
+    const extras = s1Extras(s, pc);
+    const c = s1Counts(mods);
+    const flags = [...mods.filter(m => m.headline).map(m => `${m.n}. ${m.headline}`), ...extras.filter(e => e.flag).map(e => e.lines[0])];
+    const same = listEl.getAttribute('data-s1-for') === s1Key(pc) && !!listEl.querySelector('.fc-s1');
+    const openSet = same ? new Set([...listEl.querySelectorAll('details.fc-s1-mod[open]')].map(d => d.getAttribute('data-mod'))) : null;
+    const scrollY = listEl.scrollTop;
+    const running = __s1.running === s1Key(pc);
+    const loading = pc.loadingDetails || running || !!(pc.build && pc.build.pending);
+    const title = pc.address || (s.unsaved ? '' : listingTitle(s));
+    listEl.innerHTML = back + `<div class="fc-pc fc-s1">
+      <div class="fc-pc-title">Stage 1 pre-screen</div>
+      <div class="fc-pc-sub">${title ? escapeHtml(title) + ' · ' : ''}${escapeHtml(pc.county || '')} · ${fmtAcres(pc.acres)} · PIN <span class="fc-mono">${escapeHtml(pc.pin)}</span></div>
+      <div class="fc-s1-sum"><span><strong>${c.found}</strong> ✓ found</span><span><strong>${c.you}</strong> ✋ yours to check</span><span><strong>${c.na}</strong> — not applicable</span>${loading ? '<span class="fc-pc-dim">Still checking…</span>' : ''}</div>
+      ${flags.length ? `<ul class="fc-s1-flags">${flags.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
+      <div class="fc-pc-links">
+        <button class="fc-btn fc-btn-sm" data-s1="run"${running ? ' disabled' : ''}>${running ? 'Checking…' : 'Run checks again'}</button>
+        <button class="fc-btn fc-btn-sm" data-s1="print">🖨 Report</button>
+        ${s.unsaved ? '' : '<button class="fc-btn fc-btn-sm" data-s1="checklist">📋 Due diligence</button>'}
+      </div>
+      ${pc.failed && !pc.loadingDetails ? `<div class="fc-area-warn">${pc.failed} county lookup${pc.failed === 1 ? '' : 's'} didn't respond, so some answers below are missing. <button class="fc-btn fc-btn-sm" data-s1="retry">Retry county lookups</button></div>` : ''}
+      <div class="fc-pc-note">From county, state and federal public data — a screening aid, not a title search or legal advice. Court, clerk and state business records don't allow automated searches, so those steps are links with the exact search to run.</div>
+      ${mods.map(m => {
+        const tone = DD_TONE[m.tone] || DD_TONE.unknown;
+        const open = openSet ? openSet.has(String(m.n)) : (m.n === 1 || !!m.headline);
+        const marks = s1Marks(s, m.n);
+        return `<details class="fc-dd-stage fc-s1-mod" data-mod="${m.n}"${open ? ' open' : ''}>
+          <summary><span>${m.n}. ${escapeHtml(m.title)}</span><span class="fc-pill ${tone.pill}">${escapeHtml(tone.label)}</span></summary>
+          <div class="fc-s1-leaves">${m.leaves.map(s1LeafHtml).join('')}</div>
+          ${m.lines.length ? `<ul class="fc-dd-find">${m.lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : ''}
+          ${m.links.length ? `<div class="fc-dd-links">${m.links.map(l => `<a target="_blank" rel="noopener" href="${escapeHtml(l.url)}">${escapeHtml(l.label)} ↗</a>`).join('')}</div>` : ''}
+          ${marks.length ? `<div class="fc-s1-marks">Your checklist: ${marks.map(escapeHtml).join(' · ')}</div>` : ''}
+          ${m.skip.length ? `<div class="fc-pc-dim fc-s1-skip">Mind-map sources for other places: ${escapeHtml(m.skip.join(' · '))}</div>` : ''}
+        </details>`;
+      }).join('')}
+      <h4>Also worth knowing</h4>
+      ${extras.map(e => `<div class="fc-s1-extra"><b>${escapeHtml(e.title)}</b><ul class="fc-dd-find">${e.lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></div>`).join('')}
+    </div>`;
+    listEl.setAttribute('data-s1-for', s1Key(pc));
+    listEl.scrollTop = same ? scrollY : 0;
+    wirePanelBack(listEl);
+    listEl.querySelector('[data-s1="run"]').addEventListener('click', () => s1RunChecks());
+    listEl.querySelector('[data-s1="print"]').addEventListener('click', () => printPages(s1ReportHtml(s, pc), 'size: letter; margin: 0.5in 0.55in;'));
+    const cl = listEl.querySelector('[data-s1="checklist"]');
+    if (cl) cl.addEventListener('click', () => openDiligence(s.id, __s1.back === 'diligence' ? (__dd.back === 'stage1' ? 'listing' : __dd.back) : 'stage1'));
+    const retry = listEl.querySelector('[data-s1="retry"]');
+    if (retry) retry.addEventListener('click', () => s1Retry(s, pc));
+  }
+
+  // Re-run the county lookups behind the report: a saved listing drops its
+  // cached parcel; a map card looks the parcel up again by PIN.
+  function s1Retry(s, pc) {
+    const back = __s1.back;
+    if (!s.unsaved && __listingParcel && __listingParcel.pc === pc) {
+      __listingParcel = null;
+      openStage1ForListing(s, back);
+      return;
+    }
+    const v = __parcelView;
+    inspectParcelAt(pc.lat, pc.lng, { back: v && v.pc === pc ? v.back : 'saved', pin: pc.pin, jurisdiction: pc.jurisdiction })
+      .then(np => { if (np && !np.noParcel && __areaPanel === 'parcel') openStage1(np, 'parcel'); });
+  }
+
+  function s1ReportHtml(s, pc) {
+    const mods = s1Modules(s, pc);
+    const extras = s1Extras(s, pc);
+    const c = s1Counts(mods);
+    const flags = [...mods.filter(m => m.headline).map(m => `${m.n}. ${m.headline}`), ...extras.filter(e => e.flag).map(e => e.lines[0])];
+    return `<div class="fc-ddr">
+      <div class="fc-ddr-top">NESTSCOOP — STAGE 1 PRE-SCREENING MODULES &amp; PUBLIC RECORD LOOKUPS</div>
+      <h1>Stage 1 pre-screen</h1>
+      <div class="fc-ddr-meta">
+        <div><b>Parcel ID</b>${escapeHtml(pc.pin || '—')}</div>
+        <div><b>Jurisdiction</b>${escapeHtml(pc.state || 'VA')} — ${escapeHtml(pc.county || '')}</div>
+        <div><b>Owner of record</b>${escapeHtml(pc.ownerHidden ? 'Withheld by the county' : pc.owner || (pc.ownerUnknown ? 'Not in free records (SDAT)' : '—'))}</div>
+        <div><b>Run on</b>${escapeHtml(fmtDay(todayIso()))}</div>
+      </div>
+      <div class="fc-ddr-sub">${escapeHtml([pc.address || (s.unsaved ? '' : listingTitle(s)), fmtAcres(pc.acres), `${c.found} found`, `${c.you} to check by hand`, `${c.na} not applicable`].filter(Boolean).join(' · '))}</div>
+      ${flags.length ? `<div class="fc-ddr-n">${flags.map(escapeHtml).join('<br>')}</div>` : ''}
+      ${pc.loadingDetails || c.pending ? '<div class="fc-ddr-n">Some county data was still loading when this was printed.</div>' : ''}
+      ${mods.map(m => `<div class="fc-ddr-stage">${m.n}. ${escapeHtml(m.title)} — ${escapeHtml((DD_TONE[m.tone] || DD_TONE.unknown).label)}</div>
+        ${m.leaves.map(l => `<div class="fc-ddr-item"><div class="fc-ddr-box">${S1_MARK[l.st]}</div><div><div class="fc-ddr-t">${escapeHtml(l.label)}</div>${l.text ? `<div class="fc-ddr-f">${escapeHtml(l.text)}</div>` : ''}</div></div>`).join('')}
+        ${m.lines.length ? `<div class="fc-ddr-f fc-s1r-lines">${m.lines.map(escapeHtml).join('<br>')}</div>` : ''}
+        ${s1Marks(s, m.n).map(t => `<div class="fc-ddr-n">Checklist: ${escapeHtml(t)}</div>`).join('')}`).join('')}
+      <div class="fc-ddr-stage">Also worth knowing</div>
+      ${extras.map(e => `<div class="fc-ddr-item"><div class="fc-ddr-box"></div><div><div class="fc-ddr-t">${escapeHtml(e.title)}</div><div class="fc-ddr-f">${e.lines.map(escapeHtml).join('<br>')}</div></div></div>`).join('')}
+      <div class="fc-ddr-foot">✓ found in public data · ✋ check by hand · — not applicable. A screening aid from public data, not a title search, survey or legal advice.</div>
+    </div>`;
+  }
+
   // ─── Panel plumbing ────────────────────────────────────────────────────
   function panelBack(to) {
-    const label = { results: 'Radius results', find: 'Find land results', saved: 'Saved listings', listing: 'Back to listing', diligence: 'Due diligence' }[to] || 'Back';
+    const label = { results: 'Radius results', find: 'Find land results', saved: 'Saved listings', listing: 'Back to listing', diligence: 'Due diligence', parcel: 'Back to parcel', stage1: 'Stage 1 report' }[to] || 'Back';
     return `<button class="fc-area-back" data-back="${to}">← ${label}</button>`;
   }
   function wirePanelBack(el) {
@@ -8463,6 +9489,15 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     else if (name === 'find') renderFindPanel();
     else if (name === 'letters') renderLettersPanel();
     else if (name === 'diligence') renderDiligencePanel();
+    else if (name === 'stage1') renderStage1Panel();
+    else if (name === 'parcel') {
+      // Back from Stage 1 to the parcel card it was opened from.
+      const v = __parcelView, el = document.getElementById('fc-area-list');
+      if (!v || !el) { showAreaPanel('saved'); return; }
+      el.innerHTML = panelBack(v.back) + renderParcelCard(v.pc, {});
+      wireParcelCard(el, v.pc);
+      drawParcelHighlight(v.pc.geometry);
+    }
   }
 
   function setAreaMode(mode) {
@@ -12686,6 +13721,25 @@ Return ONLY the 2-sentence analysis.`,
   .fc-ddr-f { color: #333; }
   .fc-ddr-n { color: #111; font-style: italic; }
   .fc-ddr-foot { margin-top: 10px; font-size: 8pt; color: #666; }
+  /* Stage 1 report */
+  .fc-s1-sum { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); margin: 6px 0 2px; }
+  .fc-s1-sum strong { color: var(--ink); }
+  .fc-s1-flags { margin: 8px 0 4px; padding: 8px 10px 8px 26px; background: var(--coral-soft); border-radius: 6px; font-size: 12px; line-height: 1.45; color: var(--ink); }
+  .fc-s1-flags li { margin: 2px 0; }
+  .fc-s1-leaves { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
+  .fc-s1-leaf { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; font-size: 12px; line-height: 1.45; padding: 4px 6px; border-radius: 6px; background: var(--paper); border: 1px solid var(--hair); }
+  .fc-s1-leaf.is-na { opacity: 0.65; }
+  .fc-s1-leaf a { color: var(--sky); text-decoration: none; white-space: nowrap; }
+  .fc-s1-mk { font-weight: 700; text-align: center; }
+  .fc-s1-leaf.is-found .fc-s1-mk { color: var(--sage); }
+  .fc-s1-leaf.is-you .fc-s1-mk { color: var(--gold-ink); }
+  .fc-s1-lt { font-weight: 600; color: var(--ink); }
+  .fc-s1-tx { color: var(--ink); overflow-wrap: anywhere; }
+  .fc-s1-marks { margin-top: 6px; font-size: 12px; color: var(--ink); background: var(--sage-soft); border-radius: 6px; padding: 5px 8px; }
+  .fc-s1-skip { margin: 6px 0 4px; font-size: 11px; }
+  .fc-s1-extra { margin: 4px 0 8px; font-size: 12px; }
+  .fc-s1-extra b { color: var(--ink); }
+  .fc-s1r-lines { margin: 2px 0 4px 0.45in; font-size: 8.5pt; color: #444; }
 
   @media (max-width: 768px) {
     body.fc-on-area-focus .fc-page-head { display: none; }
