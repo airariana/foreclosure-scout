@@ -3898,6 +3898,7 @@
   let __areaGisData = []; // [{cfg, fc, bboxes}]
   let __parcelLayer = null;
   let __parcelHighlight = null;
+  let __baseOsm = null, __baseSat = null;
   let __parcelReqSeq = 0;
   let __inspectSeq = 0;
   let __savedLayer = null;
@@ -4115,7 +4116,7 @@
     });
     if (__parcelLayer) overlays['Parcel lines (zoom in)'] = __parcelLayer;
     if (__savedLayer) overlays['My saved listings'] = __savedLayer;
-    L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(__areaMap);
+    L.control.layers(__baseOsm && __baseSat ? { 'Street map': __baseOsm, 'Satellite': __baseSat } : null, overlays, { collapsed: true, position: 'topright' }).addTo(__areaMap);
     return __areaGisData;
   }
 
@@ -5186,7 +5187,7 @@
     const m = pc.mail;
     if (pc.ownerHidden || !m || !(m.line1 || m.city)) return '';
     const cityLine = [m.city, [m.state, m.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    return kv('Owner mailing address', escapeHtml(m.line1 || '') + (cityLine ? '<br>' + escapeHtml(cityLine) : ''));
+    return helpKv('mail', 'Owner mailing address', escapeHtml(m.line1 || '') + (cityLine ? '<br>' + escapeHtml(cityLine) : ''), mailHelp());
   }
 
   function kv(label, valueHtml) {
@@ -5204,10 +5205,172 @@
       const a = mdAcct(pc.pin);
       links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx" title="${escapeHtml(pc.county || '')} County · district ${escapeHtml(a.district)} · account ${escapeHtml(a.account)}">SDAT record ↗</a>`);
     }
-    if (isFinite(pc.lat) && isFinite(pc.lng)) {
-      links.push(`<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/@${pc.lat.toFixed(6)},${pc.lng.toFixed(6)},400m/data=!3m1!1e3">Satellite ↗</a>`);
-    }
     return links.join('');
+  }
+
+  // ─── Seeing the parcel: satellite on this map + outside imagery ────────
+  function parcelLineStyle(sat) {
+    return sat ? { color: '#ffe08a', weight: 1.1, opacity: 0.9, fill: false } : { color: '#5b4a2f', weight: 0.9, opacity: 0.75, fill: false };
+  }
+  function onBasemapChanged(sat) {
+    try { localStorage.setItem('fc_area_base', sat ? 'sat' : 'map'); } catch (e) {}
+    if (__parcelLayer) { __parcelLayer.options.style = parcelLineStyle(sat); __parcelLayer.setStyle(parcelLineStyle(sat)); }
+  }
+  function setBasemap(sat) {
+    if (!__areaMap || !__baseOsm || !__baseSat) return;
+    const on = sat ? __baseSat : __baseOsm, off = sat ? __baseOsm : __baseSat;
+    if (__areaMap.hasLayer(off)) __areaMap.removeLayer(off);
+    if (!__areaMap.hasLayer(on)) on.addTo(__areaMap);
+    onBasemapChanged(sat);
+  }
+  // Center for outside links: a point inside the parcel when we have its outline.
+  function parcelViewPoint(pc) {
+    const lp = pc.geometry ? screenLabelPoint(pc.geometry) : null;
+    if (lp && isFinite(lp.lat) && isFinite(lp.lng)) return lp;
+    return isFinite(pc.lat) && isFinite(pc.lng) ? { lat: pc.lat, lng: pc.lng } : null;
+  }
+  function seeItHtml(pc, o) {
+    const p = parcelViewPoint(pc);
+    if (!p) return '';
+    const lat = p.lat.toFixed(6), lng = p.lng.toFixed(6);
+    const a = (href, text, title) => `<a class="fc-btn fc-btn-sm" target="_blank" rel="noopener" href="${href}" title="${escapeHtml(title)}">${text}</a>`;
+    const btns = [];
+    if (!(o && o.embedded) && __areaMap && __baseSat) btns.push('<button type="button" class="fc-btn fc-btn-sm fc-btn-dark" data-act="sat-map" title="Switch this map to satellite and zoom to the parcel">🛰 Satellite on this map</button>');
+    btns.push(a(`https://www.google.com/maps/@?api=1&amp;map_action=map&amp;center=${lat}%2C${lng}&amp;zoom=18&amp;basemap=satellite`, 'Google satellite ↗', 'Google Maps satellite view centered on the parcel'));
+    btns.push(a(`https://earth.google.com/web/@${lat},${lng},150a,600d,35y,0h,45t,0r`, 'Google Earth 3D ↗', 'Tilted 3D view. Google Earth also has older imagery (clock icon) to see how the land has changed.'));
+    btns.push(a(`https://www.google.com/maps/search/?api=1&amp;query=${lat}%2C${lng}`, 'Pin + Street View ↗', 'Google Maps pin on the parcel. Drag the Street View figure onto the nearest road to see the frontage.'));
+    btns.push(a(`https://www.bing.com/maps?cp=${lat}~${lng}&amp;lvl=18&amp;style=a`, 'Bing aerial ↗', 'A second aerial photo, often taken on a different date'));
+    return `<div class="fc-pc-see">${btns.join('')}</div>`;
+  }
+
+  // ─── What each card row means (ⓘ per row; "Explain this card" shows all) ──
+  let __pcExplainAll = false;
+  try { __pcExplainAll = localStorage.getItem('fc_pc_explain') === '1'; } catch (e) {}
+  const __pcHelpOpen = new Set();
+  function helpKv(key, label, valueHtml, help) {
+    if (!help) return kv(label, valueHtml);
+    const open = __pcExplainAll || __pcHelpOpen.has(key);
+    return `<div class="fc-pc-row"><span>${escapeHtml(label)}<button type="button" class="fc-pc-i" data-help="${escapeHtml(key)}" aria-expanded="${open}" title="What this means">ⓘ</button></span><span>${valueHtml}</span></div>` +
+      `<div class="fc-pc-help${open ? ' open' : ''}" data-help-for="${escapeHtml(key)}">${help}</div>`;
+  }
+  function helpBlock(key, help) {
+    if (!help) return '';
+    const open = __pcExplainAll || __pcHelpOpen.has(key);
+    return `<div class="fc-pc-help${open ? ' open' : ''}" data-help-for="${escapeHtml(key)}">${help}</div>`;
+  }
+  // One delegated listener per container: the card re-renders into the same element many times.
+  function wireCardHelp(el) {
+    if (!el || el.__fcHelpWired) return;
+    el.__fcHelpWired = true;
+    el.addEventListener('click', ev => {
+      const t = ev.target.closest && ev.target.closest('[data-help], [data-act="explain-all"]');
+      if (!t || !el.contains(t)) return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (t.getAttribute('data-act') === 'explain-all') {
+        __pcExplainAll = !__pcExplainAll;
+        try { localStorage.setItem('fc_pc_explain', __pcExplainAll ? '1' : '0'); } catch (e) {}
+        if (!__pcExplainAll) __pcHelpOpen.clear();
+        el.querySelectorAll('.fc-pc-help').forEach(h => h.classList.toggle('open', __pcExplainAll));
+        el.querySelectorAll('.fc-pc-i').forEach(b => b.setAttribute('aria-expanded', String(__pcExplainAll)));
+        el.querySelectorAll('[data-act="explain-all"]').forEach(b => { b.textContent = __pcExplainAll ? 'Hide explanations' : 'ⓘ Explain this card'; });
+        return;
+      }
+      const key = t.getAttribute('data-help');
+      const box = [...el.querySelectorAll('.fc-pc-help')].find(h => h.getAttribute('data-help-for') === key);
+      if (!box) return;
+      const open = !box.classList.contains('open');
+      box.classList.toggle('open', open);
+      t.setAttribute('aria-expanded', String(open));
+      if (open) __pcHelpOpen.add(key); else __pcHelpOpen.delete(key);
+    });
+  }
+
+  // County-aware explanations. Facts and their sources:
+  // nestscoop/research/2026-11-22-topic1-buildability.md and the 11/22 field-guide notes.
+  function zoningHelp(pc) {
+    const z = String(pc.zoningCode || '').toUpperCase().replace(/\s+/g, '');
+    const j = pc.jurisdiction;
+    if (j === 'loudoun' && /^AR-?1$/.test(z)) return 'Agricultural Rural-1. A new lot needs 20 acres (or 5 acres per lot in a cluster on a tract of 20+ acres). A smaller lot that already exists can still have a house, but it cannot be split.';
+    if (j === 'loudoun' && /^AR-?2$/.test(z)) return 'Agricultural Rural-2. A new lot needs 40 acres (15 acres per lot in a cluster on 40+ acres). A smaller existing lot can still have a house, but it cannot be split.';
+    if (j === 'fauquier' && /^(RA|RC)$/.test(z)) return 'Rural zone with a sliding scale: how many lots a tract can make depends on its size on May 21, 1981 (under 10 acres = 1 lot, so no split). A Subdivision Potential letter from the county is the binding answer.';
+    if (j === 'frederick' && (z === 'A' || /AGRIC/i.test(String(pc.zoningName || '')))) return 'Agricultural. A parcel that existed by Aug 18, 1976 may create up to 3 lots plus the remainder, each at least 40,000 sq ft with public-road frontage, if those rights haven\'t been used.';
+    if (j === 'washington' && /^A\(?R\)?$/.test(z)) return 'Agricultural (Rural): 1 home per 5 acres. A parcel of record on Oct 29, 2002 may create up to 3 lots (each at least 40,000 sq ft).';
+    if (j === 'washington' && /^P$/.test(z)) return 'Preservation: 1 home per 30 acres. A parcel of record on Oct 29, 2002 may still create up to 3 lots (each at least 40,000 sq ft).';
+    if (j === 'montgomery' && /^AR$/.test(z)) return 'Agricultural Reserve: 1 home per 25 acres. New lots are rare; a smaller lot that already exists is what you would buy.';
+    return 'The county\'s zoning district. It decides whether a house is allowed and whether the land can be split.';
+  }
+  function floodHelp(pc) {
+    const f = pc.flood || {};
+    const where = 'This is FEMA\'s zone at the spot you tapped. Tap Check buildability below for how much of the whole parcel is floodplain.';
+    if (f.sfha) {
+      const rule = pc.jurisdiction === 'loudoun'
+        ? 'In Loudoun the 100-year floodplain is the Floodplain Overlay District: a new house is not among the uses allowed in it, and an existing house can be repaired without enlarging its footprint there.'
+        : 'Counties restrict building in the 100-year floodplain; plan the house, well and septic outside it.';
+      return `${escapeHtml(f.zone)} is the 1%-a-year ("100-year") floodplain. ${rule} A house in this zone with a federally backed mortgage needs flood insurance. ${where}`;
+    }
+    if (f.zone) return `${escapeHtml(f.zone)} is outside FEMA's 100-year floodplain. ${where}`;
+    return 'FEMA flood zone at the spot you tapped. AE or A means the 100-year floodplain; X means minimal flood hazard.';
+  }
+  function waterHelp(pc) {
+    const base = 'Streams, rivers and ponds from OpenStreetMap, measured from the parcel line. Water on the lot is a plus for enjoyment and value, but it brings stream buffers and often floodplain, which shrink where a house and septic can go.';
+    if (pc.jurisdiction === 'loudoun') return base + ' Loudoun keeps a no-build buffer along streams: at least 100 ft, and 300 ft along Goose Creek, Catoctin Creek, the Potomac, Bull Run and Broad Run (county GIS layer).';
+    if (pc.jurisdiction === 'montgomery') return base + ' Montgomery asks for 100 to 200 ft stream buffers when land goes through plan review.';
+    return base + ' Check the county\'s stream buffer before counting on that part of the lot.';
+  }
+  function soilsHelp() {
+    return 'USDA soil survey for the spot you tapped. "Septic: Not / Somewhat / Very limited" is USDA\'s general rating for a standard drainfield. It screens land; it does not decide. Only the health department\'s soil evaluation or perc test does, and a lot with an approved perc is worth more than one without.';
+  }
+  function elevHelp(pc) {
+    return `Ground height and slope at the tapped spot (USGS). Slopes over ${BUILD_SLOPE_MAX}% make a house and drainfield harder to place${pc.jurisdiction === 'loudoun' ? '; Loudoun does not allow drainfields on slopes over 25%' : ''}. Check buildability below measures slope across the whole parcel.`;
+  }
+  function ownerHelp(pc) {
+    const o = String(pc.owner || '');
+    let t = 'Who is on the deed, per the county. Everyone listed must sign a sale.';
+    if (/\bTR\b|\bTRS\b|TRUSTEE|\bTRUST\b/i.test(o)) t += ' "TR" means trustee: the land is held in a trust, so the trustees sign and the trust agreement decides who can sell.';
+    if (screenIsEstate(o)) t += ' An estate or heirs: the personal representative or every heir must sign. Stage 1 lays out who.';
+    if (isMd(pc.jurisdiction) && !o) t += ' Maryland\'s free data has no owner names; SDAT shows them.';
+    return t;
+  }
+  function assessedHelp(pc) {
+    if (isMd(pc.jurisdiction)) return 'Maryland\'s (SDAT) assessed value. Maryland revalues each property every three years and phases increases in, so it can lag the market. Use it as a rough guide, not a price.';
+    return 'The county\'s value as of January 1. Virginia law sets assessments at 100% of fair market value, split into land and building. Use it as a rough guide: rural land often sells above or below it.';
+  }
+  function perAcreHelp(pc, pa) {
+    let t = 'Assessed value divided by acres. ';
+    if (pa && /^Land value/.test(pa.label)) t += 'With a house on it, only the land part counts. ';
+    return t + 'Small lots carry a higher per-acre value than big tracts because each comes with a home site, so compare it with lots of a similar size.';
+  }
+  function saleHelp(pc) {
+    let t = 'Date and price on the last recorded deed. A "$0 non-market transfer" means no money changed hands: a move into the owner\'s own trust, a gift, or passing to heirs. It is not a price to compare against.';
+    if (pc.sale && pc.sale.nonMarket && /\bTR\b|TRUST/i.test(String(pc.owner || ''))) t += ' Here the land went into a trust, so the family may have owned it long before this date. Stage 1 shows the deed history.';
+    return t;
+  }
+  const ownerSinceHelp = () => 'Date of the current owner\'s deed. After a transfer into a trust or to heirs this can be much later than when the family first bought the land.';
+  const mailHelp = () => 'Where the tax bill goes, and where your letter should go. An address in another state or country usually means the owner doesn\'t live on or near the land, one of the signs an owner may sell.';
+  const trendHelp = () => 'How much the total assessment moved over these years. It reflects the market and any building work.';
+  const landUseHelp = () => 'How the county classifies the current use. "Single-family detached" or a year built means there is a house, so the price includes a building. For raw land look for vacant or agricultural uses.';
+  const rezoningHelp = pc => pc.jurisdiction === 'loudoun'
+    ? 'A rezoning case on file for this spot. Cases dated 2006 (such as ZMAP-2005-0042) are the county\'s rezoning of the rural west to AR-1 and AR-2, not a sign of new growth. Only cases from the last 10 years count as a growth signal.'
+    : 'A rezoning case on file for this spot. Only cases from the last 10 years count as a growth signal.';
+  const easementHelp = () => 'A conservation easement limits building and splitting, usually for good. Read the deed of easement before making an offer.';
+  const delinquentHelp = () => 'Unpaid property tax. Two or more missed installments can point to an owner under pressure. Stage 1 shows when a tax sale could happen.';
+  // The tags under the title, explained only for the tags this parcel has.
+  function flagsHelp(pc) {
+    const out = [];
+    const ov = pc.overlays || {};
+    if (pc.easement || ov.easementSpatial) out.push('<b>Conservation easement</b>: building and splitting are limited by a recorded easement.');
+    if (pc.flood && pc.flood.zone) out.push(`<b>Flood zone ${escapeHtml(pc.flood.zone)}</b>: ${pc.flood.sfha ? 'FEMA 100-year floodplain' : 'outside the 100-year floodplain'} at the spot you tapped.`);
+    if (pc.water && pc.water.ft != null && pc.water.ft <= 1000) out.push(`<b>Water</b>: ${pc.water.ft === 0 ? 'a mapped stream or pond touches the parcel' : 'distance from the parcel line to mapped water'}.`);
+    if (!pc.ownerHidden && screenIsEstate(pc.owner)) out.push('<b>Estate / heirs</b>: the owner name points to an estate or heirs; several people may need to sign.');
+    if (!pc.ownerHidden && screenAwayLabel(pc.mail, pc.state)) out.push('<b>Owner in another state</b>: tax bills go out of state, so the owner likely doesn\'t live here.');
+    if (pc.ownerSinceIso && pc.ownerSinceIso < screenHeldCutoff()) out.push(`<b>Owned since</b>: the same owner for ${SCREEN_HELD_YEARS}+ years, one of the Find land seller signals.`);
+    if (ov.growth) out.push('<b>Growth area</b>: the county plans more development here, which can raise land value.');
+    if (ov.transition) out.push('<b>Transition policy area</b>: Loudoun\'s band between suburban east and rural west, with its own density rules.');
+    if ((ov.rezoningOn && ov.rezoningOn.some(r => r.recent)) || ov.rezoningNear) out.push('<b>Rezoning</b>: a rezoning case from the last 10 years on or near this spot.');
+    if (pc.delinquent) out.push('<b>Taxes past due</b>: property tax is unpaid.');
+    if (isMd(pc.jurisdiction) && mdTaxState(pc).state && /sold|listed|paid/.test(mdTaxState(pc).state)) out.push('<b>Tax sale</b>: this account was on Maryland\'s tax-sale list; Stage 1 shows the redemption timing.');
+    if (pc.vacant && !pc.hasStruct && !(pc.assessed && pc.assessed.building > 0)) out.push('<b>Vacant land</b>: no building on record.');
+    return out.length ? out.join('<br>') : '';
   }
 
   function renderParcelCard(pc, o) {
@@ -5243,6 +5406,7 @@
         <div class="fc-pc-title">${pc.noParcel === 'error' ? 'County parcel servers did not respond' : 'No county parcel here'}</div>
         <div class="fc-pc-sub">${pc.noParcel === 'error' ? 'Try again in a moment.' : 'This spot is outside the parcel coverage (Loudoun and Fauquier, VA; Frederick, Washington and Montgomery, MD).'}</div>
         ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}</div>` : ''}
+        ${seeItHtml(pc, o)}
         ${renderSiteSection(pc)}
         <div class="fc-pc-links">${parcelLinks(pc)}</div>
       </div>`;
@@ -5289,7 +5453,7 @@
     let perAcre = '';
     const valueForAcre = a && (a.marketTotal != null ? a.marketTotal : a.total);
     const pa = perAcreBasis(pc);
-    if (pa) perAcre = kv(pa.label, fmtMoney(pa.value));
+    if (pa) perAcre = helpKv('peracre', pa.label, fmtMoney(pa.value), perAcreHelp(pc, pa));
 
     let trend = '';
     const hist = (pc.assessHistory || []).filter(h => h.total != null).sort((p, q) => p.year - q.year);
@@ -5298,7 +5462,7 @@
       const last = hist[hist.length - 1];
       if (first.total > 0) {
         const pct = (last.total - first.total) / first.total * 100;
-        trend = kv(`Change ${first.year}→${last.year}`, `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`);
+        trend = helpKv('trend', `Change ${first.year}→${last.year}`, `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`, trendHelp());
       }
     }
 
@@ -5329,41 +5493,43 @@
     let rezoningHtml = '';
     if (ov.rezoningOn && ov.rezoningOn.length) {
       const cases = ov.rezoningOn.slice().sort((p, q) => (q.year || 0) - (p.year || 0)).slice(0, 3);
-      rezoningHtml = kv('Rezoning case', cases.map(r => escapeHtml([r.id || (r.year ? String(r.year) : 'Case'), r.zone && ('→ ' + r.zone), r.status && ('· ' + r.status)].filter(Boolean).join(' '))).join('<br>') +
-        (cases.some(r => r.recent) ? '' : '<div class="fc-pc-dim">Older case — not a current growth signal.</div>'));
+      rezoningHtml = helpKv('rezoning', 'Rezoning case', cases.map(r => escapeHtml([r.id || (r.year ? String(r.year) : 'Case'), r.zone && ('→ ' + r.zone), r.status && ('· ' + r.status)].filter(Boolean).join(' '))).join('<br>') +
+        (cases.some(r => r.recent) ? '' : '<div class="fc-pc-dim">Older case — not a current growth signal.</div>'), rezoningHelp(pc));
     } else if (pc.landApplication) rezoningHtml = kv('Land application', escapeHtml(pc.landApplication));
 
     let easementHtml = '';
     if (pc.easement) {
-      easementHtml = kv('Easement', escapeHtml([pc.easement.holder, pc.easement.type, pc.easement.kind].filter(Boolean).join(' · ') || 'On record') +
-        '<div class="fc-pc-dim">Development is restricted by the deed of easement.</div>');
+      easementHtml = helpKv('easement', 'Easement', escapeHtml([pc.easement.holder, pc.easement.type, pc.easement.kind].filter(Boolean).join(' · ') || 'On record') +
+        '<div class="fc-pc-dim">Development is restricted by the deed of easement.</div>', easementHelp());
     } else if (ov.easementSpatial) {
-      easementHtml = kv('Easement', 'This spot is inside a mapped easement<div class="fc-pc-dim">May cover only part of the parcel.</div>');
+      easementHtml = helpKv('easement', 'Easement', 'This spot is inside a mapped easement<div class="fc-pc-dim">May cover only part of the parcel.</div>', easementHelp());
     }
 
-    const delinquentHtml = pc.delinquent ? kv('Taxes past due', escapeHtml([pc.delinquent.days != null ? fmtOverdue(pc.delinquent.days) : null, pc.delinquent.balance != null ? fmtMoney(pc.delinquent.balance) : null].filter(Boolean).join(' · ')) +
-      (pc.delinquent.serious ? '<div class="fc-pc-dim">Two or more missed installments — a possible motivated seller.</div>' : '')) : '';
+    const delinquentHtml = pc.delinquent ? helpKv('delinquent', 'Taxes past due', escapeHtml([pc.delinquent.days != null ? fmtOverdue(pc.delinquent.days) : null, pc.delinquent.balance != null ? fmtMoney(pc.delinquent.balance) : null].filter(Boolean).join(' · ')) +
+      (pc.delinquent.serious ? '<div class="fc-pc-dim">Two or more missed installments — a possible motivated seller.</div>' : ''), delinquentHelp()) : '';
 
     return `<div class="fc-pc">
       ${pc.pinNote ? `<div class="fc-area-warn">${escapeHtml(pc.pinNote)}</div>` : ''}
       ${mismatchHtml}
       <div class="fc-pc-title">${escapeHtml(title)}</div>
       <div class="fc-pc-sub">${escapeHtml(pc.county)} County · ${fmtAcres(pc.acres)} · PIN <span class="fc-mono">${escapeHtml(pc.pin)}</span>
-        <button class="fc-pc-copy" data-act="copy-pin" title="Copy PIN">⧉</button></div>
-      ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}</div>` : ''}
+        <button class="fc-pc-copy" data-act="copy-pin" title="Copy PIN">⧉</button>
+        <button type="button" class="fc-pc-explain" data-act="explain-all">${__pcExplainAll ? 'Hide explanations' : 'ⓘ Explain this card'}</button></div>
+      ${flags.length ? `<div class="fc-pc-flags">${flags.join('')}${flagsHelp(pc) ? '<button type="button" class="fc-pc-i" data-help="flags" title="What these tags mean">ⓘ</button>' : ''}</div>${helpBlock('flags', flagsHelp(pc))}` : ''}
+      ${seeItHtml(pc, o)}
       <h4>Ownership &amp; value</h4>
-      ${kv('Owner', ownerHtml)}
-      ${kv(useProgram ? 'Assessed market value' : (a && a.year ? `Assessed (${a.year})` : 'Assessed'), assessedHtml)}
+      ${helpKv('owner', 'Owner', ownerHtml, ownerHelp(pc))}
+      ${helpKv('assessed', useProgram ? 'Assessed market value' : (a && a.year ? `Assessed (${a.year})` : 'Assessed'), assessedHtml, assessedHelp(pc))}
       ${useProgram ? kv('Taxed on (land use)', fmtMoney(a.total) + '<div class="fc-pc-dim">In the land-use (ag/forestal) tax program. Rollback taxes can apply if the use changes.</div>') : ''}
       ${a && a.landUseValue ? kv('Land-use value', fmtMoney(a.landUseValue)) : ''}
       ${perAcre}${trend}
-      ${kv('Last sale', saleHtml)}
-      ${pc.ownerSince ? kv('Current owner since', escapeHtml(pc.ownerSince)) : ''}
+      ${helpKv('sale', 'Last sale', saleHtml, saleHelp(pc))}
+      ${pc.ownerSince ? helpKv('since', 'Current owner since', escapeHtml(pc.ownerSince), ownerSinceHelp()) : ''}
       ${mailingHtml(pc)}
       ${delinquentHtml}
       <h4>Zoning &amp; use</h4>
-      ${kv('Zoning', zoningHtml)}
-      ${kv('Land use', pc.landUse ? escapeHtml(pc.landUse) : (loading ? skel() : '—'))}
+      ${helpKv('zoning', 'Zoning', zoningHtml, pc.zoningCode ? zoningHelp(pc) : '')}
+      ${helpKv('landuse', 'Land use', pc.landUse ? escapeHtml(pc.landUse) : (loading ? skel() : '—'), pc.landUse ? landUseHelp() : '')}
       ${pc.yearBuilt ? kv('Year built', String(pc.yearBuilt)) : ''}
       ${rezoningHtml}${easementHtml}
       ${renderSiteSection(pc)}
@@ -5407,11 +5573,11 @@
       }
     }
     return `<h4>Site</h4>
-      ${kv('Water', waterHtml)}
-      ${kv('Flood', floodHtml)}
-      ${kv('Elevation', elevHtml)}
-      ${kv('Soils', soilHtml)}
-      <div class="fc-pc-note">Soil ratings are a screening tool. A septic permit needs a health-department site evaluation.</div>`;
+      ${helpKv('water', 'Water', waterHtml, waterHelp(pc))}
+      ${helpKv('flood', 'Flood (tapped spot)', floodHtml, floodHelp(pc))}
+      ${helpKv('elev', 'Elevation (tapped spot)', elevHtml, elevHelp(pc))}
+      ${helpKv('soils', 'Soils (tapped spot)', soilHtml, soilsHelp())}
+      <div class="fc-pc-note">Flood, elevation and soils are read at the spot you tapped. Check buildability below covers the whole parcel. Soil ratings are a screening tool; a septic permit needs a health-department site evaluation.</div>`;
   }
 
   function wireParcelCard(el, pc) {
@@ -5425,6 +5591,15 @@
     }));
     el.querySelectorAll('[data-act="connect"]').forEach(b => b.addEventListener('click', () => { setView('settings'); }));
     el.querySelectorAll('[data-act="stage1"]').forEach(b => b.addEventListener('click', () => openStage1(pc, 'parcel')));
+    el.querySelectorAll('[data-act="sat-map"]').forEach(b => b.addEventListener('click', () => {
+      setBasemap(true);
+      if (!__areaMap) return;
+      if (pc.geometry) {
+        try { __areaMap.fitBounds(L.geoJSON(pc.geometry).getBounds(), { maxZoom: 18, padding: [30, 30] }); return; } catch (e) {}
+      }
+      if (isFinite(pc.lat) && isFinite(pc.lng)) __areaMap.setView([pc.lat, pc.lng], 18);
+    }));
+    wireCardHelp(el);
     wireBuildValue(el, pc);
     el.querySelectorAll('[data-act="save-parcel"], [data-act="open-saved"]').forEach(b => b.addEventListener('click', () => {
       if (b.getAttribute('data-act') === 'open-saved' && pc.savedId) { drawParcelHighlight(null); openListing(pc.savedId); return; }
@@ -9590,14 +9765,23 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     // Debug / scripted helpers: window.fcAreaDrop(lat, lng) fires a map click.
     window.__fcAreaMap = __areaMap;
     window.fcAreaDrop = (lat, lng) => __areaMap.fire('click', { latlng: L.latLng(lat, lng) });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(__areaMap);
+    // Base maps: street map, or Esri World Imagery with road lines on top.
+    __baseOsm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' });
+    __baseSat = L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics and the GIS User Community' }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.75 }),
+    ]);
+    let savedBase = '';
+    try { savedBase = localStorage.getItem('fc_area_base') || ''; } catch (e) {}
+    (savedBase === 'sat' ? __baseSat : __baseOsm).addTo(__areaMap);
+    __areaMap.on('baselayerchange', e => onBasemapChanged(e.layer === __baseSat));
 
     const hint = document.createElement('div');
     hint.id = 'fc-area-zoomhint';
     hint.className = 'fc-area-zoomhint';
     mapEl.appendChild(hint);
 
-    __parcelLayer = L.geoJSON(null, { style: { color: '#5b4a2f', weight: 0.9, opacity: 0.75, fill: false }, interactive: false }).addTo(__areaMap);
+    __parcelLayer = L.geoJSON(null, { style: parcelLineStyle(__areaMap.hasLayer(__baseSat)), interactive: false }).addTo(__areaMap);
     __areaListingLayer = L.layerGroup().addTo(__areaMap);
     __savedLayer = L.layerGroup().addTo(__areaMap);
 
@@ -13602,6 +13786,13 @@ Return ONLY the 2-sentence analysis.`,
   .fc-pc-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
   .fc-pc-note:empty { display: none; }
   .fc-pc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .fc-pc-see { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .fc-pc-explain { background: transparent; border: 0; padding: 0 0 0 6px; cursor: pointer; color: var(--sky, #2f6f9f); font-size: 11px; }
+  .fc-pc-i { background: transparent; border: 0; padding: 0 0 0 4px; margin: 0; cursor: pointer; color: var(--muted-2); font-size: 11px; line-height: 1; vertical-align: baseline; }
+  .fc-pc-i[aria-expanded="true"] { color: var(--ink); }
+  .fc-pc-flags .fc-pc-i { align-self: center; font-size: 13px; }
+  .fc-pc-help { display: none; font-size: 11px; line-height: 1.5; color: var(--ink); background: var(--paper, #f6f3ec); border-radius: 4px; padding: 6px 8px; margin: 0 0 6px; }
+  .fc-pc-help.open { display: block; }
   .fc-pc-skel { color: var(--muted-2); font-style: italic; }
   .fc-find { background: var(--white); border: 1px solid var(--hair); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
   /* Outreach */
