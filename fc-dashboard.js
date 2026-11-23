@@ -8185,6 +8185,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     lProbate: 'https://www.loudoun.gov/Faq.aspx?QID=1053',
     lTaxSales: 'https://www.loudoun.gov/1918/Tax-Sales',
     fClerk: 'https://www.fauquiercounty.gov/government/departments-a-g/circuit-court-clerk/frequently-asked-questions',
+    fSra: 'https://www.fauquiercounty.gov/government/departments-a-g/circuit-court-clerk/online-services/officer-of-the-court-remote-access-ocra/land-records-sra',
     fWills: 'https://www.fauquiercounty.gov/government/departments-a-g/circuit-court-clerk/wills-and-estates/research',
     fAccounts: 'https://www.fauquiercounty.gov/government/departments-a-g/circuit-court-clerk/wills-and-estates/commissioner-of-accounts',
     fTaxSale: 'https://www.fauquiercounty.gov/government/departments-h-z/treasurer-s-office/judicial-tax-sale',
@@ -8196,7 +8197,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
   const ddCode = (sec, label) => ({ label: label || `Va. Code § ${sec}`, url: `https://law.lis.virginia.gov/vacode/${sec}/` });
   const ddLand = pc => isMd(pc.jurisdiction) ? { label: 'MD Land Records (free account)', url: 'https://landrec.msa.maryland.gov/' }
     : pc.jurisdiction === 'fauquier'
-    ? { label: 'Fauquier land records (clerk)', url: DD_URL.fClerk }
+    ? { label: 'Fauquier land records (clerk)', url: DD_URL.fSra }
     : { label: 'Loudoun land-records index (free account)', url: DD_URL.lIndex };
   const DD_LINKS = {
     '1.1': pc => [ddLand(pc), pc.jurisdiction === 'loudoun' && /^\d{12}$/.test(pc.pin || '')
@@ -9245,6 +9246,116 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     return out;
   }
 
+  // ─── Where each hand check happens, and how to get in ─────────────────
+  // Access notes checked 2026-11-22 on each office's own page (Fauquier SRA
+  // page; Loudoun and MD Land Records per the 11/22 login research).
+  const S1_ACCESS = [
+    [/lisweb\.loudoun\.gov/, 'free account for the index; deed images $0.50 a page or $262 a year'],
+    [/land-records-sra/, 'online only by Clerk-approved subscription ($400 a year, two users; deeds from 1962, wills from 1991), or free at the Record Room, 29 Ashby St, Warrenton'],
+    [/circuit-court-clerk\/wills-and-estates/, 'will index online on the same $400 SRA subscription (from 1991); older wills at the Record Room, 29 Ashby St, Warrenton'],
+    [/landrec\.msa\.maryland\.gov/, 'free account; a one-time code is emailed at each sign-in'],
+    [/sdat\.dat\.maryland\.gov/, 'free, no account'],
+    [/registers\.maryland\.gov/, 'free, no account'],
+    [/egov\.maryland\.gov\/BusinessExpress/, 'free, no account'],
+    [/cis\.scc\.virginia\.gov/, 'free, no account'],
+    [/vacourts\.gov\/caseinfo/, 'free; pick the court, then search by name'],
+    [/pacer\.uscourts\.gov/, 'account required; $0.10 a page, no charge under $30 a quarter'],
+  ];
+  const s1Access = url => { for (const [re, t] of S1_ACCESS) if (re.test(url || '')) return t; return ''; };
+  function s1LinkHtml(x) {
+    const acc = s1Access(x.url);
+    return `<span class="fc-s1-link"><a target="_blank" rel="noopener" href="${escapeHtml(x.url)}">${escapeHtml(x.label)} ↗</a>${acc ? `<span class="fc-s1-acc">${escapeHtml(acc)}</span>` : ''}</span>`;
+  }
+  const S1_STATUTE = /law\.lis\.virginia\.gov|mgaleg\.maryland\.gov/;
+  // Every ✋ step gets the place to go: the module's own sources (not the
+  // statute links), with tax-collector links for the tax-type steps.
+  function s1AddWhere(mods, pc) {
+    const tax = isMd(pc.jurisdiction)
+      ? (MD_TAX_LINKS[pc.jurisdiction] ? [{ label: `${pc.county} tax account lookup`, url: MD_TAX_LINKS[pc.jurisdiction].lookup }] : [])
+      : (DD_LINKS['1.6'](pc) || []);
+    for (const m of mods) {
+      const src = (m.links || []).filter(l => l && l.url && !S1_STATUTE.test(l.url));
+      for (const l of m.leaves) {
+        if (l.st !== 'you' || l.links.length) continue;
+        if (/weed|abatement|payoff|principal tax|interest and penalties/i.test(l.label)) l.links = tax.slice(0, 1);
+        else if (/municipal lien/i.test(l.label)) l.links = [ddLand(pc)];
+        else l.links = src.slice(0, 2);
+      }
+    }
+    return mods;
+  }
+
+  // ─── Suggested approach (rules of thumb from the findings) ─────────────
+  // AJ's buy box (11/22): 1–10 acres, under $150K to $1M.
+  const BUY_BOX = { minAc: 1, maxAc: 10, maxPrice: 1000000 };
+  // Median sale ÷ assessed value, vacant rural 1–10 ac, 2023–26
+  // (research/2026-11-22-topic2-land-prices.md). Loudoun not measured.
+  const VACANT_SALE_RATIO = { fauquier: 1.00, frederick: 1.20, washington: 1.21, montgomery: 1.35 };
+  function s1LivesHere(pc) {
+    const key = t => { const m = String(t || '').toUpperCase().match(/^\s*(\d+)\s+([A-Z0-9]+)/); return m ? m[1] + ' ' + m[2] : null; };
+    const site = key(pc.address), mail = key((pc.mail || {}).line1);
+    return !!(site && site === mail);
+  }
+  function s1Approach(s, pc) {
+    const owner = pc.ownerHidden ? (s.owner_name || '') : (pc.owner || s.owner_name || '');
+    const kind = owner ? ownerKind(owner) : 'unknown';
+    const own = s1Owners(owner);
+    const a = pc.assessed || {};
+    const total = a.marketTotal != null ? a.marketTotal : a.total;
+    const ac = pc.acres;
+    const house = a.building > 0 || !!pc.hasStruct || !!pc.yearBuilt;
+    const lives = !pc.ownerHidden && s1LivesHere(pc);
+    const away = !pc.ownerHidden && screenAwayLabel(pc.mail, pc.state);
+    const sale = pc.sale || {};
+    const fit = [], who = [], before = [];
+    // Fit with the buy box
+    if (ac > BUY_BOX.maxAc) fit.push(`${fmtAcres(ac)} is more than your ${BUY_BOX.minAc}–${BUY_BOX.maxAc} acre target: buy it all and resell part, or offer to buy a piece, which needs the county to approve a division.`);
+    else if (ac > 0 && ac < BUY_BOX.minAc) fit.push(`${fmtAcres(ac)} is under ${BUY_BOX.minAc} acre, tight for a house, well and septic.`);
+    if (house) fit.push(`There's a house${a.building > 0 ? ` (building assessed at ${fmtMoney(a.building)})` : ''}${lives ? ', and the owner lives here (the tax bill goes to the property)' : ''}. You'd be buying a home, not raw land.`);
+    if (total > BUY_BOX.maxPrice) fit.push(`Assessed at ${fmtMoney(total)}, above your ${fmtMoney(BUY_BOX.maxPrice)} ceiling.`);
+    if (sale.price > 0 && !sale.nonMarket && sale.date) fit.push(`The owner paid ${fmtMoney(sale.price)} (${sale.date})${total > 0 ? `; the county now assesses it at ${fmtMoney(total)}` : ''}. Expect their price to start from today's value.`);
+    const ratio = VACANT_SALE_RATIO[pc.jurisdiction];
+    if (!house && ratio && total > 0 && ac >= 1 && ac <= 25) fit.push(`Vacant rural land here sold for about ${ratio.toFixed(2)}× its assessed value in 2023–26 (median), which puts this near ${fmtMoney(Math.round(total * ratio / 1000) * 1000)}. Single sales vary widely.`);
+    if (ac > BUY_BOX.maxAc && pc.zoningCode) fit.push(`Splitting: ${zoningHelp(pc)}`);
+    if (pc.build && !pc.build.pending && !pc.build.error && pc.build.flood > 0.25) fit.push(`About ${Math.round(pc.build.flood * 100)}% of it is in the 100-year floodplain.`);
+    if (pc.easement || (pc.overlays && pc.overlays.easementSpatial)) fit.push('A conservation easement limits building and splitting. Read the deed of easement first.');
+    // Who signs and how to reach them
+    const mailTo = pc.mail && pc.mail.line1 ? `the tax-bill address (${[pc.mail.line1, pc.mail.city, pc.mail.state].filter(Boolean).join(', ')})` : 'the tax-bill address';
+    if (!owner) who.push('The owner isn\'t on the free record. Get the name from the deed or SDAT first.');
+    else if (kind === 'trust') who.push(`Held in trust: write to ${own.trustees.length ? s1Names(own.trustees) : 'the trustee'} as trustee${own.trusts.length ? ` of the ${own.trusts[0].replace(/\s+(Agmt|Agreement)\b.*$/i, '').replace(/\s+U\/.*$/i, '')}` : ''}, at ${mailTo}. The trustee signs, if the trust gives the power to sell.`);
+    else if (kind === 'estate') who.push('Heirs or an estate: find out whether a personal representative has qualified (module 3). If so, write to them; if not, every heir signs. Expect a slower deal, and offer to handle the title work.');
+    else if (kind === 'entity') who.push(`A company owns it: confirm it's active and who can sign (module 4), then write to its registered agent and to ${mailTo}.`);
+    else if (own.people.length > 1 || /\bET\s?AL\b/i.test(owner)) who.push(`Several owners, and every one signs. Write to each owner you can find, not only ${mailTo}.`);
+    else who.push(`Write to the owner at ${mailTo}.`);
+    if (lives) who.push('They live on the property. Start with a letter that says plainly what you want (the whole property, or a piece of the land) before any visit or call.');
+    else if (away) who.push(`${away}: an as-is offer with a remote closing is the simplest thing to say yes to.`);
+    if (pc.delinquent) who.push(`Taxes are past due${pc.delinquent.balance != null ? ` (${fmtMoney(pc.delinquent.balance)})` : ''}: an offer that pays them off at closing solves a real problem for the owner. Say it plainly.`);
+    if (isMd(pc.jurisdiction)) {
+      const t = mdTaxState(pc);
+      if (t.state === 'sold') who.push(`A tax-sale buyer bought the lien in ${t.year}. The owner must redeem or risk losing it, so a sale that pays the lien off helps them (module 6 has the timing).`);
+    }
+    who.push('Use Letters in Nestscoop for the first letter and a follow-up two to three weeks later.');
+    // Before an offer
+    before.push('Read the last deed (module 1): its type, exactly who took title, and any easement or restriction.');
+    if (kind === 'trust') before.push(`Ask for a certification of trust naming the current trustee and their power to sell${isMd(pc.jurisdiction) ? '' : ' (§ 64.2-804)'}.`);
+    if (kind === 'estate') before.push('Get the will, the list of heirs, or the personal representative\'s qualification from the clerk or Register of Wills (module 3).');
+    if (kind === 'entity') before.push('Confirm the company is active and get a resolution or document showing who can sign (module 4).');
+    if (ac > BUY_BOX.maxAc) before.push(pc.jurisdiction === 'fauquier' ? 'Before proposing a split, ask Fauquier for a Subdivision Potential letter: it says how many lots the parcel still has.' : 'Before proposing a split, ask the county planning office how many lots the parcel can still make.');
+    if (!house) before.push('Make any offer subject to a passing perc (septic) evaluation and road access.');
+    before.push('Order a title search before closing. This screen isn\'t one.');
+    return { fit, who, before };
+  }
+  function s1ApproachHtml(ap) {
+    const grp = (t, list) => list.length ? `<div class="fc-s1-ap-h">${t}</div><ul class="fc-dd-find">${list.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : '';
+    return `<div class="fc-s1-approach"><h4>Suggested approach</h4>
+      ${grp('Fit with your buy box', ap.fit)}${grp('Who signs and how to reach them', ap.who)}${grp('Before you make an offer', ap.before)}
+      <div class="fc-pc-dim">Rules of thumb from the findings below, not legal advice.</div></div>`;
+  }
+  function s1ApproachPrint(ap) {
+    const grp = (t, list) => list.length ? `<div class="fc-ddr-t">${t}</div><div class="fc-ddr-f">${list.map(escapeHtml).join('<br>')}</div>` : '';
+    return `<div class="fc-ddr-stage">Suggested approach</div>${grp('Fit with your buy box', ap.fit)}${grp('Who signs and how to reach them', ap.who)}${grp('Before you make an offer', ap.before)}`;
+  }
+
   // Maryland statute text on mgaleg (article codes: grp Real Property, get
   // Estates & Trusts, gtp Tax-Property, gca Corporations & Associations, gpu Public Utilities).
   const mdCode = (article, sec, label) => ({ label, url: `https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=${article}&section=${sec}&enactments=false` });
@@ -9513,7 +9624,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
     },
   };
 
-  function s1Modules(s, pc) { return isMd(pc.jurisdiction) ? s1ModulesMD(s, pc) : s1ModulesVA(s, pc); }
+  function s1Modules(s, pc) { return s1AddWhere(isMd(pc.jurisdiction) ? s1ModulesMD(s, pc) : s1ModulesVA(s, pc), pc); }
 
   function s1Counts(mods) {
     const c = { found: 0, you: 0, na: 0, pending: 0 };
@@ -9529,7 +9640,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
 
   function s1LeafHtml(l) {
     return `<div class="fc-s1-leaf is-${l.st}"><span class="fc-s1-mk" title="${{ found: 'Found in public data', you: 'Yours to check', na: 'Not applicable here', pending: 'Checking' }[l.st]}">${S1_MARK[l.st]}</span>
-      <div><span class="fc-s1-lt">${escapeHtml(l.label)}</span>${l.text ? ` <span class="fc-s1-tx">${escapeHtml(l.text)}</span>` : ''}${l.links.length ? ` ${l.links.map(x => `<a target="_blank" rel="noopener" href="${escapeHtml(x.url)}">${escapeHtml(x.label)} ↗</a>`).join(' ')}` : ''}</div></div>`;
+      <div><span class="fc-s1-lt">${escapeHtml(l.label)}</span>${l.text ? ` <span class="fc-s1-tx">${escapeHtml(l.text)}</span>` : ''}${l.links.length ? `<span class="fc-s1-go">${l.links.map(s1LinkHtml).join('')}</span>` : ''}</div></div>`;
   }
 
   function renderStage1Panel() {
@@ -9559,6 +9670,7 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       <div class="fc-pc-sub">${title ? escapeHtml(title) + ' · ' : ''}${escapeHtml(pc.county || '')} · ${fmtAcres(pc.acres)} · PIN <span class="fc-mono">${escapeHtml(pc.pin)}</span></div>
       <div class="fc-s1-sum"><span><strong>${c.found}</strong> ✓ found</span><span><strong>${c.you}</strong> ✋ yours to check</span><span><strong>${c.na}</strong> — not applicable</span>${loading ? '<span class="fc-pc-dim">Still checking…</span>' : ''}</div>
       ${flags.length ? `<ul class="fc-s1-flags">${flags.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
+      ${s1ApproachHtml(s1Approach(s, pc))}
       <div class="fc-pc-links">
         <button class="fc-btn fc-btn-sm" data-s1="run"${running ? ' disabled' : ''}>${running ? 'Checking…' : 'Run checks again'}</button>
         <button class="fc-btn fc-btn-sm" data-s1="print">🖨 Report</button>
@@ -9624,8 +9736,9 @@ LEFT JOIN (SELECT c.mukey, STRING_AGG(ci.interphrc, '; ') AS reasons FROM compon
       <div class="fc-ddr-sub">${escapeHtml([pc.address || (s.unsaved ? '' : listingTitle(s)), fmtAcres(pc.acres), `${c.found} found`, `${c.you} to check by hand`, `${c.na} not applicable`].filter(Boolean).join(' · '))}</div>
       ${flags.length ? `<div class="fc-ddr-n">${flags.map(escapeHtml).join('<br>')}</div>` : ''}
       ${pc.loadingDetails || c.pending ? '<div class="fc-ddr-n">Some county data was still loading when this was printed.</div>' : ''}
+      ${s1ApproachPrint(s1Approach(s, pc))}
       ${mods.map(m => `<div class="fc-ddr-stage">${m.n}. ${escapeHtml(m.title)} — ${escapeHtml((DD_TONE[m.tone] || DD_TONE.unknown).label)}</div>
-        ${m.leaves.map(l => `<div class="fc-ddr-item"><div class="fc-ddr-box">${S1_MARK[l.st]}</div><div><div class="fc-ddr-t">${escapeHtml(l.label)}</div>${l.text ? `<div class="fc-ddr-f">${escapeHtml(l.text)}</div>` : ''}</div></div>`).join('')}
+        ${m.leaves.map(l => `<div class="fc-ddr-item"><div class="fc-ddr-box">${S1_MARK[l.st]}</div><div><div class="fc-ddr-t">${escapeHtml(l.label)}</div>${l.text ? `<div class="fc-ddr-f">${escapeHtml(l.text)}</div>` : ''}${l.st === 'you' && l.links.length ? `<div class="fc-ddr-f">${l.links.map(x => escapeHtml(`${x.label}: ${x.url}${s1Access(x.url) ? ` (${s1Access(x.url)})` : ''}`)).join('<br>')}</div>` : ''}</div></div>`).join('')}
         ${m.lines.length ? `<div class="fc-ddr-f fc-s1r-lines">${m.lines.map(escapeHtml).join('<br>')}</div>` : ''}
         ${s1Marks(s, m.n).map(t => `<div class="fc-ddr-n">Checklist: ${escapeHtml(t)}</div>`).join('')}`).join('')}
       <div class="fc-ddr-stage">Also worth knowing</div>
@@ -13896,6 +14009,12 @@ Return ONLY the 2-sentence analysis.`,
   .fc-s1-leaf { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; font-size: 12px; line-height: 1.45; padding: 4px 6px; border-radius: 6px; background: var(--paper); border: 1px solid var(--hair); }
   .fc-s1-leaf.is-na { opacity: 0.65; }
   .fc-s1-leaf a { color: var(--sky); text-decoration: none; white-space: nowrap; }
+  .fc-s1-go { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+  .fc-s1-link { display: block; }
+  .fc-s1-acc { display: block; font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .fc-s1-approach { margin: 8px 0 4px; padding: 8px 10px; background: var(--sky-soft); border-radius: 6px; }
+  .fc-s1-approach h4 { margin-top: 0; }
+  .fc-s1-ap-h { font-size: 12px; font-weight: 600; color: var(--ink); margin-top: 6px; }
   .fc-s1-mk { font-weight: 700; text-align: center; }
   .fc-s1-leaf.is-found .fc-s1-mk { color: var(--sage); }
   .fc-s1-leaf.is-you .fc-s1-mk { color: var(--gold-ink); }
