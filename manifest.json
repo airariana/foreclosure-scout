@@ -1,7 +1,7 @@
 {
   "name": "Nestscoop",
   "short_name": "Nestscoop",
-  "description": "DC/MD/VA foreclosure + distress-property intelligence",
+  "description": "Off-market land search and pre-screening for Virginia and Maryland",
   "start_url": "./foreclosure-scout.html",
   "display": "standalone",
   "background_color": "#0E1728",
@@ -30,10 +30,10 @@
   "categories": ["finance", "business"],
   "shortcuts": [
     {
-      "name": "Search Listings",
-      "short_name": "Search",
-      "description": "Search DC/MD/VA foreclosure listings",
-      "url": "./foreclosure-scout.html",
+      "name": "Land pipeline",
+      "short_name": "Land",
+      "description": "Find and pre-screen land",
+      "url": "./foreclosure-scout.html#area-focus",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]

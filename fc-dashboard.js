@@ -1795,10 +1795,10 @@
       });
     });
     // Restore view from URL hash
-    const initial = (location.hash || '#dashboard').replace('#', '');
+    const initial = (location.hash || '#' + HOME_VIEW).replace('#', '');
     setView(initial);
     window.addEventListener('hashchange', () => {
-      const v = (location.hash || '#dashboard').replace('#', '');
+      const v = (location.hash || '#' + HOME_VIEW).replace('#', '');
       setView(v);
     });
   }
@@ -1936,9 +1936,12 @@
     }
   }
 
+  // The land pipeline (Area Focus) is home. The foreclosure views were retired
+  // 2026-11-22 with the scraper that fed them; old bookmarks land here.
+  const HOME_VIEW = 'area-focus';
   function setView(view) {
-    const valid = ['dashboard', 'listings', 'deals', 'area-focus', 'map', 'alerts', 'zillow-queue', 'financing-203k', 'rehab', 'market', 'brrrr', 'settings'];
-    if (!valid.includes(view)) view = 'dashboard';
+    const valid = ['area-focus', 'settings'];
+    if (!valid.includes(view)) view = HOME_VIEW;
     if (location.hash !== '#' + view) {
       history.replaceState(null, '', '#' + view);
     }
@@ -2008,6 +2011,7 @@
 
     // Update page title + eyebrow per view
     const titles = {
+      'area-focus': 'Land pipeline',
       dashboard: 'Command Center',
       listings:  'All Listings',
       map:       'Property Map',
@@ -11554,6 +11558,14 @@ Return ONLY the 2-sentence analysis.`,
     }
   }
 
+  function setHeaderDate() {
+    const eyebrow = document.getElementById('fc-date-eyebrow');
+    if (!eyebrow) return;
+    const d2 = new Date();
+    const week = Math.ceil(((d2 - new Date(d2.getFullYear(), 0, 1)) / 86400000 + 1) / 7);
+    eyebrow.textContent = `${d2.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · Week ${week}`;
+  }
+
   // ─── KPI computation + rendering ────────────────────────────────────────
   function renderKPIs(d) {
     d = filterByState(d);
@@ -11710,11 +11722,11 @@ Return ONLY the 2-sentence analysis.`,
       applyRoleToDom();
     }
     buildShell();
-    loadData();
+    setHeaderDate();
 
-    // Now that the shell is up and setView('dashboard') ran (because hash
-    // was empty at buildShell time), re-apply the user's intended view.
-    if (deferredHash && deferredHash !== 'dashboard') {
+    // Now that the shell is up and the home view ran (the hash was empty at
+    // buildShell time), re-apply the user's intended view.
+    if (deferredHash && deferredHash !== HOME_VIEW) {
       try { history.replaceState(null, '', location.pathname + location.search + '#' + deferredHash); }
       catch (e) { /* ignore */ }
       setView(deferredHash);
@@ -11765,22 +11777,12 @@ Return ONLY the 2-sentence analysis.`,
       </div>
       <div class="fc-topbar-sep"></div>
       <div class="fc-workspace">
-        <strong>DC/MD/VA Foreclosures</strong>
+        <strong>Land</strong>
         ${ICO.chevR}
-        <span>Command Center</span>
-      </div>
-      <div class="fc-tb-search" id="fc-tb-search-wrap">
-        ${ICO.search}
-        <input id="fc-tb-search-input" type="text"
-          placeholder="Search address, county, zip, case #…"
-          autocomplete="off" spellcheck="false">
-        <kbd id="fc-tb-search-kbd">⌘K</kbd>
-        <div id="fc-tb-search-results" class="fc-tb-search-results" style="display:none"></div>
+        <span>VA · MD</span>
       </div>
       <div class="fc-tb-right">
-        <button class="fc-tb-btn" title="Notifications">${ICO.bell}</button>
         <button class="fc-tb-btn" id="fc-tb-keys" title="Data Keys">${ICO.gear}</button>
-        <button class="fc-tb-btn fc-primary" id="fc-tb-watchlist" title="View watchlisted properties">${ICO.plus} Watchlist <span id="fc-tb-watchlist-count" class="fc-state-count" style="margin-left:4px">0</span></button>
         <!-- Role indicator + sign out: click to log out. -->
         <button class="fc-tb-btn fc-role-chip" id="fc-tb-role" title="Sign out"></button>
       </div>
@@ -11792,24 +11794,8 @@ Return ONLY the 2-sentence analysis.`,
     <div class="fc-body">
       <div class="fc-sidebar" id="fc-sidebar">
         <div class="fc-side-section">
-          <div class="fc-side-label">Properties</div>
-          <div class="fc-side-item active" data-view="dashboard">${ICO.home}<span>Dashboard</span></div>
-          <div class="fc-side-item" data-view="listings">${ICO.building}<span>Listings</span><span class="fc-side-count" id="fc-sc-listings">—</span></div>
-          <div class="fc-side-item" data-view="deals">${ICO.chart}<span>Deals</span><span class="fc-side-count" id="fc-sc-deals">—</span></div>
-          <div class="fc-side-item" data-view="area-focus">${ICO.map}<span>Area Focus</span><span class="fc-side-count" id="fc-sc-area">—</span></div>
-          <div class="fc-side-item" data-view="map">${ICO.map}<span>Map</span></div>
-          <div class="fc-side-item" data-view="alerts">${ICO.bell}<span>Alerts</span><span class="fc-side-count">0</span></div>
-        </div>
-        <div class="fc-side-section">
-          <div class="fc-side-label">Tools</div>
-          <div class="fc-side-item" data-view="zillow-queue">${ICO.plus}<span>Zillow Queue</span><span class="fc-side-count" id="fc-sc-zqueue">—</span></div>
-          <div class="fc-side-item" data-view="rehab">${ICO.calc}<span>Rehab Calculator</span></div>
-          <div class="fc-side-item" data-view="market">${ICO.chart}<span>Market Analysis</span></div>
-          <div class="fc-side-item" data-view="brrrr">${ICO.book}<span>BRRRR Calculator</span></div>
-        </div>
-        <div class="fc-side-section">
-          <div class="fc-side-label">Financing</div>
-          <div class="fc-side-item" data-view="financing-203k">${ICO.book}<span>203(k) HUD Homes</span><span class="fc-side-count" id="fc-sc-203k">—</span></div>
+          <div class="fc-side-label">Land</div>
+          <div class="fc-side-item active" data-view="area-focus">${ICO.map}<span>Land pipeline</span><span class="fc-side-count" id="fc-sc-area">—</span></div>
         </div>
         <div class="fc-side-section">
           <div class="fc-side-label">Workspace</div>
@@ -11817,7 +11803,7 @@ Return ONLY the 2-sentence analysis.`,
         </div>
         <div class="fc-side-footer">
           <div class="fc-eyebrow" style="margin-bottom:6px">Coverage</div>
-          <span class="fc-pill gold">DC · MD · VA</span>
+          <span class="fc-pill gold">VA · MD</span>
         </div>
       </div>
 
@@ -11826,21 +11812,10 @@ Return ONLY the 2-sentence analysis.`,
           <div class="fc-page-head">
             <div>
               <div class="fc-eyebrow" style="margin-bottom:8px" id="fc-date-eyebrow">Loading…</div>
-              <h1 class="fc-page-title">Command Center</h1>
+              <h1 class="fc-page-title">Land pipeline</h1>
               <div class="fc-page-sub">
-                <span class="fc-pill sage" style="margin-right:8px"><span class="fc-dot"></span> Live data</span>
-                <span id="fc-subline">Pipeline warming up.</span>
+                <span id="fc-subline">Western Loudoun and Fauquier, VA · Frederick, Washington and Montgomery, MD. Parcels are looked up from county and state records each time you open one.</span>
               </div>
-            </div>
-            <div class="fc-page-actions">
-              <div class="fc-state-chips" id="fc-state-chips" role="group" aria-label="Filter by state">
-                <button class="fc-btn fc-btn-sm fc-state-chip active" data-state="ALL">All <span class="fc-state-count" id="fc-state-count-ALL">—</span></button>
-                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="VA">VA <span class="fc-state-count" id="fc-state-count-VA">—</span></button>
-                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="MD">MD <span class="fc-state-count" id="fc-state-count-MD">—</span></button>
-                <button class="fc-btn fc-btn-sm fc-state-chip" data-state="DC">DC <span class="fc-state-count" id="fc-state-count-DC">—</span></button>
-              </div>
-              <button class="fc-btn">${ICO.plus} Add watchlist</button>
-              <button class="fc-btn fc-btn-dark">${ICO.search} Search listings</button>
             </div>
           </div>
 

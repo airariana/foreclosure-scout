@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Nestscoop — DC/MD/VA Foreclosures</title>
+<title>Nestscoop — Land</title>
 
   <!-- Cache Control - Force Refresh -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1152,7 +1152,7 @@ header,
 </style>
 <!-- Desktop dashboard rebuild (Mercantile Precision): topbar + sidebar + main
      dashboard view. Mobile PWA (<769px) bypasses this and keeps existing layout. -->
-<script src="fc-dashboard.js?v=101"></script>
+<script src="fc-dashboard.js?v=102"></script>
 </head>
 <body>
 <div class="mobile-frame">
@@ -4695,25 +4695,14 @@ window.addEventListener('resize', () => {
 });
 // ── Init ──────────────────────────────────────────────────────────────────────
 updateAlertBadge(); updateApiDots(); updateKeyStatus();
-setTimeout(()=>{ loadMDNOI(); loadUSDA(); }, 1500);
 checkiOS();
 document.getElementById('alertModal').addEventListener('click',function(e){if(e.target===this)closeAlerts();});
 document.getElementById('boolInput').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
 </script>
 <script>
-(function(){
-  // Skip Maps SDK entirely when no key is configured — avoids the noisy
-  // "DeveloperError" overlay and lets users land in the app, go to
-  // Settings → Data Keys, paste their key, and reload.
-  if (!window.GOOGLE_MAPS_API_KEY) {
-    window.initMap = function(){};
-    return;
-  }
-  const s = document.createElement('script');
-  s.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_API_KEY}&callback=initMap`;
-  s.async = true; s.defer = true;
-  document.head.appendChild(s);
-})();
+// The foreclosure map (Google Maps) was retired 2026-11-22 with the
+// foreclosure scraper; the land pipeline uses its own Leaflet map.
+window.initMap = function(){};
 </script>
 </div><!-- /app -->
 </div><!-- /mobile-frame -->
@@ -4734,7 +4723,6 @@ document.getElementById('boolInput').addEventListener('keydown',e=>{if(e.key==='
   </div>
 </div>
 
-<button class="floating-calendar-btn" onclick="toggleAuctionCalendar()" title="View Auction Calendar">📅</button>
 
 <script>
 // ═══ Auction Calendar Functions ════════════════════════════════════════════
